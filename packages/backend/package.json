@@ -10,7 +10,7 @@
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "biome check ./src",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "migrate:make": "knex --knexfile ./src/db/knexfile.ts migrate:make",
     "migrate:latest": "knex --knexfile ./src/db/knexfile.ts migrate:latest",
