@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile=false
+
+      - name: Build
+        run: pnpm -r run build
+
+      - name: Build release tarball
+        run: |
+          mkdir -p release-staging/cloudgate
+          cp -r packages/backend/dist release-staging/cloudgate/backend
+          cp -r packages/frontend/dist release-staging/cloudgate/frontend
+          cp -r packages/recovery-ui/dist release-staging/cloudgate/recovery-ui
+          cp packages/backend/.version release-staging/cloudgate/
+          cp CHANGELOG.md release-staging/cloudgate/ 2>/dev/null || echo "(no CHANGELOG yet)" > release-staging/cloudgate/CHANGELOG.md
+          cd release-staging
+          tar -czf ../cloudgate-${{ steps.version.outputs.tag }}.tar.gz cloudgate
+
+      - name: Generate SHA256
+        run: sha256sum cloudgate-${{ steps.version.outputs.tag }}.tar.gz > cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sha256
+
+      - name: Import GPG key
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          gpg --list-secret-keys
+
+      - name: Sign release artifact
+        if: ${{ secrets.GPG_PRIVATE_KEY != '' }}
+        run: |
+          gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            --detach-sign --armor \
+            --output cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sig \
+            cloudgate-${{ steps.version.outputs.tag }}.tar.gz
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.version.outputs.tag }}
+          generate_release_notes: true
+          files: |
+            cloudgate-${{ steps.version.outputs.tag }}.tar.gz
+            cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sha256
+            cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sig
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/elias02345/cloudgate:${{ steps.version.outputs.tag }}
+            ghcr.io/elias02345/cloudgate:latest
+            ghcr.io/elias02345/cloudgate:main
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

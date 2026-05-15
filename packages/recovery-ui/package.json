@@ -1,0 +1,23 @@
+{
+  "name": "@cloudgate/recovery-ui",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Minimal fallback UI for when the main backend cannot start. Anti-brick guarantee.",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check ./src"
+  },
+  "dependencies": {
+    "express": "^5.0.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

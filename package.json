@@ -1,0 +1,32 @@
+{
+  "name": "cloudgate",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Self-hosted WebUI for Cloudflare Tunnels — host services behind CGNAT without port forwarding",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Elias02345/CloudGate.git"
+  },
+  "license": "MIT",
+  "author": "Elias Kanakidis",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "dev": "pnpm -r --parallel run dev",
+    "build": "pnpm -r run build",
+    "lint": "pnpm -r run lint",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "format": "biome format --write .",
+    "clean": "pnpm -r exec rm -rf dist node_modules .turbo",
+    "docker:build": "docker build -f docker/Dockerfile -t cloudgate:local .",
+    "docker:dev": "docker compose -f docker/docker-compose.dev.yml up --build"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.7.2"
+  }
+}

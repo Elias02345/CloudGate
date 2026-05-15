@@ -1,0 +1,25 @@
+# CloudGate production-style compose file.
+# For end users who prefer compose over `docker run`.
+#
+# Quickstart:
+#   docker compose -f docker/docker-compose.yml up -d
+
+services:
+  cloudgate:
+    image: ghcr.io/elias02345/cloudgate:latest
+    container_name: cloudgate
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - cloudgate-data:/data
+    # All env vars are OPTIONAL (see .env.example).
+    # Leave them out and CloudGate generates secure defaults.
+    # environment:
+    #   - CLOUDGATE_INITIAL_ADMIN_EMAIL=admin@example.com
+    #   - TZ=Europe/Berlin
+
+volumes:
+  cloudgate-data:
+    driver: local

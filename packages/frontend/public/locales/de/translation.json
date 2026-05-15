@@ -1,0 +1,26 @@
+{
+  "common": {
+    "loading": "Lädt…",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten"
+  },
+  "login": {
+    "title": "Anmelden",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "submit": "Anmelden",
+    "invalid_email": "Gültige E-Mail-Adresse eingeben",
+    "password_required": "Passwort erforderlich"
+  },
+  "dashboard": {
+    "title": "Übersicht",
+    "backend_status": "Backend-Status",
+    "version": "Version",
+    "healthy": "Erreichbar",
+    "degraded": "Eingeschränkt",
+    "unreachable": "Nicht erreichbar",
+    "placeholder_hint": "Hosts, Tunnels und Cloudflare-Account-Verwaltung kommen in M1."
+  }
+}

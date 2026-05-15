@@ -1,0 +1,22 @@
+# Dev compose: builds the image locally + bind-mounts source for fast iteration.
+# Use:  pnpm docker:dev
+
+services:
+  cloudgate-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: cloudgate-dev
+    restart: "no"
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - cloudgate-dev-data:/data
+    environment:
+      - NODE_ENV=development
+      - CLOUDGATE_LOG_LEVEL=debug
+
+volumes:
+  cloudgate-dev-data:
+    driver: local

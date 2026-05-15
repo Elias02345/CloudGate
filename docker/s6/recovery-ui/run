@@ -1,0 +1,7 @@
+#!/command/with-contenv sh
+# Recovery UI — runs on port 8001 always.
+# nginx fronts it on :80 only when bootstrap failed (see nginx/run).
+# Cheap to keep running; useful entry point even on a healthy system.
+
+cd /app/recovery-ui
+exec env RECOVERY_PORT=8001 node dist/index.js

@@ -1,0 +1,27 @@
+# Default: let git decide based on content.
+* text=auto eol=lf
+
+# Force LF for anything that runs in Linux containers — CRLF breaks shebangs.
+*.sh           text eol=lf
+*.bash         text eol=lf
+*.yml          text eol=lf
+*.yaml         text eol=lf
+*.conf         text eol=lf
+Dockerfile     text eol=lf
+docker/s6/**   text eol=lf
+docker/**      text eol=lf
+
+# Force CRLF only for files that explicitly need it (Windows scripts).
+*.bat          text eol=crlf
+*.cmd          text eol=crlf
+*.ps1          text eol=crlf
+
+# Binary files: never touch.
+*.png          binary
+*.jpg          binary
+*.gif          binary
+*.ico          binary
+*.pem          binary
+*.gpg          binary
+*.tar.gz       binary
+*.zip          binary

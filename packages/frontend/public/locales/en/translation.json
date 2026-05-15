@@ -1,0 +1,26 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit"
+  },
+  "login": {
+    "title": "Sign in",
+    "email": "Email",
+    "password": "Password",
+    "submit": "Sign in",
+    "invalid_email": "Enter a valid email",
+    "password_required": "Password is required"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "backend_status": "Backend status",
+    "version": "Version",
+    "healthy": "Healthy",
+    "degraded": "Degraded",
+    "unreachable": "Unreachable",
+    "placeholder_hint": "Hosts, tunnels and Cloudflare account management land in M1."
+  }
+}

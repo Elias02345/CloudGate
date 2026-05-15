@@ -1,0 +1,14 @@
+#!/command/with-contenv sh
+# Backend service. Starts only if bootstrap succeeded.
+# If bootstrap failed, recovery-ui takes the port instead.
+
+outcome=$(cat /data/.bootstrap-outcome 2>/dev/null || echo "unknown")
+
+if [ "$outcome" != "ok" ]; then
+    echo "[backend] Bootstrap outcome=$outcome — refusing to start, letting recovery-ui take over"
+    # Sleep forever so s6 doesn't restart-loop us; recovery-ui handles the port.
+    exec sleep infinity
+fi
+
+cd /app/backend
+exec node dist/index.js

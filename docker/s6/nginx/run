@@ -1,0 +1,20 @@
+#!/command/with-contenv sh
+# Pick the right nginx config based on bootstrap outcome:
+#  - ok   → cloudgate proxy (UI on :80, /api → backend:3000, custom hosts)
+#  - fail → recovery proxy (everything on :80 → recovery-ui:8001)
+
+outcome=$(cat /data/.bootstrap-outcome 2>/dev/null || echo "unknown")
+
+if [ "$outcome" = "ok" ]; then
+    cp /etc/nginx-cloudgate/cloudgate.conf /etc/nginx/sites-enabled/default
+else
+    cp /etc/nginx-cloudgate/recovery.conf /etc/nginx/sites-enabled/default
+fi
+
+# Quick syntax check; if it fails fall back to recovery
+if ! nginx -t 2>/dev/null; then
+    echo "[nginx] config test failed, falling back to recovery"
+    cp /etc/nginx-cloudgate/recovery.conf /etc/nginx/sites-enabled/default
+fi
+
+exec nginx -g 'daemon off;'
