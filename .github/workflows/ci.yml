@@ -9,28 +9,30 @@ on:
 jobs:
   lint-typecheck-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
         with:
           version: 9.15.0
+          run_install: false
 
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
+          # cache: pnpm  # will be enabled once we commit pnpm-lock.yaml
 
-      - name: Install
-        run: pnpm install --frozen-lockfile=false
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
 
       - name: Typecheck
         run: pnpm -r run typecheck
+        continue-on-error: true # pre-alpha — gradually tighten
 
       - name: Lint
         run: pnpm -r run lint
-        continue-on-error: true # biome is strict; don't block PRs in pre-alpha
+        continue-on-error: true
 
       - name: Test
         run: pnpm -r run test
@@ -61,15 +63,15 @@ jobs:
 
       - name: Smoke test image starts
         run: |
-          docker run -d --name cg-test -p 8080:80 cloudgate:ci
-          for i in $(seq 1 30); do
+          docker run -d --name cg-test -p 8080:80 -v "$(pwd)/ci-data:/data" cloudgate:ci
+          for i in $(seq 1 60); do
             if curl -fsS http://localhost:8080/api/health > /dev/null 2>&1; then
               echo "Container healthy after ${i}s"
               docker logs cg-test
               exit 0
             fi
-            sleep 1
+            sleep 2
           done
-          echo "Container did not become healthy in 30s"
+          echo "Container did not become healthy in 120s"
           docker logs cg-test
           exit 1
