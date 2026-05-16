@@ -26,6 +26,11 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
 
+      # Build first — pnpm -r runs in topological order, so shared/dist
+      # exists before backend/frontend typecheck against it.
+      - name: Build
+        run: pnpm -r run build
+
       - name: Typecheck
         run: pnpm -r run typecheck
         continue-on-error: true # pre-alpha — gradually tighten
@@ -36,9 +41,6 @@ jobs:
 
       - name: Test
         run: pnpm -r run test
-
-      - name: Build
-        run: pnpm -r run build
 
   docker-build:
     runs-on: ubuntu-latest

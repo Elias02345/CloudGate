@@ -117,7 +117,7 @@ cloudflareRouter.delete('/accounts/:id', requireAuth, requirePasswordSet, async 
 		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 		return;
 	}
-	const id = Number.parseInt(req.params.id ?? '', 10);
+	const id = Number.parseInt(String(req.params.id ?? ''), 10);
 	if (!Number.isFinite(id)) {
 		res.status(400).json({ error: 'Invalid id', code: 'BAD_REQUEST' });
 		return;
@@ -138,7 +138,7 @@ cloudflareRouter.post('/accounts/:id/sync', requireAuth, requirePasswordSet, asy
 		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 		return;
 	}
-	const id = Number.parseInt(req.params.id ?? '', 10);
+	const id = Number.parseInt(String(req.params.id ?? ''), 10);
 	const account = await getAccountById(id, req.user.id);
 	if (!account) {
 		res.status(404).json({ error: 'Account not found', code: 'NOT_FOUND' });
@@ -164,7 +164,7 @@ cloudflareRouter.get('/accounts/:id/zones', requireAuth, requirePasswordSet, asy
 		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 		return;
 	}
-	const id = Number.parseInt(req.params.id ?? '', 10);
+	const id = Number.parseInt(String(req.params.id ?? ''), 10);
 	const account = await getAccountById(id, req.user.id);
 	if (!account) {
 		res.status(404).json({ error: 'Account not found', code: 'NOT_FOUND' });

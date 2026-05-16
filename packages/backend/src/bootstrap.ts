@@ -62,7 +62,9 @@ export async function runBootstrap(): Promise<BootstrapStatus> {
 		steps.push(step);
 
 		try {
-			await STEP_RUNNERS[stepName]();
+			const runner = STEP_RUNNERS[stepName];
+			if (!runner) throw new Error(`Unknown bootstrap step: ${stepName}`);
+			await runner();
 			step.status = 'completed';
 			step.finished_at = new Date().toISOString();
 			log.info({ step: stepName }, 'Bootstrap step completed');
