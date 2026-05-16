@@ -82,8 +82,8 @@ backupRouter.get('/', requireAuth, requirePasswordSet, requireAdmin, async (req,
 		].filter((p) => p) // tar filters out non-existent on its own
 	);
 
-	tarStream.on('error', (err) => {
-		log.error({ err: err.message }, 'tar pipeline error');
+	tarStream.on('error', (err: unknown) => {
+		log.error({ err: (err as Error).message }, 'tar pipeline error');
 		if (!res.headersSent) res.status(500).json({ error: 'tar failed', code: 'BACKUP_FAILED' });
 	});
 
