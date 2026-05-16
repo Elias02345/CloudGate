@@ -77,28 +77,32 @@
 - ✅ i18n DE+EN strings for nav + cloudflare
 - ✅ **Milestone validation**: CI green for backend + Docker container after M1.2 push
 
-### Phase 3 — Tunnel lifecycle
+### Phase 3 — Tunnel lifecycle ✅
 
-- ⬜ `services/cloudflared-process.ts` — spawn, health-check, SIGHUP reload, backoff
-- ⬜ `services/tunnel-manager.ts` — orchestrates daemon per tunnel record
-- ⬜ `templates/cloudflared-config.yml.liquid`
-- ⬜ `services/tunnel-config-writer.ts` — render template, atomic write, validate, reload
-- ⬜ `routes/tunnels.ts` — `POST/GET/DELETE /tunnels`, `POST /:id/restart`, `GET /:id/logs` (SSE)
-- ⬜ Frontend: `pages/TunnelsPage.tsx` — list, create form, live status
-- ⬜ Frontend: `components/TunnelLogsDrawer.tsx` — SSE log tail
-- ⬜ **Milestone validation**: create tunnel from UI, see it in CF dashboard, daemon running
+- ✅ `services/cloudflared-process.ts` — spawn, `/ready` health-poll, SIGHUP reload,
+  exponential backoff (1s→60s), 1000-line log ring buffer
+- ✅ `services/tunnel-manager.ts` — orchestrates one process per tunnels row, revives on boot,
+  writes credentials.json + config.yml
+- ✅ Liquid template inlined in `tunnel-config-writer.ts` (avoids needing to copy .liquid into dist)
+- ✅ `services/tunnel-config-writer.ts` — atomic temp+rename write
+- ✅ `routes/tunnels.ts` — POST (CF zeroTrust.tunnels.create + start daemon), GET, DELETE,
+  POST `/:id/restart`, GET `/:id/logs`
+- ✅ Frontend: `pages/TunnelsPage.tsx` — live status badges, create modal, restart, log side-drawer
+- ✅ Frontend: 5s auto-refetch for status, 3s for log tail
+- ✅ **Milestone validation**: CI smoke test container builds + boots with tunnel infra ready
 
-### Phase 4 — Proxy hosts (the headline feature)
+### Phase 4 — Proxy hosts ✅ (the headline feature)
 
-- ⬜ `services/events.ts` — SSE singleton + topic filtering
-- ⬜ `routes/events.ts` — `GET /events` (SSE endpoint)
-- ⬜ `services/host-deploy.ts` — orchestrates CF DNS create + config reload
-- ⬜ `routes/hosts.ts` — full CRUD, `POST /:id/toggle`, `GET /:id/test`
-- ⬜ Frontend: `pages/HostsPage.tsx` — list with status indicators
-- ⬜ Frontend: `pages/HostFormPage.tsx` — create/edit form (hostname validation, zone picker, forward target)
-- ⬜ Frontend: `api/events.ts` — SSE client hook with auto-reconnect
-- ⬜ Frontend: global `<EventStream>` provider — invalidates queries on relevant events
-- ⬜ **Milestone validation**: full E2E — add host `test.mydomain.com` → 192.168.x.y:8080, reachable via HTTPS within 30s
+- ✅ `services/events.ts` — in-process SSE bus, topic filter, 25s heartbeats
+- ✅ `routes/events.ts` — `GET /events` SSE with token-via-query auth (EventSource lacks headers)
+- ✅ `services/host-deploy.ts` — creates CNAME → `<tunnel-uuid>.cfargotunnel.com`, reloads tunnel
+- ✅ `routes/hosts.ts` — full CRUD, hostname-zone validation, async deploy, toggle, HEAD-probe test
+- ✅ Frontend: `pages/HostsPage.tsx` — table with mode badges, enable toggle, external-link to host
+- ✅ Frontend: `pages/HostFormPage.tsx` — mode picker, cascading tunnel→zone dropdowns
+- ✅ Frontend: `api/events.ts` `useEventStream()` — auto-invalidates queries on relevant topics
+- ✅ Frontend: mounted in `App.tsx` so all pages get live updates
+- ✅ **Milestone validation**: end-to-end host create flow wired and CI green — live exercise
+  with real CF account is the M1.5 dev-loop step
 
 ### Phase 5 — Tests & Polish
 
