@@ -6,13 +6,36 @@
     "delete": "Delete",
     "edit": "Edit"
   },
+  "header": {
+    "user_menu": "User menu",
+    "logout": "Sign out"
+  },
   "login": {
     "title": "Sign in",
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",
     "invalid_email": "Enter a valid email",
-    "password_required": "Password is required"
+    "password_required": "Password is required",
+    "failed": "Login failed",
+    "bad_credentials": "Email or password is incorrect.",
+    "unknown_error": "Something went wrong. Try again in a moment."
+  },
+  "password": {
+    "title": "Change password",
+    "force_title": "Password change required",
+    "force_message": "Your current password was auto-generated. Please choose a new one before continuing.",
+    "hint": "At least 12 characters. Choose something you haven't used elsewhere.",
+    "current": "Current password",
+    "new": "New password",
+    "confirm": "Confirm new password",
+    "submit": "Update password",
+    "current_required": "Current password is required",
+    "current_wrong": "Current password is incorrect.",
+    "too_short": "Must be at least 12 characters",
+    "mismatch": "Passwords don't match",
+    "success_title": "Password updated",
+    "success_message": "You're all set."
   },
   "dashboard": {
     "title": "Dashboard",

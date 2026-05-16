@@ -17,6 +17,10 @@ export type Tunnel = z.infer<typeof TunnelSchema>;
 
 export const CreateTunnelRequestSchema = z.object({
 	cloudflare_account_id: z.number().int().positive(),
-	name: z.string().min(1).max(100).regex(/^[a-zA-Z0-9-_]+$/),
+	name: z
+		.string()
+		.min(1)
+		.max(100)
+		.regex(/^[a-zA-Z0-9-_]+$/),
 });
 export type CreateTunnelRequest = z.infer<typeof CreateTunnelRequestSchema>;

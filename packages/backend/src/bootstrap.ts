@@ -102,19 +102,20 @@ export async function runBootstrap(): Promise<BootstrapStatus> {
 // ===========================================================================
 
 async function checkDiskHealth(): Promise<void> {
-	const cfg = getConfig();
+	// dataPath() reads live env (CLOUDGATE_DATA_DIR) — important for tests that
+	// swap data dirs after module load.
+	const dir = dataPath();
 	try {
-		await mkdir(cfg.DATA_DIR, { recursive: true });
+		await mkdir(dir, { recursive: true });
 	} catch (err) {
-		throw new Error(`Cannot create or access DATA_DIR (${cfg.DATA_DIR}): ${(err as Error).message}`);
+		throw new Error(`Cannot create or access DATA_DIR (${dir}): ${(err as Error).message}`);
 	}
-	// Quick writability check — write & remove a small file
 	const probe = dataPath('.write-probe');
 	try {
 		await writeFile(probe, 'ok', 'utf8');
 		await unlink(probe);
 	} catch (err) {
-		throw new Error(`DATA_DIR (${cfg.DATA_DIR}) is not writable: ${(err as Error).message}`);
+		throw new Error(`DATA_DIR (${dir}) is not writable: ${(err as Error).message}`);
 	}
 }
 

@@ -6,13 +6,36 @@
     "delete": "Löschen",
     "edit": "Bearbeiten"
   },
+  "header": {
+    "user_menu": "Benutzermenü",
+    "logout": "Abmelden"
+  },
   "login": {
     "title": "Anmelden",
     "email": "E-Mail",
     "password": "Passwort",
     "submit": "Anmelden",
     "invalid_email": "Gültige E-Mail-Adresse eingeben",
-    "password_required": "Passwort erforderlich"
+    "password_required": "Passwort erforderlich",
+    "failed": "Anmeldung fehlgeschlagen",
+    "bad_credentials": "E-Mail oder Passwort ist falsch.",
+    "unknown_error": "Etwas ging schief. Bitte erneut versuchen."
+  },
+  "password": {
+    "title": "Passwort ändern",
+    "force_title": "Passwort-Änderung erforderlich",
+    "force_message": "Dein aktuelles Passwort wurde automatisch erzeugt. Bitte wähle ein neues, bevor es weiter geht.",
+    "hint": "Mindestens 12 Zeichen. Nutze ein Passwort, das du sonst nirgends verwendest.",
+    "current": "Aktuelles Passwort",
+    "new": "Neues Passwort",
+    "confirm": "Neues Passwort bestätigen",
+    "submit": "Passwort aktualisieren",
+    "current_required": "Aktuelles Passwort erforderlich",
+    "current_wrong": "Das aktuelle Passwort ist falsch.",
+    "too_short": "Mindestens 12 Zeichen",
+    "mismatch": "Passwörter stimmen nicht überein",
+    "success_title": "Passwort aktualisiert",
+    "success_message": "Alles bereit."
   },
   "dashboard": {
     "title": "Übersicht",
