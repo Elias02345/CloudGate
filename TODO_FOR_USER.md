@@ -19,6 +19,7 @@
 | M2 UI Polish (Dashboard, Settings, Theme, i18n, ErrorBoundary) | ✅ | — |
 | M4 Production (2FA, Backup, Audit log) | ✅ | — |
 | M5 Auto-Update (Updater, UpdatesPage, apply-update.sh) | ✅ | — |
+| M3 Hybrid Mode Phase 1 (local_nginx, no ACME yet) | ✅ | — |
 | Docker image | Builds + smoke-tests on every push | First test on real machine when Starlink is up |
 | One-liner LXC installer | ✅ ready in `install/lxc-install.sh` | Try it once internet is up |
 | GHCR `:nightly` + `:dev` images | ✅ exist on GHCR | — |
