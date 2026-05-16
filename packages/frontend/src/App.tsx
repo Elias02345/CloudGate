@@ -6,6 +6,7 @@ import {
 	IconLogout,
 	IconRoute,
 	IconServer2,
+	IconSettings,
 	IconUser,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +20,7 @@ import { HostFormPage } from './pages/HostFormPage.js';
 import { HostsPage } from './pages/HostsPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { PasswordChangePage } from './pages/PasswordChangePage.js';
+import { SettingsPage } from './pages/SettingsPage.js';
 import { TunnelsPage } from './pages/TunnelsPage.js';
 
 export function App() {
@@ -100,6 +102,12 @@ export function App() {
 							active={location.pathname.startsWith('/hosts')}
 							onClick={() => navigate('/hosts')}
 						/>
+						<NavLink
+							label={t('nav.settings')}
+							leftSection={<IconSettings size={16} />}
+							active={location.pathname.startsWith('/settings')}
+							onClick={() => navigate('/settings')}
+						/>
 					</Stack>
 				</AppShell.Navbar>
 			)}
@@ -152,6 +160,14 @@ export function App() {
 						element={
 							<ProtectedRoute>
 								<HostFormPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/settings"
+						element={
+							<ProtectedRoute>
+								<SettingsPage />
 							</ProtectedRoute>
 						}
 					/>
