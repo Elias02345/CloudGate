@@ -22,7 +22,7 @@ import {
 	IconAlertCircle,
 	IconCheck,
 	IconRefresh,
-	IconRoutePlus,
+	IconCirclePlus,
 	IconTerminal2,
 	IconTrash,
 } from '@tabler/icons-react';
@@ -107,7 +107,7 @@ export function TunnelsPage() {
 		<Stack>
 			<Group justify="space-between">
 				<Title order={2}>{t('tunnels.title')}</Title>
-				<Button leftSection={<IconRoutePlus size={18} />} onClick={modal.open}>
+				<Button leftSection={<IconCirclePlus size={18} />} onClick={modal.open}>
 					{t('tunnels.create')}
 				</Button>
 			</Group>
