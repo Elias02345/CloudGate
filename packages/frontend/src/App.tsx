@@ -1,5 +1,6 @@
 import { ActionIcon, AppShell, Group, Menu, NavLink, Stack, Text, Title } from '@mantine/core';
 import {
+	IconArrowUp,
 	IconClipboardList,
 	IconCloudCheck,
 	IconCloudComputing,
@@ -24,6 +25,7 @@ import { LoginPage } from './pages/LoginPage.js';
 import { PasswordChangePage } from './pages/PasswordChangePage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
 import { TunnelsPage } from './pages/TunnelsPage.js';
+import { UpdatesPage } from './pages/UpdatesPage.js';
 
 export function App() {
 	const { t } = useTranslation();
@@ -111,6 +113,12 @@ export function App() {
 							onClick={() => navigate('/audit')}
 						/>
 						<NavLink
+							label={t('nav.updates')}
+							leftSection={<IconArrowUp size={16} />}
+							active={location.pathname.startsWith('/updates')}
+							onClick={() => navigate('/updates')}
+						/>
+						<NavLink
 							label={t('nav.settings')}
 							leftSection={<IconSettings size={16} />}
 							active={location.pathname.startsWith('/settings')}
@@ -184,6 +192,14 @@ export function App() {
 						element={
 							<ProtectedRoute>
 								<AuditLogPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/updates"
+						element={
+							<ProtectedRoute>
+								<UpdatesPage />
 							</ProtectedRoute>
 						}
 					/>

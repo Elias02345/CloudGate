@@ -104,11 +104,12 @@ COPY --from=builder /build/packages/backend/.version /app/.version
 
 # Container-internal files
 COPY docker/bootstrap.sh /app/bin/bootstrap.sh
+COPY docker/apply-update.sh /app/bin/apply-update.sh
 COPY docker/s6/ /etc/s6-overlay/s6-rc.d/
 COPY docker/nginx/ /etc/nginx-cloudgate/
 COPY docker/keys/ /app/keys/
 
-RUN chmod +x /app/bin/bootstrap.sh
+RUN chmod +x /app/bin/bootstrap.sh /app/bin/apply-update.sh
 
 # nginx user/perms
 RUN mkdir -p /var/log/nginx /var/lib/nginx /run/nginx \

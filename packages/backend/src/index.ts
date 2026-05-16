@@ -31,8 +31,10 @@ import { healthRouter } from './routes/health.js';
 import { hostsRouter } from './routes/hosts.js';
 import { totpRouter } from './routes/totp.js';
 import { tunnelsRouter } from './routes/tunnels.js';
+import { updatesRouter } from './routes/updates.js';
 import { verifyKeyOrSeed } from './services/crypto.js';
 import { init as initTunnelManager } from './services/tunnel-manager.js';
+import { init as initUpdater } from './services/updater.js';
 
 const log = childLogger('server');
 
@@ -71,9 +73,11 @@ async function main(): Promise<void> {
 	app.use('/api/audit', auditRouter);
 	app.use('/api/backup', backupRouter);
 	app.use('/api/totp', totpRouter);
+	app.use('/api/updates', updatesRouter);
 
 	// Revive any tunnels marked as running before previous shutdown
 	void initTunnelManager().catch((err) => log.warn({ err: (err as Error).message }, 'Tunnel manager init failed'));
+	void initUpdater().catch((err) => log.warn({ err: (err as Error).message }, 'Updater init failed'));
 
 	app.get('/api', (_req, res) => {
 		res.json({
