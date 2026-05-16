@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@cloudgate/shared": "workspace:*",
+    "acme-client": "^5.4.0",
     "argon2": "^0.41.1",
     "better-sqlite3": "^11.7.0",
     "cloudflare": "^4.0.0",

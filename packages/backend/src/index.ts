@@ -22,6 +22,7 @@ import { getConfig, VERSION } from './config.js';
 import { closeDb } from './db/db.js';
 import { childLogger, logger } from './logger.js';
 import { globalLimiter } from './middleware/rate-limit.js';
+import { acmeRouter } from './routes/acme.js';
 import { auditRouter } from './routes/audit.js';
 import { authRouter } from './routes/auth.js';
 import { backupRouter } from './routes/backup.js';
@@ -32,6 +33,7 @@ import { hostsRouter } from './routes/hosts.js';
 import { totpRouter } from './routes/totp.js';
 import { tunnelsRouter } from './routes/tunnels.js';
 import { updatesRouter } from './routes/updates.js';
+import { initRenewalCron } from './services/acme.js';
 import { verifyKeyOrSeed } from './services/crypto.js';
 import { init as initTunnelManager } from './services/tunnel-manager.js';
 import { init as initUpdater } from './services/updater.js';
@@ -74,10 +76,12 @@ async function main(): Promise<void> {
 	app.use('/api/backup', backupRouter);
 	app.use('/api/totp', totpRouter);
 	app.use('/api/updates', updatesRouter);
+	app.use('/api/acme', acmeRouter);
 
 	// Revive any tunnels marked as running before previous shutdown
 	void initTunnelManager().catch((err) => log.warn({ err: (err as Error).message }, 'Tunnel manager init failed'));
 	void initUpdater().catch((err) => log.warn({ err: (err as Error).message }, 'Updater init failed'));
+	initRenewalCron();
 
 	app.get('/api', (_req, res) => {
 		res.json({
