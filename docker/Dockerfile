@@ -39,9 +39,9 @@ COPY packages/ ./packages/
 
 RUN pnpm -r run build
 
-# Prune to production-only deps for runtime image
-RUN pnpm -r --prod deploy --legacy /deploy/backend --filter @cloudgate/backend && \
-    pnpm -r --prod deploy --legacy /deploy/recovery-ui --filter @cloudgate/recovery-ui
+# Prune to production-only deps for runtime image (pnpm 9 syntax)
+RUN pnpm --filter @cloudgate/backend deploy --prod /deploy/backend && \
+    pnpm --filter @cloudgate/recovery-ui deploy --prod /deploy/recovery-ui
 
 # -----------------------------------------------------------------------------
 # Stage 2: runtime
