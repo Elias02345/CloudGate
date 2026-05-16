@@ -110,7 +110,10 @@ export async function touchValidated(id: number): Promise<void> {
  * Materialise the stored credentials for use by the API client.
  * Throws if encryption key has changed (decryption fails).
  */
-export function decryptCredentials(row: DbCfAccount): Credentials {
-	const raw = typeof row.encrypted_credentials === 'string' ? row.encrypted_credentials : row.encrypted_credentials.toString('utf8');
+export function decryptCredentials(row: { encrypted_credentials: Buffer | string }): Credentials {
+	const raw =
+		typeof row.encrypted_credentials === 'string'
+			? row.encrypted_credentials
+			: row.encrypted_credentials.toString('utf8');
 	return decryptJson<Credentials>(raw);
 }
