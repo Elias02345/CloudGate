@@ -5,14 +5,18 @@ import {
 	IconHome,
 	IconLogout,
 	IconRoute,
+	IconServer2,
 	IconUser,
 } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useLogout, useMe } from './api/auth.js';
+import { useEventStream } from './api/events.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
 import { CloudflarePage } from './pages/CloudflarePage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
+import { HostFormPage } from './pages/HostFormPage.js';
+import { HostsPage } from './pages/HostsPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { PasswordChangePage } from './pages/PasswordChangePage.js';
 import { TunnelsPage } from './pages/TunnelsPage.js';
@@ -25,6 +29,9 @@ export function App() {
 	const location = useLocation();
 
 	const showShell = !!me?.user && !me.user.must_change_password;
+
+	// Subscribe to backend events for live query invalidation
+	useEventStream();
 
 	return (
 		<AppShell
@@ -87,6 +94,12 @@ export function App() {
 							active={location.pathname.startsWith('/tunnels')}
 							onClick={() => navigate('/tunnels')}
 						/>
+						<NavLink
+							label={t('nav.hosts')}
+							leftSection={<IconServer2 size={16} />}
+							active={location.pathname.startsWith('/hosts')}
+							onClick={() => navigate('/hosts')}
+						/>
 					</Stack>
 				</AppShell.Navbar>
 			)}
@@ -123,6 +136,22 @@ export function App() {
 						element={
 							<ProtectedRoute>
 								<TunnelsPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/hosts"
+						element={
+							<ProtectedRoute>
+								<HostsPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/hosts/new"
+						element={
+							<ProtectedRoute>
+								<HostFormPage />
 							</ProtectedRoute>
 						}
 					/>
