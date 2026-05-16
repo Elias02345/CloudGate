@@ -241,6 +241,10 @@
     "confirm_delete": "Host {{hostname}} löschen? DNS-Eintrag wird auch entfernt.",
     "errors_present_title": "Einige Hosts haben Fehler",
     "errors_present_body": "Über das rote Statussymbol fahren zeigt Details. Oft fehlt ein Token-Scope:",
-    "docs_link": "Setup-Anleitung ansehen"
+    "docs_link": "Setup-Anleitung ansehen",
+    "issue_cert": "Let's-Encrypt-Zertifikat ausstellen (DNS-01)",
+    "confirm_issue_cert": "Let's-Encrypt-Zertifikat für {{hostname}} via DNS-01 anfordern? CloudGate legt einen temporären TXT-Eintrag in Cloudflare an, prüft ihn, speichert das Zertifikat. Dauert ~1 Minute.",
+    "cert_issued_title": "Zertifikat ausgestellt",
+    "cert_issued_message": "{{hostname}} hat jetzt TLS bis {{expires}}."
   }
 }

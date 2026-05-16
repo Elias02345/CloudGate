@@ -11,10 +11,12 @@ import {
 	Text,
 	Title,
 } from '@mantine/core';
-import { IconAlertCircle, IconCirclePlus, IconExternalLink, IconTrash } from '@tabler/icons-react';
+import { IconAlertCircle, IconCertificate, IconCirclePlus, IconExternalLink, IconTrash } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@mantine/core';
+import { useIssueCert } from '../api/acme.js';
 import { useDeleteHost, useHosts, useToggleHost } from '../api/hosts.js';
 
 export function HostsPage() {
@@ -23,6 +25,21 @@ export function HostsPage() {
 	const hosts = useHosts();
 	const toggleMutation = useToggleHost();
 	const deleteMutation = useDeleteHost();
+	const issueCert = useIssueCert();
+
+	const onIssue = async (hostname: string) => {
+		if (!confirm(t('hosts.confirm_issue_cert', { hostname }))) return;
+		try {
+			const r = await issueCert.mutateAsync({ hostname });
+			notifications.show({
+				color: 'green',
+				title: t('hosts.cert_issued_title'),
+				message: t('hosts.cert_issued_message', { hostname, expires: r.expires_at.slice(0, 10) }),
+			});
+		} catch (err) {
+			notifications.show({ color: 'red', message: (err as Error).message });
+		}
+	};
 
 	return (
 		<Stack>
@@ -102,17 +119,30 @@ export function HostsPage() {
 											/>
 										</Table.Td>
 										<Table.Td>
-											<ActionIcon
-												variant="subtle"
-												color="red"
-												onClick={() => {
-													if (confirm(t('hosts.confirm_delete', { hostname: h.hostname }))) {
-														void deleteMutation.mutate(h.id);
-													}
-												}}
-											>
-												<IconTrash size={16} />
-											</ActionIcon>
+											<Group gap={4} justify="flex-end">
+												{h.mode === 'local_nginx' && (
+													<ActionIcon
+														variant="subtle"
+														color="cyan"
+														onClick={() => void onIssue(h.hostname)}
+														loading={issueCert.isPending}
+														title={t('hosts.issue_cert')}
+													>
+														<IconCertificate size={16} />
+													</ActionIcon>
+												)}
+												<ActionIcon
+													variant="subtle"
+													color="red"
+													onClick={() => {
+														if (confirm(t('hosts.confirm_delete', { hostname: h.hostname }))) {
+															void deleteMutation.mutate(h.id);
+														}
+													}}
+												>
+													<IconTrash size={16} />
+												</ActionIcon>
+											</Group>
 										</Table.Td>
 									</Table.Tr>
 								))}

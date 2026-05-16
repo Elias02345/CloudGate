@@ -241,6 +241,10 @@
     "confirm_delete": "Delete host {{hostname}}? DNS record will also be removed.",
     "errors_present_title": "Some hosts have errors",
     "errors_present_body": "Hover the red status badge for details. Often a missing token scope:",
-    "docs_link": "review setup guide"
+    "docs_link": "review setup guide",
+    "issue_cert": "Issue Let's Encrypt cert (DNS-01)",
+    "confirm_issue_cert": "Acquire a Let's Encrypt certificate for {{hostname}} via DNS-01? CloudGate will create a temporary TXT record in Cloudflare and verify, then save the cert. Takes ~1 minute.",
+    "cert_issued_title": "Certificate issued",
+    "cert_issued_message": "{{hostname}} now has TLS until {{expires}}."
   }
 }
