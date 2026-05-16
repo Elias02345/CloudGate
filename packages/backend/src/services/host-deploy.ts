@@ -10,6 +10,7 @@ import { childLogger } from '../logger.js';
 import { decryptCredentials } from './cf-account.js';
 import { CloudflareApiError, clientFor } from './cloudflare-client.js';
 import { publish } from './events.js';
+import { removeHostConfig, writeHostConfig } from './nginx-config.js';
 import { reloadTunnel } from './tunnel-manager.js';
 
 const log = childLogger('host-deploy');
@@ -35,12 +36,47 @@ export async function deployHost(hostId: number): Promise<void> {
 	const host = await knex<HostRow>('proxy_hosts').where({ id: hostId }).first();
 	if (!host) throw new Error(`host ${hostId} not found`);
 
-	if (host.mode !== 'cloudflare_tunnel') {
-		// Local nginx path comes in M3
-		await knex('proxy_hosts')
+	if (host.mode === 'local_nginx') {
+		// Local nginx reverse-proxy path
+		const full = await knex<{
+			id: number;
+			hostname: string;
+			forward_scheme: string;
+			forward_host: string;
+			forward_port: number;
+			path_prefix: string;
+			tls_options: string;
+		}>('proxy_hosts')
 			.where({ id: hostId })
-			.update({ last_deployed_at: new Date().toISOString(), last_error: null });
-		publish('host.deployed', { id: hostId, mode: host.mode });
+			.first();
+		if (!full) throw new Error(`host ${hostId} not found`);
+		let tls: { no_tls_verify?: boolean } = {};
+		try {
+			tls = typeof full.tls_options === 'string' ? JSON.parse(full.tls_options) : {};
+		} catch {
+			tls = {};
+		}
+		try {
+			await writeHostConfig({
+				id: full.id,
+				hostname: full.hostname,
+				forward_scheme: full.forward_scheme,
+				forward_host: full.forward_host,
+				forward_port: full.forward_port,
+				path_prefix: full.path_prefix,
+				no_tls_verify: Boolean(tls.no_tls_verify),
+			});
+			await knex('proxy_hosts')
+				.where({ id: hostId })
+				.update({ last_deployed_at: new Date().toISOString(), last_error: null });
+			publish('host.deployed', { id: hostId, mode: 'local_nginx', hostname: full.hostname });
+			log.info({ id: hostId, hostname: full.hostname }, 'local_nginx host deployed');
+		} catch (err) {
+			const msg = (err as Error).message;
+			await knex('proxy_hosts').where({ id: hostId }).update({ last_error: msg });
+			publish('host.deploy_failed', { id: hostId, error: msg });
+			throw err;
+		}
 		return;
 	}
 
@@ -153,6 +189,14 @@ export async function undeployHost(hostId: number): Promise<void> {
 					log.warn({ err: (err as Error).message }, 'DNS record delete failed (continuing)');
 				}
 			}
+		}
+	}
+
+	if (host.mode === 'local_nginx') {
+		try {
+			await removeHostConfig(host.id);
+		} catch (err) {
+			log.warn({ err: (err as Error).message }, 'local_nginx undeploy failed');
 		}
 	}
 

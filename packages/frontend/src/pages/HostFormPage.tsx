@@ -118,7 +118,7 @@ export function HostFormPage() {
 							label={t('hosts.mode_field')}
 							data={[
 								{ value: 'cloudflare_tunnel', label: t('hosts.mode_tunnel') },
-								{ value: 'local_nginx', label: `${t('hosts.mode_nginx')} (M3)`, disabled: true },
+								{ value: 'local_nginx', label: t('hosts.mode_nginx') },
 							]}
 							{...form.getInputProps('mode')}
 						/>
