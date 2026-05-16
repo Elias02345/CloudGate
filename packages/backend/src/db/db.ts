@@ -27,7 +27,10 @@ export function getDb(): Knex {
 		migrations: {
 			directory: new URL('./migrations/', import.meta.url).pathname,
 			extension: 'ts',
-			loadExtensions: ['.ts', '.js'],
+			// In production we run compiled JS — load .js only.
+			// In dev (tsx) we run TS directly — load .ts only.
+			// Loading both would pick up .d.ts files as migrations and crash.
+			loadExtensions: process.env.NODE_ENV === 'production' ? ['.js'] : ['.ts'],
 		},
 	});
 	return cached;
