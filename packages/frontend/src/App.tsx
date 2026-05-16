@@ -1,9 +1,17 @@
-import { ActionIcon, AppShell, Group, Menu, Text, Title } from '@mantine/core';
-import { IconCloudComputing, IconLogout, IconUser } from '@tabler/icons-react';
+import { ActionIcon, AppShell, Group, Menu, NavLink, Stack, Text, Title } from '@mantine/core';
+import {
+	IconCloudCheck,
+	IconCloudComputing,
+	IconHome,
+	IconLogout,
+	IconRoute,
+	IconUser,
+} from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useLogout, useMe } from './api/auth.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
+import { CloudflarePage } from './pages/CloudflarePage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { PasswordChangePage } from './pages/PasswordChangePage.js';
@@ -13,9 +21,16 @@ export function App() {
 	const { data: me } = useMe();
 	const logout = useLogout();
 	const navigate = useNavigate();
+	const location = useLocation();
+
+	const showShell = !!me?.user && !me.user.must_change_password;
 
 	return (
-		<AppShell header={{ height: 56 }} padding="md">
+		<AppShell
+			header={{ height: 56 }}
+			navbar={showShell ? { width: 220, breakpoint: 'sm' } : undefined}
+			padding="md"
+		>
 			<AppShell.Header>
 				<Group h="100%" px="md" justify="space-between">
 					<Group gap="xs">
@@ -49,6 +64,32 @@ export function App() {
 					)}
 				</Group>
 			</AppShell.Header>
+
+			{showShell && (
+				<AppShell.Navbar p="xs">
+					<Stack gap={4}>
+						<NavLink
+							label={t('nav.dashboard')}
+							leftSection={<IconHome size={16} />}
+							active={location.pathname === '/'}
+							onClick={() => navigate('/')}
+						/>
+						<NavLink
+							label={t('nav.cloudflare')}
+							leftSection={<IconCloudCheck size={16} />}
+							active={location.pathname.startsWith('/cloudflare')}
+							onClick={() => navigate('/cloudflare')}
+						/>
+						<NavLink
+							label={t('nav.tunnels')}
+							leftSection={<IconRoute size={16} />}
+							disabled
+							description={t('nav.coming_soon')}
+						/>
+					</Stack>
+				</AppShell.Navbar>
+			)}
+
 			<AppShell.Main>
 				<Routes>
 					<Route path="/login" element={<LoginPage />} />
@@ -65,6 +106,14 @@ export function App() {
 						element={
 							<ProtectedRoute>
 								<DashboardPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/cloudflare"
+						element={
+							<ProtectedRoute>
+								<CloudflarePage />
 							</ProtectedRoute>
 						}
 					/>

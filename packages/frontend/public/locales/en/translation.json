@@ -10,6 +10,14 @@
     "user_menu": "User menu",
     "logout": "Sign out"
   },
+  "nav": {
+    "dashboard": "Dashboard",
+    "cloudflare": "Cloudflare",
+    "tunnels": "Tunnels",
+    "hosts": "Hosts",
+    "settings": "Settings",
+    "coming_soon": "Coming in M1.3"
+  },
   "login": {
     "title": "Sign in",
     "email": "Email",
@@ -44,6 +52,31 @@
     "healthy": "Healthy",
     "degraded": "Degraded",
     "unreachable": "Unreachable",
-    "placeholder_hint": "Hosts, tunnels and Cloudflare account management land in M1."
+    "placeholder_hint": "Tunnels & hosts management land in M1.3 / M1.4."
+  },
+  "cloudflare": {
+    "title": "Cloudflare accounts",
+    "hint": "Add your Cloudflare API token to let CloudGate create tunnels and DNS records on your behalf.",
+    "docs_link": "How to create a token",
+    "add_account": "Add account",
+    "add_hint": "Paste an API token with the scopes Tunnels:Edit, DNS:Edit and Zone:Read.",
+    "add_hint_link": "Token creation guide",
+    "label_field": "Label",
+    "token_field": "API token",
+    "validate_and_add": "Validate & add",
+    "added_title": "Account added",
+    "added_message": "{{label}} is ready to use.",
+    "empty": "No Cloudflare accounts yet. Add one to get started.",
+    "col_label": "Label",
+    "col_account_tag": "Account ID",
+    "col_auth": "Auth",
+    "col_last_validated": "Last validated",
+    "confirm_delete": "Delete {{label}}? This removes the account and all cached zones.",
+    "zones_title": "Zones",
+    "sync": "Refresh from Cloudflare",
+    "no_zones": "No zones cached. Click refresh to fetch them.",
+    "col_zone_name": "Domain",
+    "col_status": "Status",
+    "col_zone_id": "Zone ID"
   }
 }

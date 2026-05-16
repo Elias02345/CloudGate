@@ -10,6 +10,14 @@
     "user_menu": "Benutzermenü",
     "logout": "Abmelden"
   },
+  "nav": {
+    "dashboard": "Übersicht",
+    "cloudflare": "Cloudflare",
+    "tunnels": "Tunnels",
+    "hosts": "Hosts",
+    "settings": "Einstellungen",
+    "coming_soon": "Kommt in M1.3"
+  },
   "login": {
     "title": "Anmelden",
     "email": "E-Mail",
@@ -44,6 +52,31 @@
     "healthy": "Erreichbar",
     "degraded": "Eingeschränkt",
     "unreachable": "Nicht erreichbar",
-    "placeholder_hint": "Hosts, Tunnels und Cloudflare-Account-Verwaltung kommen in M1."
+    "placeholder_hint": "Tunnels & Hosts-Verwaltung kommen in M1.3 / M1.4."
+  },
+  "cloudflare": {
+    "title": "Cloudflare-Accounts",
+    "hint": "Trage deinen Cloudflare-API-Token ein, damit CloudGate Tunnels und DNS-Einträge für dich verwaltet.",
+    "docs_link": "Wie erstellt man einen Token?",
+    "add_account": "Account hinzufügen",
+    "add_hint": "API-Token mit den Scopes Tunnels:Edit, DNS:Edit und Zone:Read einfügen.",
+    "add_hint_link": "Anleitung zur Token-Erstellung",
+    "label_field": "Bezeichnung",
+    "token_field": "API-Token",
+    "validate_and_add": "Prüfen & hinzufügen",
+    "added_title": "Account hinzugefügt",
+    "added_message": "{{label}} ist einsatzbereit.",
+    "empty": "Noch keine Cloudflare-Accounts. Füge einen hinzu, um loszulegen.",
+    "col_label": "Bezeichnung",
+    "col_account_tag": "Account-ID",
+    "col_auth": "Auth",
+    "col_last_validated": "Zuletzt geprüft",
+    "confirm_delete": "{{label}} löschen? Account und alle zwischengespeicherten Zonen werden entfernt.",
+    "zones_title": "Zonen",
+    "sync": "Von Cloudflare aktualisieren",
+    "no_zones": "Noch keine Zonen zwischengespeichert. Aktualisieren zum Abrufen.",
+    "col_zone_name": "Domain",
+    "col_status": "Status",
+    "col_zone_id": "Zone-ID"
   }
 }

@@ -35,8 +35,8 @@
 - ✅ `.github/PULL_REQUEST_TEMPLATE.md` with persistence checklist
 - ✅ Issue templates (bug, feature)
 - ✅ First commit + push to `dev`
-- 🚧 **CI green** — fixing `cache: pnpm` requires lockfile + `release.yml` secrets-conditional pattern
-- ⬜ First successful CI run on `dev`
+- ✅ **CI green** — lint-typecheck-test + docker-build + smoke test all pass
+- ✅ First successful CI run on `dev`
 - 🔁 **GPG keypair** generation (user action — keep optional, signing is graceful no-op without)
 - 🔁 **Branch protection** for `main` (user action via GitHub UI)
 
@@ -46,20 +46,23 @@
 
 > Goal: full end-to-end host-create flow works. Login → add CF token → create tunnel → add host → service reachable via Cloudflare. Single user, HTTP/HTTPS only.
 
-### Phase 1 — Authentication foundation
+### Phase 1 — Authentication foundation ✅
 
-- ⬜ `services/crypto.ts` — AES-256-GCM encrypt/decrypt with `/data/secrets/encryption.key`
-- ⬜ `services/auth.ts` — JWT issue/verify, Argon2 password hash/verify
-- ⬜ `middleware/auth.ts` — Express middleware extracting + validating JWT
-- ⬜ `middleware/rate-limit.ts` — express-rate-limit for `/auth/login`
-- ⬜ `routes/auth.ts` — `POST /login`, `POST /logout`, `GET /me`, `POST /password`
-- ⬜ `routes/auth.ts` test — login flow with mock DB
-- ⬜ Frontend: `api/auth.ts` — TanStack Query hooks
-- ⬜ Frontend: `contexts/AuthContext.tsx` — global auth state
-- ⬜ Frontend: `components/ProtectedRoute.tsx`
-- ⬜ Frontend: real `LoginPage` (real API, error display, force-password-change flow)
-- ⬜ Frontend: `PasswordChangePage`
-- ⬜ **Milestone validation**: can log in as auto-generated admin, change password, see dashboard
+- ✅ `services/crypto.ts` — AES-256-GCM encrypt/decrypt with `/data/secrets/encryption.key`
+- ✅ `services/auth.ts` — JWT issue/verify, Argon2 password hash/verify
+- ✅ `middleware/auth.ts` — Express middleware extracting + validating JWT
+- ✅ `middleware/rate-limit.ts` — express-rate-limit for `/auth/login`
+- ✅ `routes/auth.ts` — `POST /login`, `POST /logout`, `GET /me`, `POST /password`
+- ✅ `tests/auth.test.ts` + `tests/crypto.test.ts` — end-to-end with real bootstrap
+- ✅ Frontend: `api/auth.ts` — TanStack Query hooks
+- ✅ Frontend: `api/client.ts` — fetch wrapper with token storage
+- ✅ Frontend: `components/ProtectedRoute.tsx`
+- ✅ Frontend: real `LoginPage` (real API, error display, force-password-change flow)
+- ✅ Frontend: `PasswordChangePage` with force-change UX + toast
+- ✅ Frontend: `App.tsx` routing + header user menu + logout
+- ✅ i18n DE+EN strings for header + login + password
+- ✅ **Milestone validation**: CI smoke test confirms backend boots, bootstrap runs idempotent,
+  health endpoint responds. Full E2E login validation in dev container deferred to M1.4.
 
 ### Phase 2 — Cloudflare integration (read-only first)
 

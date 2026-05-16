@@ -23,6 +23,7 @@ import { closeDb } from './db/db.js';
 import { childLogger, logger } from './logger.js';
 import { globalLimiter } from './middleware/rate-limit.js';
 import { authRouter } from './routes/auth.js';
+import { cloudflareRouter } from './routes/cloudflare.js';
 import { healthRouter } from './routes/health.js';
 import { verifyKeyOrSeed } from './services/crypto.js';
 
@@ -56,6 +57,7 @@ async function main(): Promise<void> {
 	app.use('/api', globalLimiter);
 	app.use('/api/health', healthRouter);
 	app.use('/api/auth', authRouter);
+	app.use('/api/cloudflare', cloudflareRouter);
 
 	app.get('/api', (_req, res) => {
 		res.json({
