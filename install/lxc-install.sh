@@ -31,6 +31,8 @@ readonly CG_IMAGE_CANDIDATES=(
   "ghcr.io/elias02345/cloudgate:dev"
 )
 readonly CG_REPO_URL="https://github.com/Elias02345/CloudGate.git"
+# Default branch for source builds. Switch to `main` once the first
+# stable release is tagged; until then `dev` has the latest working code.
 readonly CG_REPO_BRANCH="${CG_REPO_BRANCH:-dev}"
 
 readonly LOG_PREFIX="[cloudgate]"

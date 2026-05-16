@@ -138,21 +138,21 @@
 
 ---
 
-## M3 — Hybrid Mode (local nginx) — Phase 1 ✅ (Phase 2 = ACME pending)
+## M3 — Hybrid Mode (local nginx) ✅
 
 > Goal: per host, user can pick "via Cloudflare Tunnel" OR "local nginx reverse proxy". Killer feature for mixed homelabs.
 
-- ✅ `mode='local_nginx'` branch wired in host form (no longer disabled)
-- ✅ Inlined liquidjs nginx-host template in `services/nginx-config.ts`
+- ✅ `mode='local_nginx'` branch wired in host form
+- ✅ Inlined liquidjs nginx-host template with cert path conditionals
 - ✅ `services/nginx-config.ts` — atomic write, `nginx -t` validation with
   rollback, `nginx -s reload`
 - ✅ Host-deploy + host-undeploy paths for local_nginx mode
 - ✅ Frontend: mode-picker enabled, conditional CF fields hide for local_nginx
-- ⬜ ACME / Let's Encrypt integration (npm `acme-client`) — pending
-- ⬜ DNS-01 challenge via Cloudflare API — pending
-- ⬜ Cert auto-renewal cron (30-day check) — pending
-- ⬜ Cert UI: status, expiry, manual renew button — pending
-- ⬜ Integration test: local nginx host serving correctly — needs running container
+- ✅ ACME / Let's Encrypt integration via `acme-client` npm
+- ✅ DNS-01 challenge via Cloudflare API (perfect for CGNAT — no port 80 needed)
+- ✅ Cert auto-renewal cron (30-day threshold, 24h check interval)
+- ✅ Cert-issue UI: button on HostsPage with confirm + expiry toast
+- ⬜ Integration test: local nginx host serving HTTPS correctly — needs running container with real cert
 
 ---
 
