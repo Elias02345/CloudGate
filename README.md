@@ -27,7 +27,29 @@ Many home internet connections (especially in Germany — 1&1, Vodafone Cable, m
 
 ## Quick Start
 
-**Zero-config install** — no env vars, no config files, just one command:
+### Option A — One-liner (Ubuntu / Debian / LXC / Proxmox)
+
+Fresh Ubuntu container, no prior setup:
+
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Elias02345/CloudGate/main/install/lxc-install.sh)"
+```
+
+The installer:
+- Installs Docker if missing
+- Pulls the latest CloudGate image (falls back to building from source)
+- Creates a persistent data volume
+- Starts the container and waits for it to become healthy
+- Prints your initial admin password
+
+**Re-runnable** — running it again won't wipe your data.
+
+> **Proxmox LXC users**: enable `nesting=1,keyctl=1` in the container's features config.
+> Use an Ubuntu 24.04 template, 2 cores, 1 GB RAM, 4 GB disk minimum.
+
+### Option B — Plain Docker
+
+If you already have Docker:
 
 ```bash
 docker run -d --name cloudgate \
@@ -37,11 +59,12 @@ docker run -d --name cloudgate \
   ghcr.io/elias02345/cloudgate:latest
 ```
 
-Then:
+### What happens next
+
 1. Open `http://<your-host-ip>/` in a browser.
 2. Login as `admin@cloudgate.local` with the password shown in container logs:
    ```bash
-   docker logs cloudgate | grep "Initial admin password"
+   docker logs cloudgate | grep -A1 "INITIAL ADMIN PASSWORD"
    ```
 3. Change the password (forced on first login).
 4. Add your Cloudflare API token in the UI (instructions: see [`docs/CLOUDFLARE_SETUP.md`](docs/CLOUDFLARE_SETUP.md)).
