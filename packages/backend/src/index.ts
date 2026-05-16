@@ -10,9 +10,11 @@
 
 import compression from 'compression';
 import cors from 'cors';
-import express, { type ErrorRequestHandler } from 'express';
+import express, { type ErrorRequestHandler, type RequestHandler } from 'express';
 import helmet from 'helmet';
-import pinoHttp from 'pino-http';
+// pino-http exports a default that's both a namespace and a callable; cast smooths CJS/ESM interop.
+import pinoHttpDefault from 'pino-http';
+const pinoHttp = pinoHttpDefault as unknown as (opts?: Parameters<typeof pinoHttpDefault>[0]) => RequestHandler;
 import { runBootstrap } from './bootstrap.js';
 import { getConfig, VERSION } from './config.js';
 import { closeDb } from './db/db.js';

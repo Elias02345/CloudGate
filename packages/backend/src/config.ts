@@ -65,5 +65,8 @@ export function getConfig(): Config {
 export const VERSION = readVersion();
 
 export function dataPath(...parts: string[]): string {
-	return join(getConfig().DATA_DIR, ...parts);
+	// Read live env so tests can swap DATA_DIR per test-suite without restarting.
+	// In production, env is set once at boot; this is essentially equivalent to caching.
+	const dir = process.env.CLOUDGATE_DATA_DIR ?? getConfig().DATA_DIR;
+	return join(dir, ...parts);
 }
