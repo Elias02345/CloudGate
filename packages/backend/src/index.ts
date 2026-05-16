@@ -22,11 +22,14 @@ import { getConfig, VERSION } from './config.js';
 import { closeDb } from './db/db.js';
 import { childLogger, logger } from './logger.js';
 import { globalLimiter } from './middleware/rate-limit.js';
+import { auditRouter } from './routes/audit.js';
 import { authRouter } from './routes/auth.js';
+import { backupRouter } from './routes/backup.js';
 import { cloudflareRouter } from './routes/cloudflare.js';
 import { eventsRouter } from './routes/events.js';
 import { healthRouter } from './routes/health.js';
 import { hostsRouter } from './routes/hosts.js';
+import { totpRouter } from './routes/totp.js';
 import { tunnelsRouter } from './routes/tunnels.js';
 import { verifyKeyOrSeed } from './services/crypto.js';
 import { init as initTunnelManager } from './services/tunnel-manager.js';
@@ -65,6 +68,9 @@ async function main(): Promise<void> {
 	app.use('/api/tunnels', tunnelsRouter);
 	app.use('/api/hosts', hostsRouter);
 	app.use('/api/events', eventsRouter);
+	app.use('/api/audit', auditRouter);
+	app.use('/api/backup', backupRouter);
+	app.use('/api/totp', totpRouter);
 
 	// Revive any tunnels marked as running before previous shutdown
 	void initTunnelManager().catch((err) => log.warn({ err: (err as Error).message }, 'Tunnel manager init failed'));

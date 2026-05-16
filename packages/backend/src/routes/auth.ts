@@ -10,8 +10,15 @@
  * httpOnly cookie + refresh in M2 polish).
  */
 
+import { unlink } from 'node:fs/promises';
 import { Router, type Router as RouterType } from 'express';
+import { authenticator } from 'otplib';
 import { ChangePasswordRequestSchema, LoginRequestSchema } from '@cloudgate/shared';
+import { dataPath } from '../config.js';
+import { childLogger } from '../logger.js';
+import { requireAuth } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rate-limit.js';
+import { record } from '../services/audit.js';
 import {
 	changePassword,
 	findUserByEmail,
@@ -20,11 +27,12 @@ import {
 	recordLogin,
 	verifyPassword,
 } from '../services/auth.js';
-import { unlink } from 'node:fs/promises';
-import { dataPath } from '../config.js';
-import { childLogger } from '../logger.js';
-import { requireAuth } from '../middleware/auth.js';
-import { authLimiter } from '../middleware/rate-limit.js';
+import { decryptJson } from '../services/crypto.js';
+
+interface EncryptedTotpSecret {
+	type: 'totp';
+	secret: string;
+}
 
 const log = childLogger('routes:auth');
 export const authRouter: RouterType = Router();
@@ -57,11 +65,30 @@ authRouter.post('/login', authLimiter, async (req, res) => {
 	}
 
 	if (user.totp_enabled) {
-		// TODO(M4): require parsed.data.totp_code and verify with otplib.
-		// For M1 we never set totp_enabled=true, so this is dead code for now.
+		if (!parsed.data.totp_code) {
+			res.status(401).json({ error: 'TOTP code required', code: 'TOTP_REQUIRED' });
+			return;
+		}
+		if (!user.totp_secret) {
+			log.warn({ user_id: user.id }, 'totp_enabled but no secret stored — refusing login');
+			res.status(500).json({ error: 'Account misconfigured', code: 'INTERNAL' });
+			return;
+		}
+		try {
+			const decrypted = decryptJson<EncryptedTotpSecret>(user.totp_secret);
+			if (!authenticator.verify({ token: parsed.data.totp_code, secret: decrypted.secret })) {
+				res.status(401).json({ error: 'Invalid TOTP code', code: 'TOTP_INVALID' });
+				return;
+			}
+		} catch (err) {
+			log.error({ err: (err as Error).message }, 'totp decrypt failed');
+			res.status(500).json({ error: 'TOTP verification failed', code: 'INTERNAL' });
+			return;
+		}
 	}
 
 	await recordLogin(user.id);
+	record({ user_id: user.id, action: 'auth.login', ip: req.ip ?? null });
 	const token = await issueAccessToken({
 		sub: String(user.id),
 		email: user.email,

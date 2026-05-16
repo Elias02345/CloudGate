@@ -1,5 +1,6 @@
 import { ActionIcon, AppShell, Group, Menu, NavLink, Stack, Text, Title } from '@mantine/core';
 import {
+	IconClipboardList,
 	IconCloudCheck,
 	IconCloudComputing,
 	IconHome,
@@ -14,6 +15,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import { useLogout, useMe } from './api/auth.js';
 import { useEventStream } from './api/events.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
+import { AuditLogPage } from './pages/AuditLogPage.js';
 import { CloudflarePage } from './pages/CloudflarePage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { HostFormPage } from './pages/HostFormPage.js';
@@ -103,6 +105,12 @@ export function App() {
 							onClick={() => navigate('/hosts')}
 						/>
 						<NavLink
+							label={t('nav.audit')}
+							leftSection={<IconClipboardList size={16} />}
+							active={location.pathname.startsWith('/audit')}
+							onClick={() => navigate('/audit')}
+						/>
+						<NavLink
 							label={t('nav.settings')}
 							leftSection={<IconSettings size={16} />}
 							active={location.pathname.startsWith('/settings')}
@@ -168,6 +176,14 @@ export function App() {
 						element={
 							<ProtectedRoute>
 								<SettingsPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/audit"
+						element={
+							<ProtectedRoute>
+								<AuditLogPage />
 							</ProtectedRoute>
 						}
 					/>
