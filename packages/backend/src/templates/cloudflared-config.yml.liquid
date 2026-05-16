@@ -1,0 +1,18 @@
+tunnel: {{ tunnel_id }}
+credentials-file: {{ credentials_path }}
+metrics: {{ metrics_addr }}
+no-autoupdate: true
+
+ingress:
+{%- for host in hosts %}
+  - hostname: {{ host.hostname }}
+    {%- if host.path_prefix and host.path_prefix != '/' %}
+    path: ^{{ host.path_prefix }}.*$
+    {%- endif %}
+    service: {{ host.forward_scheme }}://{{ host.forward_host }}:{{ host.forward_port }}
+    {%- if host.no_tls_verify %}
+    originRequest:
+      noTLSVerify: true
+    {%- endif %}
+{%- endfor %}
+  - service: http_status:404

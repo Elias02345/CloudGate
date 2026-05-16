@@ -16,7 +16,29 @@
     "tunnels": "Tunnels",
     "hosts": "Hosts",
     "settings": "Settings",
-    "coming_soon": "Coming in M1.3"
+    "coming_soon": "Coming soon"
+  },
+  "tunnels": {
+    "title": "Cloudflare tunnels",
+    "create": "Create tunnel",
+    "submit": "Create & start",
+    "empty": "No tunnels yet. Create one to expose services.",
+    "no_account_warning": "Add a Cloudflare account first.",
+    "account_field": "Cloudflare account",
+    "pick_account": "Pick an account",
+    "name_field": "Tunnel name",
+    "name_hint": "Letters, numbers, dashes and underscores only.",
+    "created_title": "Tunnel created",
+    "created_message": "{{name}} is starting up.",
+    "col_name": "Name",
+    "col_status": "Status",
+    "col_tunnel_id": "Tunnel ID",
+    "col_last_change": "Last change",
+    "logs": "View logs",
+    "restart": "Restart",
+    "logs_title": "Tunnel daemon logs",
+    "no_logs": "(no logs yet)",
+    "confirm_delete": "Delete tunnel {{name}}? It will also be removed from Cloudflare."
   },
   "login": {
     "title": "Sign in",

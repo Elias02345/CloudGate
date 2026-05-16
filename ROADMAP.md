@@ -64,15 +64,18 @@
 - ✅ **Milestone validation**: CI smoke test confirms backend boots, bootstrap runs idempotent,
   health endpoint responds. Full E2E login validation in dev container deferred to M1.4.
 
-### Phase 2 — Cloudflare integration (read-only first)
+### Phase 2 — Cloudflare integration (read-only first) ✅
 
-- ⬜ `services/cloudflare-client.ts` — wraps official `cloudflare` npm lib, token validation
-- ⬜ `services/cf-account.ts` — CRUD logic with encrypted token storage
-- ⬜ `services/zone-sync.ts` — fetches & caches zones from CF
-- ⬜ `routes/cloudflare.ts` — `POST/GET/DELETE /accounts`, `POST /accounts/:id/sync-zones`, `GET /accounts/:id/zones`
-- ⬜ Frontend: `pages/CloudflarePage.tsx` — list accounts, add account form
-- ⬜ Frontend: `pages/CloudflareDetail.tsx` — show account info + zones
-- ⬜ **Milestone validation**: paste CF token, see your zones
+- ✅ `services/cloudflare-client.ts` — wraps official `cloudflare` npm lib, token validation,
+  zone listing, structured `CloudflareApiError` mapping
+- ✅ `services/cf-account.ts` — CRUD with encrypted credentials, decrypt-on-demand pattern
+- ✅ Zone sync inlined as `doZoneSync()` in routes (transactional reset+insert)
+- ✅ `routes/cloudflare.ts` — `POST/GET/DELETE /accounts`, `POST /:id/sync`, `GET /:id/zones`
+- ✅ Frontend: `api/cloudflare.ts` — TanStack Query hooks
+- ✅ Frontend: `pages/CloudflarePage.tsx` — accounts table + drill-down zones + add modal
+- ✅ Frontend: sidebar nav with Dashboard / Cloudflare / Tunnels (disabled, hint to M1.3)
+- ✅ i18n DE+EN strings for nav + cloudflare
+- ✅ **Milestone validation**: CI green for backend + Docker container after M1.2 push
 
 ### Phase 3 — Tunnel lifecycle
 

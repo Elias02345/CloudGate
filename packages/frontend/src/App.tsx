@@ -15,6 +15,7 @@ import { CloudflarePage } from './pages/CloudflarePage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { PasswordChangePage } from './pages/PasswordChangePage.js';
+import { TunnelsPage } from './pages/TunnelsPage.js';
 
 export function App() {
 	const { t } = useTranslation();
@@ -83,8 +84,8 @@ export function App() {
 						<NavLink
 							label={t('nav.tunnels')}
 							leftSection={<IconRoute size={16} />}
-							disabled
-							description={t('nav.coming_soon')}
+							active={location.pathname.startsWith('/tunnels')}
+							onClick={() => navigate('/tunnels')}
 						/>
 					</Stack>
 				</AppShell.Navbar>
@@ -114,6 +115,14 @@ export function App() {
 						element={
 							<ProtectedRoute>
 								<CloudflarePage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/tunnels"
+						element={
+							<ProtectedRoute>
+								<TunnelsPage />
 							</ProtectedRoute>
 						}
 					/>

@@ -25,7 +25,9 @@ import { globalLimiter } from './middleware/rate-limit.js';
 import { authRouter } from './routes/auth.js';
 import { cloudflareRouter } from './routes/cloudflare.js';
 import { healthRouter } from './routes/health.js';
+import { tunnelsRouter } from './routes/tunnels.js';
 import { verifyKeyOrSeed } from './services/crypto.js';
+import { init as initTunnelManager } from './services/tunnel-manager.js';
 
 const log = childLogger('server');
 
@@ -58,6 +60,10 @@ async function main(): Promise<void> {
 	app.use('/api/health', healthRouter);
 	app.use('/api/auth', authRouter);
 	app.use('/api/cloudflare', cloudflareRouter);
+	app.use('/api/tunnels', tunnelsRouter);
+
+	// Revive any tunnels marked as running before previous shutdown
+	void initTunnelManager().catch((err) => log.warn({ err: (err as Error).message }, 'Tunnel manager init failed'));
 
 	app.get('/api', (_req, res) => {
 		res.json({
