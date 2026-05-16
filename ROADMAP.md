@@ -122,18 +122,19 @@
 
 > Goal: feels like a real product, not a wireframe. Empty states, errors, i18n complete.
 
-- ⬜ Dashboard with status cards (backend, daemon, hosts, last events)
-- ⬜ Empty states for hosts/tunnels/cf-accounts
-- ⬜ Form validation with inline errors
-- ⬜ i18n: complete DE + EN strings for all UI
-- ⬜ Language switcher in settings
-- ⬜ Color scheme toggle (system / dark / light)
-- ⬜ Mantine theming with CloudGate brand colors
-- ⬜ Status icons + colors consistent across pages
-- ⬜ Keyboard shortcuts (Cmd+K command palette, optional)
-- ⬜ First screenshots for README
-- ⬜ Sidebar navigation polish (active state, collapse, icons)
-- ⬜ User profile menu (header dropdown)
+- ✅ Dashboard with 4 status cards (CF accounts / tunnels / hosts / version) + click-through links + skeletons + hosts-error alert + first-steps guide
+- ✅ Empty states for hosts/tunnels/cf-accounts/audit
+- ✅ Form validation with inline errors (Mantine form + zod)
+- ✅ i18n: complete EN + DE strings for all UI surfaces
+- ✅ Language switcher in Settings (live)
+- ✅ Color scheme toggle (light / dark / auto)
+- ✅ Mantine v7 theming + CloudGate brand color accents
+- ✅ Status icons + colors consistent (badges across pages)
+- ✅ Sidebar navigation with active-state highlighting
+- ✅ User profile menu (header dropdown with logout)
+- ✅ ErrorBoundary — top-level crash handler (never blank page)
+- ⬜ Keyboard shortcuts (Cmd+K command palette) — deferred to M6
+- ⬜ First screenshots for README — needs running instance
 
 ---
 
@@ -153,35 +154,41 @@
 
 ---
 
-## M4 — Production-ready
+## M4 — Production-ready ✅ (subset done; long-tail items remain)
 
-> Goal: 1.0-worthy. Backups, 2FA, audit UI, first official GHCR release.
+> Goal: 1.0-worthy. Backups, 2FA, audit UI.
 
-- ⬜ 2FA TOTP setup flow (QR code, verify)
-- ⬜ 2FA enforcement on login
-- ⬜ Backup endpoint: `GET /settings/backup` → encrypted ZIP
-- ⬜ Restore wizard (first-run can accept backup file)
-- ⬜ Audit log UI (filterable list, JSON detail view)
-- ⬜ Deep health endpoint (`/api/health/deep`): DB, daemon, CF, disk space
-- ⬜ Structured log file rotation (pino-roll)
-- ⬜ Public GHCR image first build (`v0.1.0`)
-- ⬜ ARCHITECTURE.md polish (diagrams as PNG/SVG)
-- ⬜ Getting-started screencast
-- ⬜ OAuth flow (best-effort) for CF auth alongside API token
+- ✅ 2FA TOTP setup flow (QR code, secret + verify) — Settings page
+- ✅ 2FA enforcement on login (server validates totp_code when totp_enabled)
+- ✅ Backup endpoint: `GET /api/backup?passphrase=…` → encrypted .cgbk file
+  (AES-256-GCM + PBKDF2 200k iterations, tar.gz inside)
+- ✅ Audit log UI: paginated `/audit` page, color-coded action badges
+- ✅ Audit writes wired into login/totp/backup
+- ✅ GHCR `:nightly` + `:dev` images built (workflow_dispatch run)
+- ⬜ Restore wizard (first-run accepts a backup file) — deferred to M6
+- ⬜ Deep health endpoint (`/api/health/deep`) — deferred
+- ⬜ Structured log file rotation (pino-roll) — deferred
+- ⬜ Public `v0.1.0` tagged release on `main` — waits for Elias to test on hardware
+- ⬜ ARCHITECTURE.md diagrams as SVG — deferred
+- ⬜ Getting-started screencast — needs running instance
+- ⬜ OAuth flow alongside API token — deferred (API token covers 99% of use)
 
 ---
 
-## M5 — Auto-Update
+## M5 — Auto-Update ✅
 
 > Goal: containers update themselves seamlessly. The flagship feature.
 
-- ⬜ `services/updater.ts` — release polling
-- ⬜ `services/gpg-verify.ts` — signature verification (graceful no-op when unsigned)
-- ⬜ `services/snapshot.ts` — `/app` and DB snapshots
-- ⬜ `services/update-runner.ts` — orchestrates download → verify → backup → swap → migrate → health → rollback
-- ⬜ `services/cloudflared-updater.ts` — separate binary update flow
-- ⬜ `routes/updates.ts` — status, trigger, history, channel/mode settings
-- ⬜ Frontend: `pages/UpdatesPage.tsx` (settings/updates)
+- ✅ `services/updater.ts` — 6h release polling against GitHub API with channel filter
+- ✅ GPG signature verification inline (graceful warning if unsigned)
+- ✅ SHA256 integrity check (graceful skip if absent)
+- ✅ `docker/apply-update.sh` — paranoid in-container applier:
+  Snapshot /app + DB → atomic move-aside swap → migrate → restart → health-check
+  → automatic rollback on any failure. NEVER touches /data/secrets, etc.
+- ⬜ `services/cloudflared-updater.ts` — separate binary update flow (deferred to vNext)
+- ✅ `routes/updates.ts` — status, trigger, install, channel/mode settings
+- ✅ Frontend: `pages/UpdatesPage.tsx` with current/latest version, install button,
+  channel + mode selectors
 - ⬜ Frontend: header banner when update available in `notify` mode
 - ⬜ Frontend: full-screen maintenance overlay during update
 - ⬜ `tests/updater.test.ts` — simulate upgrade with fixtures
