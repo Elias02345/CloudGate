@@ -8,8 +8,8 @@
  * when the backend cannot import its own files.
  */
 
-import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import express from 'express';
 

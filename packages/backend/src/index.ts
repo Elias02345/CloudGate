@@ -12,14 +12,19 @@ import compression from 'compression';
 import cors from 'cors';
 import express, { type ErrorRequestHandler, type RequestHandler } from 'express';
 import helmet from 'helmet';
-// pino-http exports a default that's both a namespace and a callable; cast smooths CJS/ESM interop.
+// pino-http exports a CJS function; the TS namespace-as-default makes it look non-callable.
+// biome-ignore lint/suspicious/noExplicitAny: CJS/ESM interop with pino-http
 import pinoHttpDefault from 'pino-http';
-const pinoHttp = pinoHttpDefault as unknown as (opts?: Parameters<typeof pinoHttpDefault>[0]) => RequestHandler;
+// biome-ignore lint/suspicious/noExplicitAny: see above
+const pinoHttp: (opts?: any) => RequestHandler = pinoHttpDefault as any;
 import { runBootstrap } from './bootstrap.js';
 import { getConfig, VERSION } from './config.js';
 import { closeDb } from './db/db.js';
 import { childLogger, logger } from './logger.js';
+import { globalLimiter } from './middleware/rate-limit.js';
+import { authRouter } from './routes/auth.js';
 import { healthRouter } from './routes/health.js';
+import { verifyKeyOrSeed } from './services/crypto.js';
 
 const log = childLogger('server');
 
@@ -33,6 +38,13 @@ async function main(): Promise<void> {
 		process.exit(2);
 	}
 
+	// Verify encryption key is the same one used previously (or seed if first run).
+	const keyCheck = await verifyKeyOrSeed();
+	if (!keyCheck.ok) {
+		log.fatal({ reason: keyCheck.reason }, 'Encryption key mismatch — backend refusing to start');
+		process.exit(3);
+	}
+
 	const app = express();
 	app.disable('x-powered-by');
 	app.use(helmet({ contentSecurityPolicy: false })); // CSP set per-route once frontend is wired
@@ -41,7 +53,9 @@ async function main(): Promise<void> {
 	app.use(express.json({ limit: '1mb' }));
 	app.use(pinoHttp({ logger }));
 
+	app.use('/api', globalLimiter);
 	app.use('/api/health', healthRouter);
+	app.use('/api/auth', authRouter);
 
 	app.get('/api', (_req, res) => {
 		res.json({

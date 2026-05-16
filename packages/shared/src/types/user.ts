@@ -16,7 +16,10 @@ export type User = z.infer<typeof UserSchema>;
 export const LoginRequestSchema = z.object({
 	email: z.string().email(),
 	password: z.string().min(1),
-	totp_code: z.string().regex(/^\d{6}$/).optional(),
+	totp_code: z
+		.string()
+		.regex(/^\d{6}$/)
+		.optional(),
 });
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 

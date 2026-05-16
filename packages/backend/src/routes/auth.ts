@@ -1,0 +1,138 @@
+/**
+ * Auth routes: /api/auth/*
+ *
+ * - POST /login          — email + password → JWT
+ * - POST /logout         — client-side concern; this just acks
+ * - GET  /me             — current user info (requires JWT)
+ * - POST /password       — change own password (requires JWT)
+ *
+ * 2FA flow comes in M4. Refresh tokens are skipped in M1 (we'll add
+ * httpOnly cookie + refresh in M2 polish).
+ */
+
+import { Router, type Router as RouterType } from 'express';
+import { ChangePasswordRequestSchema, LoginRequestSchema } from '@cloudgate/shared';
+import {
+	changePassword,
+	findUserByEmail,
+	issueAccessToken,
+	publicUser,
+	recordLogin,
+	verifyPassword,
+} from '../services/auth.js';
+import { unlink } from 'node:fs/promises';
+import { dataPath } from '../config.js';
+import { childLogger } from '../logger.js';
+import { requireAuth } from '../middleware/auth.js';
+import { authLimiter } from '../middleware/rate-limit.js';
+
+const log = childLogger('routes:auth');
+export const authRouter: RouterType = Router();
+
+// ---------------------------------------------------------------------------
+// POST /login
+// ---------------------------------------------------------------------------
+authRouter.post('/login', authLimiter, async (req, res) => {
+	const parsed = LoginRequestSchema.safeParse(req.body);
+	if (!parsed.success) {
+		res.status(400).json({ error: 'Invalid login payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
+		return;
+	}
+	const { email, password } = parsed.data;
+
+	const user = await findUserByEmail(email);
+	if (!user) {
+		// Constant-time-ish behaviour: still hash a fake password to avoid timing leak
+		await verifyPassword('$argon2id$v=19$m=65536,t=3,p=1$abcdefgh$ijklmnop', password);
+		log.info({ email }, 'Login failed: user not found');
+		res.status(401).json({ error: 'Invalid email or password', code: 'AUTH_FAILED' });
+		return;
+	}
+
+	const ok = await verifyPassword(user.password_hash, password);
+	if (!ok) {
+		log.info({ email }, 'Login failed: password mismatch');
+		res.status(401).json({ error: 'Invalid email or password', code: 'AUTH_FAILED' });
+		return;
+	}
+
+	if (user.totp_enabled) {
+		// TODO(M4): require parsed.data.totp_code and verify with otplib.
+		// For M1 we never set totp_enabled=true, so this is dead code for now.
+	}
+
+	await recordLogin(user.id);
+	const token = await issueAccessToken({
+		sub: String(user.id),
+		email: user.email,
+		is_admin: Boolean(user.is_admin),
+	});
+
+	res.json({
+		access_token: token,
+		user: publicUser(user),
+		must_change_password: Boolean(user.must_change_password),
+	});
+});
+
+// ---------------------------------------------------------------------------
+// POST /logout
+// ---------------------------------------------------------------------------
+authRouter.post('/logout', requireAuth, async (_req, res) => {
+	// JWTs are stateless; client should drop the token. Once we add refresh
+	// tokens in M2, this endpoint will revoke the refresh side.
+	res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// GET /me
+// ---------------------------------------------------------------------------
+authRouter.get('/me', requireAuth, async (req, res) => {
+	if (!req.user) {
+		res.status(500).json({ error: 'User missing on authenticated request', code: 'INTERNAL' });
+		return;
+	}
+	res.json({ user: publicUser(req.user) });
+});
+
+// ---------------------------------------------------------------------------
+// POST /password — change own password
+// ---------------------------------------------------------------------------
+authRouter.post('/password', requireAuth, async (req, res) => {
+	if (!req.user) {
+		res.status(500).json({ error: 'User missing on authenticated request', code: 'INTERNAL' });
+		return;
+	}
+	const parsed = ChangePasswordRequestSchema.safeParse(req.body);
+	if (!parsed.success) {
+		res
+			.status(400)
+			.json({ error: 'Invalid password change payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
+		return;
+	}
+	const { current_password, new_password } = parsed.data;
+	const ok = await verifyPassword(req.user.password_hash, current_password);
+	if (!ok) {
+		res.status(401).json({ error: 'Current password incorrect', code: 'AUTH_FAILED' });
+		return;
+	}
+	if (current_password === new_password) {
+		res.status(400).json({ error: 'New password must differ from current', code: 'BAD_REQUEST' });
+		return;
+	}
+
+	await changePassword(req.user.id, new_password);
+
+	// On first password change after bootstrap-seeded admin, drop the plaintext file.
+	if (req.user.must_change_password) {
+		try {
+			await unlink(dataPath('secrets', 'initial-admin.txt'));
+			log.info('Removed /data/secrets/initial-admin.txt after first password change');
+		} catch {
+			/* file may not exist — fine */
+		}
+	}
+
+	log.info({ user_id: req.user.id }, 'Password changed');
+	res.json({ ok: true });
+});
