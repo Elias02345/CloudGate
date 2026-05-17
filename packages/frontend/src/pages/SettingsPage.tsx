@@ -18,9 +18,10 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { useMantineColorScheme } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconDownload, IconShieldCheck } from '@tabler/icons-react';
+import { IconCheck, IconDownload, IconHeartFilled, IconShieldCheck } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useMe } from '../api/auth.js';
 import { api, getStoredToken } from '../api/client.js';
@@ -62,6 +63,8 @@ export function SettingsPage() {
 			/>
 
 			<BackupCard />
+
+			<SupportCard />
 
 			<AboutCard version={health.data?.version} uptime={health.data?.uptime_seconds} />
 		</Stack>
@@ -327,6 +330,32 @@ function BackupCard() {
 					</Button>
 				</Stack>
 			</Modal>
+		</Card>
+	);
+}
+
+// ===========================================================================
+// Support Card
+// ===========================================================================
+
+function SupportCard() {
+	const { t } = useTranslation();
+	return (
+		<Card withBorder>
+			<Stack>
+				<Group justify="space-between" align="center">
+					<Group>
+						<IconHeartFilled size={20} color="#ff6620" />
+						<Title order={4}>{t('settings.support_title')}</Title>
+					</Group>
+					<Button component={Link} to="/donate" variant="light" color="cg-orange">
+						{t('settings.support_button')}
+					</Button>
+				</Group>
+				<Text size="sm" c="dimmed">
+					{t('settings.support_body')}
+				</Text>
+			</Stack>
 		</Card>
 	);
 }

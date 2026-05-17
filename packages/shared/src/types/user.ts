@@ -33,5 +33,10 @@ export type LoginResponse = z.infer<typeof LoginResponseSchema>;
 export const ChangePasswordRequestSchema = z.object({
 	current_password: z.string().min(1),
 	new_password: z.string().min(12).max(200),
+	/** Optional — only honoured when the user is still on a default admin profile
+	 *  (must_change_password=true) and lets them set their own email/name during
+	 *  the first-login flow. Ignored on subsequent password changes. */
+	email: z.string().email().optional(),
+	name: z.string().min(1).max(100).optional(),
 });
 export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;

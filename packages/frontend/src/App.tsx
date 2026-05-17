@@ -4,6 +4,7 @@ import {
 	IconClipboardList,
 	IconCloudCheck,
 	IconCloudComputing,
+	IconHeart,
 	IconHome,
 	IconLogout,
 	IconRoute,
@@ -20,6 +21,7 @@ import { UpdateBanner } from './components/UpdateBanner.js';
 import { AuditLogPage } from './pages/AuditLogPage.js';
 import { CloudflarePage } from './pages/CloudflarePage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
+import { DonatePage } from './pages/DonatePage.js';
 import { HostFormPage } from './pages/HostFormPage.js';
 import { HostsPage } from './pages/HostsPage.js';
 import { LoginPage } from './pages/LoginPage.js';
@@ -130,6 +132,12 @@ export function App() {
 							active={location.pathname.startsWith('/settings')}
 							onClick={() => navigate('/settings')}
 						/>
+						<NavLink
+							label={t('nav.donate')}
+							leftSection={<IconHeart size={16} color="#ff6620" />}
+							active={location.pathname.startsWith('/donate')}
+							onClick={() => navigate('/donate')}
+						/>
 					</Stack>
 				</AppShell.Navbar>
 			)}
@@ -215,6 +223,14 @@ export function App() {
 						element={
 							<ProtectedRoute>
 								<UpdatesPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/donate"
+						element={
+							<ProtectedRoute>
+								<DonatePage />
 							</ProtectedRoute>
 						}
 					/>

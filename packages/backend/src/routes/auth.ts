@@ -137,7 +137,7 @@ authRouter.post('/password', requireAuth, async (req, res) => {
 			.json({ error: 'Invalid password change payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
 		return;
 	}
-	const { current_password, new_password } = parsed.data;
+	const { current_password, new_password, email, name } = parsed.data;
 	const ok = await verifyPassword(req.user.password_hash, current_password);
 	if (!ok) {
 		res.status(401).json({ error: 'Current password incorrect', code: 'AUTH_FAILED' });
@@ -149,6 +149,28 @@ authRouter.post('/password', requireAuth, async (req, res) => {
 	}
 
 	await changePassword(req.user.id, new_password);
+
+	// First-login flow: also let the user pick their own email + name if
+	// they're still on the auto-generated defaults. This is the one-shot
+	// "set up your admin account" moment.
+	if (req.user.must_change_password && (email || name)) {
+		const knex = (await import('../db/db.js')).getDb();
+		const updates: Record<string, string> = { updated_at: new Date().toISOString() };
+		if (email && email !== req.user.email) {
+			// Email-uniqueness check
+			const existing = await knex('users').where({ email: email.toLowerCase() }).whereNot({ id: req.user.id }).first();
+			if (existing) {
+				res.status(409).json({ error: 'Email already in use', code: 'CONFLICT' });
+				return;
+			}
+			updates.email = email.toLowerCase();
+		}
+		if (name) updates.name = name;
+		if (Object.keys(updates).length > 1) {
+			await knex('users').where({ id: req.user.id }).update(updates);
+			log.info({ user_id: req.user.id, updates }, 'First-login profile updated');
+		}
+	}
 
 	// On first password change after bootstrap-seeded admin, drop the plaintext file.
 	if (req.user.must_change_password) {

@@ -18,6 +18,7 @@
     "audit": "Audit-Log",
     "updates": "Updates",
     "settings": "Einstellungen",
+    "donate": "Unterstützen",
     "coming_soon": "Kommt bald"
   },
   "updates": {
@@ -136,7 +137,21 @@
     "too_short": "Mindestens 12 Zeichen",
     "mismatch": "Passwörter stimmen nicht überein",
     "success_title": "Passwort aktualisiert",
-    "success_message": "Alles bereit."
+    "success_message": "Alles bereit.",
+    "first_setup_title": "Admin-Account einrichten",
+    "first_setup_alert_title": "Willkommen bei CloudGate",
+    "first_setup_alert_body": "Wähle deine eigene E-Mail + Name und ändere das Passwort. Diese Seite siehst du nur einmal.",
+    "first_setup_submit": "Admin-Account anlegen",
+    "first_setup_done_title": "Willkommen an Bord!",
+    "first_setup_done_message": "Account eingerichtet. Lass uns deinen ersten Cloudflare-Token hinzufügen.",
+    "account_email": "Deine E-Mail",
+    "account_email_hint": "Für Login und Benachrichtigungen. Standard: admin@cloudgate.local.",
+    "account_name": "Dein Name",
+    "email_taken": "Diese E-Mail-Adresse wird bereits von einem anderen Benutzer verwendet.",
+    "name_required": "Name erforderlich",
+    "divider_password": "und das Passwort",
+    "initial_password": "Auto-generiertes Initial-Passwort",
+    "initial_password_hint": "Aus docker logs oder /data/secrets/initial-admin.txt"
   },
   "dashboard": {
     "title": "Übersicht",
@@ -197,10 +212,31 @@
     "backup_passphrase_confirm": "Passphrase bestätigen",
     "backup_download": "Erstellen & herunterladen",
     "backup_done": "Backup heruntergeladen.",
+    "support_title": "CloudGate unterstützen",
+    "support_body": "CloudGate ist kostenlos und Open Source. Wenn es dir Zeit spart, hilft eine kleine Spende, Infrastruktur + Signing-Keys + den Zeitaufwand für Bugfixes zu decken.",
+    "support_button": "Spenden-Optionen zeigen",
     "about_title": "Über",
     "version": "Version",
     "uptime": "Laufzeit",
     "source": "Quellcode"
+  },
+  "donate": {
+    "title": "CloudGate unterstützen",
+    "intro": "CloudGate ist kostenlos und Open Source. Wenn dir das Tool einen Sonntagnachmittag spart, freue ich mich riesig über eine kleine einmalige Spende — sie deckt GHCR-Storage, Signing-Zertifikate und die Zeit für Bugfixes und neue Features.",
+    "thanks": "Jeder Beitrag wird persönlich gelesen. Vielen Dank! 🙏",
+    "label_address": "Adresse",
+    "label_link": "Link",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "one_click": "Ein-Klick PayPal",
+    "paypal_hint": "Öffnet in einem neuen Tab. PayPal-Konto, Karte oder PayPal Credit.",
+    "btc_hint": "Mainnet · scanne mit beliebiger Wallet (BIP21-kompatibel).",
+    "eth_hint": "Mainnet · scanne mit beliebiger Wallet (EIP-681 URI).",
+    "sol_hint": "Mainnet · scanne mit Phantom, Solflare, Backpack…",
+    "alternative_title": "Aktuell keine Spende möglich?",
+    "alternative_body": "Kein Problem — es gibt andere Wege zu helfen:",
+    "github_star": "Repo auf GitHub starren",
+    "report_bug": "Bug oder Feature-Request melden"
   },
   "audit": {
     "title": "Audit-Log",

@@ -18,6 +18,7 @@
     "audit": "Audit log",
     "updates": "Updates",
     "settings": "Settings",
+    "donate": "Support",
     "coming_soon": "Coming soon"
   },
   "updates": {
@@ -136,7 +137,21 @@
     "too_short": "Must be at least 12 characters",
     "mismatch": "Passwords don't match",
     "success_title": "Password updated",
-    "success_message": "You're all set."
+    "success_message": "You're all set.",
+    "first_setup_title": "Set up your admin account",
+    "first_setup_alert_title": "Welcome to CloudGate",
+    "first_setup_alert_body": "Pick your own email + name and change the password. This is the only time you'll see this screen.",
+    "first_setup_submit": "Create my admin account",
+    "first_setup_done_title": "Welcome aboard!",
+    "first_setup_done_message": "Account set up. Let's add your first Cloudflare token.",
+    "account_email": "Your email",
+    "account_email_hint": "Used for login and notifications. Defaults to admin@cloudgate.local.",
+    "account_name": "Your name",
+    "email_taken": "That email is already used by another user.",
+    "name_required": "Name is required",
+    "divider_password": "and the password",
+    "initial_password": "Auto-generated initial password",
+    "initial_password_hint": "From docker logs or /data/secrets/initial-admin.txt"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -197,10 +212,31 @@
     "backup_passphrase_confirm": "Confirm passphrase",
     "backup_download": "Generate and download",
     "backup_done": "Backup downloaded.",
+    "support_title": "Support CloudGate",
+    "support_body": "CloudGate is free and open source. If it saves you time, a one-time tip helps cover infrastructure + signing keys + the time spent fixing bugs.",
+    "support_button": "Show donation options",
     "about_title": "About",
     "version": "Version",
     "uptime": "Uptime",
     "source": "Source code"
+  },
+  "donate": {
+    "title": "Support CloudGate",
+    "intro": "CloudGate is free and open source. If it saves you a Sunday afternoon, a small one-time tip is hugely appreciated — it covers GHCR storage, signing certs, and the time spent on bug-fixes + new features.",
+    "thanks": "Every contribution is read personally. Thank you! 🙏",
+    "label_address": "Address",
+    "label_link": "Link",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "one_click": "One-click PayPal",
+    "paypal_hint": "Opens in a new tab. PayPal account, card or PayPal Credit.",
+    "btc_hint": "Mainnet · scan with any wallet (BIP21-compatible).",
+    "eth_hint": "Mainnet · scan with any wallet (EIP-681 URI).",
+    "sol_hint": "Mainnet · scan with Phantom, Solflare, Backpack…",
+    "alternative_title": "Can't donate right now?",
+    "alternative_body": "No problem — there are other ways to help:",
+    "github_star": "Star the repo on GitHub",
+    "report_bug": "Report a bug or feature request"
   },
   "audit": {
     "title": "Audit log",

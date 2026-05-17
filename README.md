@@ -6,6 +6,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Build](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml)
+[![Sponsor](https://img.shields.io/badge/💛-Sponsor-ff6620.svg)](SPONSORING.md)
 
 ---
 
@@ -143,6 +144,20 @@ That's it. CloudGate manages keys, secrets, and updates automatically.
 
 PRs welcome. Read [`CLAUDE.md`](CLAUDE.md) first — especially the persistence and migration rules.
 See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for the dev workflow.
+
+## 💛 Support
+
+CloudGate is free forever (MIT) but maintained by one person in spare time. If it saves you a Sunday afternoon, a small tip helps cover infrastructure + signing keys + ongoing dev time:
+
+- ☕ [**PayPal**](https://www.paypal.me/EliasK09) — one-click
+- ₿ Bitcoin: `bc1qphk3h7sw6j429c62ypw6zxgmkfeevmxs437ze3`
+- ⟠ Ethereum: `0x81deF905D66fd17433003e749f1e69bCFd95664d`
+- ◎ Solana: `G362aMnx7jSXp4iWtCwyw2yXy52ukRVoFgYCpw4aqrPQ`
+
+The running app has all of these as scannable QR codes in **Sidebar → Support**.
+Full details in [SPONSORING.md](SPONSORING.md).
+
+Can't donate? Starring the repo and reporting bugs are equally helpful.
 
 ## License
 
