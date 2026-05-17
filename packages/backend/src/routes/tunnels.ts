@@ -13,6 +13,7 @@ import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
+import { audit } from '../middleware/audit.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { getAccountById, decryptCredentials } from '../services/cf-account.js';
 import { CloudflareApiError, clientFor } from '../services/cloudflare-client.js';
@@ -75,7 +76,11 @@ function publicTunnel(row: TunnelRow): {
 // ---------------------------------------------------------------------------
 // POST /
 // ---------------------------------------------------------------------------
-tunnelsRouter.post('/', requireAuth, requirePasswordSet, async (req, res) => {
+tunnelsRouter.post('/', requireAuth, requirePasswordSet, audit({
+	action: 'tunnel.created',
+	entityType: 'tunnel',
+	meta: (req) => ({ name: req.body?.name }),
+}), async (req, res) => {
 	if (!req.user) {
 		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 		return;
@@ -174,7 +179,11 @@ tunnelsRouter.get('/', requireAuth, requirePasswordSet, async (req, res) => {
 // ---------------------------------------------------------------------------
 // DELETE /:id
 // ---------------------------------------------------------------------------
-tunnelsRouter.delete('/:id', requireAuth, requirePasswordSet, async (req, res) => {
+tunnelsRouter.delete('/:id', requireAuth, requirePasswordSet, audit({
+	action: 'tunnel.deleted',
+	entityType: 'tunnel',
+	entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
+}), async (req, res) => {
 	if (!req.user) {
 		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 		return;

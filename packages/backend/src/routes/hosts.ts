@@ -14,6 +14,7 @@ import { Router, type Router as RouterType } from 'express';
 import { CreateProxyHostRequestSchema } from '@cloudgate/shared';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
+import { audit } from '../middleware/audit.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { deployHost, undeployHost } from '../services/host-deploy.js';
 import { publish } from '../services/events.js';
@@ -93,7 +94,11 @@ async function ownsHost(userId: number, hostId: number): Promise<HostRow | null>
 // ---------------------------------------------------------------------------
 // POST /
 // ---------------------------------------------------------------------------
-hostsRouter.post('/', requireAuth, requirePasswordSet, async (req, res) => {
+hostsRouter.post('/', requireAuth, requirePasswordSet, audit({
+	action: 'host.created',
+	entityType: 'host',
+	meta: (req) => ({ hostname: req.body?.hostname, mode: req.body?.mode }),
+}), async (req, res) => {
 	if (!req.user) {
 		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 		return;
@@ -212,7 +217,11 @@ hostsRouter.get('/:id', requireAuth, requirePasswordSet, async (req, res) => {
 // ---------------------------------------------------------------------------
 // DELETE /:id
 // ---------------------------------------------------------------------------
-hostsRouter.delete('/:id', requireAuth, requirePasswordSet, async (req, res) => {
+hostsRouter.delete('/:id', requireAuth, requirePasswordSet, audit({
+	action: 'host.deleted',
+	entityType: 'host',
+	entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
+}), async (req, res) => {
 	if (!req.user) {
 		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 		return;

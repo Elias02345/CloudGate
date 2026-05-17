@@ -23,6 +23,7 @@ import { DashboardPage } from './pages/DashboardPage.js';
 import { HostFormPage } from './pages/HostFormPage.js';
 import { HostsPage } from './pages/HostsPage.js';
 import { LoginPage } from './pages/LoginPage.js';
+import { OnboardingPage } from './pages/OnboardingPage.js';
 import { PasswordChangePage } from './pages/PasswordChangePage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
 import { RestorePage } from './pages/RestorePage.js';
@@ -137,6 +138,14 @@ export function App() {
 				<Routes>
 					<Route path="/login" element={<LoginPage />} />
 					<Route path="/restore" element={<RestorePage />} />
+					<Route
+						path="/onboarding"
+						element={
+							<ProtectedRoute>
+								<OnboardingPage />
+							</ProtectedRoute>
+						}
+					/>
 					<Route
 						path="/password"
 						element={

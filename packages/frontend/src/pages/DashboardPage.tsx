@@ -8,12 +8,14 @@ import {
 	IconWorld,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useCloudflareAccounts } from '../api/cloudflare.js';
 import { useHosts } from '../api/hosts.js';
 import { useTunnels } from '../api/tunnels.js';
 import { api } from '../api/client.js';
+import { wasOnboardingDismissed } from './OnboardingPage.js';
 
 interface HealthResponse {
 	status: string;
@@ -61,6 +63,7 @@ function StatCard({
 
 export function DashboardPage() {
 	const { t } = useTranslation();
+	const navigate = useNavigate();
 	const health = useQuery<HealthResponse>({
 		queryKey: ['health'],
 		queryFn: () => api('/health'),
@@ -72,6 +75,21 @@ export function DashboardPage() {
 
 	const accountsCount = accounts.data?.accounts.length ?? 0;
 	const tunnelsCount = tunnels.data?.tunnels.length ?? 0;
+
+	// Auto-redirect new users to onboarding (unless dismissed)
+	const allEmpty =
+		!accounts.isLoading &&
+		!tunnels.isLoading &&
+		!hosts.isLoading &&
+		accountsCount === 0 &&
+		tunnelsCount === 0 &&
+		(hosts.data?.hosts.length ?? 0) === 0;
+	useEffect(() => {
+		if (allEmpty && !wasOnboardingDismissed()) {
+			navigate('/onboarding', { replace: true });
+		}
+	}, [allEmpty, navigate]);
+
 	const tunnelsRunning = tunnels.data?.tunnels.filter((t) => t.live_status === 'running').length ?? 0;
 	const hostsCount = hosts.data?.hosts.length ?? 0;
 	const hostsLive = hosts.data?.hosts.filter((h) => h.enabled && h.last_deployed_at && !h.last_error).length ?? 0;

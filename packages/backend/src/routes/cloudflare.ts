@@ -11,6 +11,7 @@
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { childLogger } from '../logger.js';
+import { audit } from '../middleware/audit.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import {
 	type DbCfAccount,
@@ -41,7 +42,11 @@ const CreateAccountSchema = z.object({
 // ---------------------------------------------------------------------------
 // POST /accounts
 // ---------------------------------------------------------------------------
-cloudflareRouter.post('/accounts', requireAuth, requirePasswordSet, async (req, res) => {
+cloudflareRouter.post('/accounts', requireAuth, requirePasswordSet, audit({
+	action: 'cf_account.added',
+	entityType: 'cf_account',
+	meta: (req) => ({ label: req.body?.label }),
+}), async (req, res) => {
 	if (!req.user) {
 		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 		return;
@@ -112,7 +117,11 @@ cloudflareRouter.get('/accounts', requireAuth, requirePasswordSet, async (req, r
 // ---------------------------------------------------------------------------
 // DELETE /accounts/:id
 // ---------------------------------------------------------------------------
-cloudflareRouter.delete('/accounts/:id', requireAuth, requirePasswordSet, async (req, res) => {
+cloudflareRouter.delete('/accounts/:id', requireAuth, requirePasswordSet, audit({
+	action: 'cf_account.deleted',
+	entityType: 'cf_account',
+	entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
+}), async (req, res) => {
 	if (!req.user) {
 		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 		return;
