@@ -70,13 +70,15 @@ describe('restore', () => {
 	it('rejects wrong passphrase with CGBK_DECRYPT_FAILED', async () => {
 		const cgbk = await buildBackup(srcDir, 'correct-passphrase');
 		const { restoreFromBuffer } = await import('../src/services/restore.js');
-		await expect(restoreFromBuffer(cgbk, 'wrong-passphrase')).rejects.toThrow(/CGBK_DECRYPT_FAILED/);
+		await expect(restoreFromBuffer(cgbk, 'wrong-passphrase')).rejects.toMatchObject({ code: 'CGBK_DECRYPT_FAILED' });
 	});
 
 	it('rejects file without CGBACKUP magic header', async () => {
 		const bogus = Buffer.from('NOT-A-CLOUDGATE-BACKUP-FILE-AT-ALL-EVER');
 		const { restoreFromBuffer } = await import('../src/services/restore.js');
-		await expect(restoreFromBuffer(bogus, 'whatever')).rejects.toThrow(/CGBK_BAD_MAGIC/);
+		// 38 bytes is too short to hold the full header (8+1+16+12+16=53 minimum).
+		// Service rejects with CGBK_TOO_SHORT before it can check the magic header.
+		await expect(restoreFromBuffer(bogus, 'whatever')).rejects.toMatchObject({ code: 'CGBK_TOO_SHORT' });
 	});
 
 	it('refuses to overwrite an existing install without force=true', async () => {
@@ -88,7 +90,7 @@ describe('restore', () => {
 
 		const cgbk = await buildBackup(srcDir, 'pw');
 		const { restoreFromBuffer } = await import('../src/services/restore.js');
-		await expect(restoreFromBuffer(cgbk, 'pw')).rejects.toThrow(/DATA_DIR_NOT_EMPTY/);
+		await expect(restoreFromBuffer(cgbk, 'pw')).rejects.toMatchObject({ code: 'DATA_DIR_NOT_EMPTY' });
 
 		// Existing files should still be there
 		expect(readFileSync(join(dataDir, 'db', 'db.sqlite'), 'utf8')).toBe('EXISTING');

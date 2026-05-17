@@ -35,7 +35,9 @@ ingress:
   - service: http_status:404
 `;
 
-const engine = new Liquid({ trimTagLeft: true, trimOutputLeft: true });
+// trimTagLeft strips whitespace around {% for %} blocks for clean YAML.
+// trimOutputLeft would strip the space after 'key: ' so we leave it off.
+const engine = new Liquid({ trimTagLeft: true });
 
 export interface RenderHost {
 	hostname: string;
