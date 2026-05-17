@@ -18,6 +18,8 @@
 DATA_DIR="${CLOUDGATE_DATA_DIR:-/data}"
 APP_DIR="/app"
 LOG_PREFIX="[bootstrap]"
+PUID="${PUID:-}"
+PGID="${PGID:-}"
 
 log() {
   echo "${LOG_PREFIX} $*"
@@ -25,6 +27,26 @@ log() {
 
 err() {
   echo "${LOG_PREFIX} ERROR: $*" >&2
+}
+
+# -----------------------------------------------------------------------------
+# PUID/PGID — LinuxServer.io-style user-id mapping for /data ownership.
+# When the user mounts a volume from the host, /data may need to be owned by
+# a specific UID/GID so the host can read/write it cleanly. Optional.
+# -----------------------------------------------------------------------------
+apply_uid_mapping() {
+  if [ -z "$PUID" ] && [ -z "$PGID" ]; then
+    return 0
+  fi
+  if ! command -v chown >/dev/null 2>&1; then
+    log "chown not available — skipping PUID/PGID"
+    return 0
+  fi
+  if [ -n "$PUID" ]; then
+    log "Setting /data owner to UID=$PUID"
+    chown -R "$PUID:${PGID:-$PUID}" "$DATA_DIR" 2>/dev/null \
+      || log "WARN: chown -R $PUID:$PGID failed (continuing, may break later writes)"
+  fi
 }
 
 # -----------------------------------------------------------------------------
@@ -87,6 +109,8 @@ main() {
     finalize "fail-data-dir"
     return 1
   fi
+
+  apply_uid_mapping
 
   if ! run_node_bootstrap; then
     finalize "fail-node-bootstrap"

@@ -60,7 +60,28 @@ async function main(): Promise<void> {
 
 	const app = express();
 	app.disable('x-powered-by');
-	app.use(helmet({ contentSecurityPolicy: false })); // CSP set per-route once frontend is wired
+	// Mantine + emotion inject inline styles, so style-src needs 'unsafe-inline'.
+	// Script-src stays strict (no inline JS). connect-src 'self' covers /api + SSE.
+	app.use(
+		helmet({
+			contentSecurityPolicy: {
+				useDefaults: true,
+				directives: {
+					defaultSrc: ["'self'"],
+					scriptSrc: ["'self'"],
+					styleSrc: ["'self'", "'unsafe-inline'"],
+					imgSrc: ["'self'", 'data:', 'blob:'],
+					fontSrc: ["'self'", 'data:'],
+					connectSrc: ["'self'"],
+					frameAncestors: ["'none'"],
+					formAction: ["'self'"],
+					baseUri: ["'self'"],
+					objectSrc: ["'none'"],
+				},
+			},
+			crossOriginEmbedderPolicy: false, // would break TOTP QR-code image rendering
+		})
+	);
 	app.use(compression());
 	app.use(cors({ origin: cfg.NODE_ENV === 'development' ? true : false, credentials: true }));
 	app.use(pinoHttp({ logger }));
