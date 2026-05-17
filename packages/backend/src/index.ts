@@ -30,6 +30,7 @@ import { cloudflareRouter } from './routes/cloudflare.js';
 import { eventsRouter } from './routes/events.js';
 import { healthRouter } from './routes/health.js';
 import { hostsRouter } from './routes/hosts.js';
+import { restoreRouter } from './routes/restore.js';
 import { totpRouter } from './routes/totp.js';
 import { tunnelsRouter } from './routes/tunnels.js';
 import { updatesRouter } from './routes/updates.js';
@@ -62,8 +63,13 @@ async function main(): Promise<void> {
 	app.use(helmet({ contentSecurityPolicy: false })); // CSP set per-route once frontend is wired
 	app.use(compression());
 	app.use(cors({ origin: cfg.NODE_ENV === 'development' ? true : false, credentials: true }));
-	app.use(express.json({ limit: '1mb' }));
 	app.use(pinoHttp({ logger }));
+
+	// Restore endpoint accepts raw octet-stream (.cgbk file). Must be wired
+	// BEFORE express.json so the body parser doesn't consume the stream.
+	app.use('/api/restore', restoreRouter);
+
+	app.use(express.json({ limit: '1mb' }));
 
 	app.use('/api', globalLimiter);
 	app.use('/api/health', healthRouter);

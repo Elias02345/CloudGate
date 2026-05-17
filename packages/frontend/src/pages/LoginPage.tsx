@@ -1,11 +1,12 @@
-import { Alert, Button, Card, PasswordInput, Stack, TextInput, Title } from '@mantine/core';
+import { Alert, Anchor, Button, Card, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLogin, useMe } from '../api/auth.js';
 import { ApiError } from '../api/client.js';
+import { useRestoreEligibility } from '../api/restore.js';
 
 export function LoginPage() {
 	const { t } = useTranslation();
@@ -13,6 +14,7 @@ export function LoginPage() {
 	const location = useLocation();
 	const { data: me } = useMe();
 	const login = useLogin();
+	const eligibility = useRestoreEligibility();
 
 	// If already logged in, hop straight to the destination.
 	useEffect(() => {
@@ -79,6 +81,14 @@ export function LoginPage() {
 							</Button>
 						</Stack>
 					</form>
+					{eligibility.data?.fresh && (
+						<Text size="xs" c="dimmed" ta="center">
+							{t('login.restore_hint')}{' '}
+							<Anchor component={Link} to="/restore">
+								{t('login.restore_link')}
+							</Anchor>
+						</Text>
+					)}
 				</Stack>
 			</Card>
 		</Stack>

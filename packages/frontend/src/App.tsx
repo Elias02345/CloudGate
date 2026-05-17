@@ -25,6 +25,7 @@ import { HostsPage } from './pages/HostsPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { PasswordChangePage } from './pages/PasswordChangePage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
+import { RestorePage } from './pages/RestorePage.js';
 import { TunnelsPage } from './pages/TunnelsPage.js';
 import { UpdatesPage } from './pages/UpdatesPage.js';
 
@@ -135,6 +136,7 @@ export function App() {
 			<AppShell.Main>
 				<Routes>
 					<Route path="/login" element={<LoginPage />} />
+					<Route path="/restore" element={<RestorePage />} />
 					<Route
 						path="/password"
 						element={

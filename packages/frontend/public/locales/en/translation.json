@@ -64,7 +64,22 @@
     "password_required": "Password is required",
     "failed": "Login failed",
     "bad_credentials": "Email or password is incorrect.",
-    "unknown_error": "Something went wrong. Try again in a moment."
+    "unknown_error": "Something went wrong. Try again in a moment.",
+    "restore_hint": "Have a backup from a previous CloudGate install?",
+    "restore_link": "Restore it"
+  },
+  "restore": {
+    "title": "Restore from backup",
+    "intro": "Upload an encrypted .cgbk file from a previous CloudGate install. This only works on a fresh container — your existing data is protected.",
+    "back_to_login": "← back to login",
+    "file_field": "Backup file (.cgbk)",
+    "passphrase_field": "Passphrase",
+    "submit": "Restore now",
+    "note": "After restore, the container needs to restart (a single 'docker restart cloudgate' or simply restart the host).",
+    "success_title": "Restore successful",
+    "success_body": "{{files}} files restored ({{mb}} MB total). Restart the container, then login with your previous credentials.",
+    "go_to_login": "Go to login",
+    "restart_hint": "Run: docker restart cloudgate"
   },
   "password": {
     "title": "Change password",
