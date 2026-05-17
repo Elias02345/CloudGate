@@ -8,8 +8,8 @@
  * when the backend cannot import its own files.
  */
 
-import { existsSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
+import { copyFile, readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import express from 'express';
 
@@ -25,6 +25,8 @@ app.get('/', (_req, res) => {
 	res.send(renderPage());
 });
 
+// --- Status ---------------------------------------------------------------
+
 app.get('/api/status', async (_req, res) => {
 	const bootstrapError = await readJsonIfExists(join(DATA_DIR, '.bootstrap-error'));
 	const bootstrapComplete = await readJsonIfExists(join(DATA_DIR, '.bootstrap-complete'));
@@ -38,6 +40,8 @@ app.get('/api/status', async (_req, res) => {
 		last_known_version: versionFile,
 	});
 });
+
+// --- Logs -----------------------------------------------------------------
 
 app.get('/api/logs/:file', async (req, res) => {
 	const allowed = new Set(['cloudgate.log', 'cloudflared.log', 'update-history.log']);
@@ -58,6 +62,120 @@ app.get('/api/logs/:file', async (req, res) => {
 		res.status(500).json({ error: (err as Error).message });
 	}
 });
+
+// --- DB backups: list + restore ------------------------------------------
+
+interface BackupEntry {
+	name: string;
+	size: number;
+	mtime: string;
+	type: 'pre-update' | 'manual';
+}
+
+app.get('/api/backups', (_req, res) => {
+	const dir = join(DATA_DIR, 'db', 'backups');
+	const entries: BackupEntry[] = [];
+	if (existsSync(dir)) {
+		for (const name of readdirSync(dir)) {
+			if (!name.endsWith('.sqlite')) continue;
+			try {
+				const stat = statSync(join(dir, name));
+				entries.push({
+					name,
+					size: stat.size,
+					mtime: stat.mtime.toISOString(),
+					type: name.startsWith('pre-update-') ? 'pre-update' : 'manual',
+				});
+			} catch {
+				/* ignore stat failure */
+			}
+		}
+	}
+	// Newest first
+	entries.sort((a, b) => (a.mtime < b.mtime ? 1 : -1));
+	res.json({ backups: entries });
+});
+
+app.post('/api/restore-db', async (req, res) => {
+	const body = req.body as { name?: string; confirm?: string };
+	if (!body?.name) {
+		res.status(400).json({ error: 'Missing "name"' });
+		return;
+	}
+	if (body.confirm !== 'I-UNDERSTAND') {
+		res.status(400).json({ error: 'Confirmation phrase missing or wrong (must be "I-UNDERSTAND")' });
+		return;
+	}
+	const safe = body.name.replace(/[^a-zA-Z0-9._-]/g, '');
+	const src = join(DATA_DIR, 'db', 'backups', safe);
+	const dst = join(DATA_DIR, 'db', 'db.sqlite');
+	if (!existsSync(src)) {
+		res.status(404).json({ error: 'Backup not found' });
+		return;
+	}
+	try {
+		await copyFile(src, dst);
+		// Remove WAL/SHM files — they'll be regenerated against the restored DB
+		for (const aux of ['db.sqlite-wal', 'db.sqlite-shm']) {
+			const path = join(DATA_DIR, 'db', aux);
+			if (existsSync(path)) await unlink(path).catch(() => null);
+		}
+		res.json({ ok: true, restored: safe, message: 'DB restored. Restart the container.' });
+	} catch (err) {
+		res.status(500).json({ error: (err as Error).message });
+	}
+});
+
+// --- Soft reset: clear bootstrap markers, keep data ----------------------
+
+app.post('/api/soft-reset', async (req, res) => {
+	const body = req.body as { confirm?: string };
+	if (body.confirm !== 'I-UNDERSTAND') {
+		res.status(400).json({ error: 'Confirmation phrase missing or wrong' });
+		return;
+	}
+	for (const marker of ['.bootstrap-complete', '.bootstrap-error', '.bootstrap-outcome']) {
+		const path = join(DATA_DIR, marker);
+		if (existsSync(path)) {
+			try {
+				await unlink(path);
+			} catch {
+				/* ignore */
+			}
+		}
+	}
+	res.json({ ok: true, message: 'Bootstrap markers cleared. Restart the container to re-bootstrap.' });
+});
+
+// --- Hard reset: move /data to /data.broken.<ts> -------------------------
+
+app.post('/api/hard-reset', (req, res) => {
+	const body = req.body as { confirm?: string };
+	// Stricter confirmation phrase to make accidents harder.
+	if (body.confirm !== 'YES-I-WANT-TO-LOSE-ALL-DATA') {
+		res.status(400).json({
+			error: 'Confirmation phrase missing or wrong. Must literally be "YES-I-WANT-TO-LOSE-ALL-DATA".',
+		});
+		return;
+	}
+	const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+	const archiveDir = `${DATA_DIR}.broken.${stamp}`;
+	try {
+		mkdirSync(archiveDir, { recursive: true });
+		for (const name of readdirSync(DATA_DIR)) {
+			renameSync(join(DATA_DIR, name), join(archiveDir, name));
+		}
+		res.json({
+			ok: true,
+			archived: archiveDir,
+			message: `Old /data moved to ${archiveDir}. Restart the container — it will bootstrap fresh.`,
+		});
+	} catch (err) {
+		res.status(500).json({ error: (err as Error).message });
+	}
+});
+
+// --- listen ---------------------------------------------------------------
 
 app.listen(PORT, () => {
 	console.log(`[recovery-ui] Listening on port ${PORT}, DATA_DIR=${DATA_DIR}`);
@@ -83,6 +201,9 @@ async function readTextIfExists(path: string): Promise<string | null> {
 	}
 }
 
+// Touch unused import — keep available for future endpoints
+void rmSync;
+
 function renderPage(): string {
 	return `<!doctype html>
 <html lang="en">
@@ -96,22 +217,28 @@ function renderPage(): string {
     font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0; padding: 0; background: #111; color: #e0e0e0;
   }
-  .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 32px 20px; }
   h1 { font-size: 28px; margin: 0 0 8px; color: #ff9966; }
   h2 { font-size: 18px; margin: 24px 0 8px; }
   .badge { display: inline-block; background: #ff9966; color: #111; padding: 2px 10px;
            border-radius: 4px; font-weight: 600; font-size: 12px; text-transform: uppercase; }
   .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px;
           padding: 16px; margin: 16px 0; }
+  .danger { border-color: #5a2020; }
   pre { background: #0a0a0a; padding: 12px; border-radius: 4px;
-        overflow-x: auto; font-size: 13px; }
-  button { background: #ff9966; color: #111; border: 0; padding: 10px 16px;
-           border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 14px;
-           margin-right: 8px; }
+        overflow-x: auto; font-size: 13px; max-height: 320px; }
+  button { background: #ff9966; color: #111; border: 0; padding: 8px 14px;
+           border-radius: 4px; cursor: pointer; font-weight: 600; font-size: 13px;
+           margin: 4px 8px 4px 0; }
   button.secondary { background: #2a2a2a; color: #e0e0e0; }
+  button.danger { background: #5a2020; color: #ffaaaa; }
   button:hover { opacity: 0.85; }
   a { color: #ff9966; }
   .muted { color: #888; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid #2a2a2a; text-align: left; }
+  .ok { color: #66cc88; }
+  .err { color: #ff8888; }
 </style>
 </head>
 <body>
@@ -136,11 +263,36 @@ function renderPage(): string {
     </div>
 
     <div class="card">
+      <h2>Database backups</h2>
+      <p class="muted">Restoring will overwrite the current DB. After restore, restart the container.</p>
+      <div id="backups">loading…</div>
+    </div>
+
+    <div class="card danger">
+      <h2>Reset options</h2>
+      <p class="muted">In order of severity. All require typing a confirmation phrase.</p>
+
+      <p>
+        <strong>Soft reset</strong> — clear bootstrap markers, then restart.
+        Keeps all your data + secrets. Re-runs migrations.
+      </p>
+      <button class="secondary" onclick="doSoftReset()">Soft reset…</button>
+
+      <p style="margin-top: 16px;">
+        <strong>Hard reset</strong> — move <code>/data</code> aside to
+        <code>/data.broken.&lt;ts&gt;</code>. Next start: completely fresh.
+        Old data is preserved on the volume (you can copy it out later).
+      </p>
+      <button class="danger" onclick="doHardReset()">Hard reset…</button>
+    </div>
+
+    <div class="card">
       <h2>What now?</h2>
       <ul>
         <li>Most failures are fixed by a clean container restart: <code>docker restart cloudgate</code>.</li>
-        <li>If that doesn't help, share the logs above when reporting an issue.</li>
-        <li>Detailed Anti-Brick recovery actions (snapshot restore, hard reset, downgrade) ship in M4.</li>
+        <li>If you see a bootstrap error above, the soft reset is usually enough.</li>
+        <li>Hard reset is the last resort — keep an off-host backup before doing it.</li>
+        <li>Share the logs above when filing an issue.</li>
       </ul>
     </div>
 
@@ -167,6 +319,67 @@ function loadLog(name) {
   }).catch(e => {
     el.textContent = 'Error: ' + e.message;
   });
+}
+
+function loadBackups() {
+  fetch('/api/backups').then(r => r.json()).then(j => {
+    const el = document.getElementById('backups');
+    if (!j.backups.length) {
+      el.innerHTML = '<p class="muted">No backups found in /data/db/backups/</p>';
+      return;
+    }
+    let html = '<table><tr><th>Name</th><th>Size</th><th>When</th><th>Type</th><th></th></tr>';
+    for (const b of j.backups) {
+      const kb = (b.size / 1024).toFixed(0);
+      html += '<tr><td><code>' + b.name + '</code></td><td>' + kb + ' KB</td><td>' + b.mtime.slice(0, 19) +
+              '</td><td>' + b.type + '</td><td><button onclick="restoreDb(\\''+ b.name +'\\')">Restore</button></td></tr>';
+    }
+    html += '</table>';
+    el.innerHTML = html;
+  }).catch(e => { document.getElementById('backups').textContent = 'Error: ' + e.message; });
+}
+loadBackups();
+
+function restoreDb(name) {
+  const phrase = prompt('This will OVERWRITE the current database with ' + name +
+    '.\\nType exactly:  I-UNDERSTAND  to proceed.');
+  if (phrase !== 'I-UNDERSTAND') return;
+  fetch('/api/restore-db', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, confirm: phrase })
+  }).then(r => r.json()).then(j => {
+    if (j.ok) {
+      alert('Restored: ' + j.restored + '\\n\\nNow run: docker restart cloudgate');
+    } else {
+      alert('Restore failed: ' + (j.error || 'unknown'));
+    }
+  }).catch(e => alert('Error: ' + e.message));
+}
+
+function doSoftReset() {
+  const phrase = prompt('Soft reset will clear bootstrap markers (your data is kept).\\nType exactly:  I-UNDERSTAND');
+  if (phrase !== 'I-UNDERSTAND') return;
+  fetch('/api/soft-reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirm: phrase })
+  }).then(r => r.json()).then(j => {
+    alert(j.ok ? (j.message + '\\nRun: docker restart cloudgate') : (j.error || 'failed'));
+  }).catch(e => alert('Error: ' + e.message));
+}
+
+function doHardReset() {
+  const phrase = prompt('HARD reset moves /data aside — fresh start.\\n' +
+    'Type EXACTLY:  YES-I-WANT-TO-LOSE-ALL-DATA');
+  if (phrase !== 'YES-I-WANT-TO-LOSE-ALL-DATA') return;
+  fetch('/api/hard-reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirm: phrase })
+  }).then(r => r.json()).then(j => {
+    alert(j.ok ? (j.message + '\\nRun: docker restart cloudgate') : (j.error || 'failed'));
+  }).catch(e => alert('Error: ' + e.message));
 }
 </script>
 </body>
