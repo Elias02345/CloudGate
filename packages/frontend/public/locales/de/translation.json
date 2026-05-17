@@ -261,6 +261,25 @@
     "no_logs": "(noch keine Logs)",
     "confirm_delete": "Tunnel {{name}} löschen? Wird auch aus Cloudflare entfernt."
   },
+  "bulk": {
+    "button": "Bulk-Import",
+    "title": "Hosts im Bulk importieren",
+    "intro": "Lade oder füge eine CSV ein — eine Zeile pro Host. Header-Zeile ist optional. Verfügbare Spalten: hostname, forward_host, forward_port, forward_scheme, mode, tunnel_id, cf_zone_id, no_tls_verify.",
+    "csv_example": "Beispiel-Header",
+    "default_tunnel": "Standard-Tunnel für Zeilen ohne tunnel_id",
+    "default_tunnel_hint": "Wird als Fallback verwendet, wenn die Zeile kein tunnel_id hat.",
+    "default_zone": "Standard-Zone für Zeilen ohne cf_zone_id",
+    "file_field": "CSV-Datei",
+    "paste_field": "…oder CSV-Inhalt hier einfügen",
+    "import_button": "Importieren",
+    "import_more": "Weitere importieren",
+    "empty": "Keine Zeilen zum Importieren.",
+    "no_account_warning": "Erst einen Cloudflare-Account hinzufügen.",
+    "summary": "{{ok}}/{{total}} erfolgreich importiert · {{fail}} fehlgeschlagen.",
+    "col_hostname": "Hostname",
+    "col_status": "Status",
+    "col_detail": "Detail"
+  },
   "hosts": {
     "title": "Hosts",
     "add": "Host hinzufügen",

@@ -261,6 +261,25 @@
     "no_logs": "(no logs yet)",
     "confirm_delete": "Delete tunnel {{name}}? It will also be removed from Cloudflare."
   },
+  "bulk": {
+    "button": "Bulk import",
+    "title": "Bulk import hosts",
+    "intro": "Upload or paste a CSV with one host per row. Header row is optional. Available columns: hostname, forward_host, forward_port, forward_scheme, mode, tunnel_id, cf_zone_id, no_tls_verify.",
+    "csv_example": "Example header",
+    "default_tunnel": "Default tunnel for rows without one",
+    "default_tunnel_hint": "Used as fallback when a row omits tunnel_id.",
+    "default_zone": "Default zone for rows without one",
+    "file_field": "CSV file",
+    "paste_field": "…or paste CSV content here",
+    "import_button": "Import",
+    "import_more": "Import more",
+    "empty": "No rows to import.",
+    "no_account_warning": "Add a Cloudflare account first.",
+    "summary": "{{ok}}/{{total}} imported successfully · {{fail}} failed.",
+    "col_hostname": "Hostname",
+    "col_status": "Status",
+    "col_detail": "Detail"
+  },
   "hosts": {
     "title": "Hosts",
     "add": "Add host",

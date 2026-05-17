@@ -30,6 +30,7 @@ import { cloudflareRouter } from './routes/cloudflare.js';
 import { eventsRouter } from './routes/events.js';
 import { healthRouter } from './routes/health.js';
 import { hostsRouter } from './routes/hosts.js';
+import { hostsBulkRouter } from './routes/hosts-bulk.js';
 import { restoreRouter } from './routes/restore.js';
 import { totpRouter } from './routes/totp.js';
 import { tunnelsRouter } from './routes/tunnels.js';
@@ -97,6 +98,7 @@ async function main(): Promise<void> {
 	app.use('/api/auth', authRouter);
 	app.use('/api/cloudflare', cloudflareRouter);
 	app.use('/api/tunnels', tunnelsRouter);
+	app.use('/api/hosts', hostsBulkRouter);
 	app.use('/api/hosts', hostsRouter);
 	app.use('/api/events', eventsRouter);
 	app.use('/api/audit', auditRouter);

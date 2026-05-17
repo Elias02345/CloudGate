@@ -11,13 +11,15 @@ import {
 	Text,
 	Title,
 } from '@mantine/core';
-import { IconAlertCircle, IconCertificate, IconCirclePlus, IconExternalLink, IconTrash } from '@tabler/icons-react';
+import { IconAlertCircle, IconCertificate, IconCirclePlus, IconExternalLink, IconTrash, IconUpload } from '@tabler/icons-react';
+import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@mantine/core';
 import { useIssueCert } from '../api/acme.js';
 import { useDeleteHost, useHosts, useToggleHost } from '../api/hosts.js';
+import { BulkImportModal } from '../components/BulkImportModal.js';
 
 export function HostsPage() {
 	const { t } = useTranslation();
@@ -26,6 +28,7 @@ export function HostsPage() {
 	const toggleMutation = useToggleHost();
 	const deleteMutation = useDeleteHost();
 	const issueCert = useIssueCert();
+	const [bulkOpened, bulkModal] = useDisclosure(false);
 
 	const onIssue = async (hostname: string) => {
 		if (!confirm(t('hosts.confirm_issue_cert', { hostname }))) return;
@@ -45,10 +48,16 @@ export function HostsPage() {
 		<Stack>
 			<Group justify="space-between">
 				<Title order={2}>{t('hosts.title')}</Title>
-				<Button leftSection={<IconCirclePlus size={18} />} onClick={() => navigate('/hosts/new')}>
-					{t('hosts.add')}
-				</Button>
+				<Group gap="xs">
+					<Button variant="default" leftSection={<IconUpload size={16} />} onClick={bulkModal.open}>
+						{t('bulk.button')}
+					</Button>
+					<Button leftSection={<IconCirclePlus size={18} />} onClick={() => navigate('/hosts/new')}>
+						{t('hosts.add')}
+					</Button>
+				</Group>
 			</Group>
+			<BulkImportModal opened={bulkOpened} onClose={bulkModal.close} />
 
 			<Card withBorder>
 				<Stack>
