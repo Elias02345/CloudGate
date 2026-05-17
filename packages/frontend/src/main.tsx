@@ -8,6 +8,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
+import { theme } from './theme.js';
 import './i18n.js';
 import './styles/global.css';
 
@@ -28,7 +29,7 @@ createRoot(rootEl).render(
 	<StrictMode>
 		<ErrorBoundary>
 			<QueryClientProvider client={queryClient}>
-				<MantineProvider defaultColorScheme="dark">
+				<MantineProvider theme={theme} defaultColorScheme="dark">
 					<Notifications position="top-right" />
 					<BrowserRouter>
 						<App />

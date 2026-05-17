@@ -76,14 +76,50 @@ That's it. CloudGate manages keys, secrets, and updates automatically.
 
 ## Features
 
-- 🔐 **Zero-config bootstrap** — auto-generates encryption keys, JWT secret, admin password
-- 🌐 **Cloudflare Tunnel manager** — full UI for tunnels, DNS routes, ingress rules
-- 🔀 **Hybrid mode** — per host: Cloudflare Tunnel OR local nginx reverse proxy
-- ♻️ **Self-updating** — checks GitHub for new releases, GPG-verified, atomic with auto-rollback
-- 🛡️ **Anti-brick guarantee** — Recovery UI when anything fails to start
-- 🌍 **i18n** — Deutsch + English from day one
-- 🔒 **2FA** — TOTP optional
-- 📜 **Audit log** — every change tracked
+| Category | Capability |
+|---|---|
+| **Install** | One-liner installer for Ubuntu/LXC · Plain `docker run` · Multi-arch GHCR images |
+| **Bootstrap** | Auto-generated encryption key, JWT secret, admin password — zero env vars required |
+| **Cloudflare** | API-token auth · multi-account · automatic zone sync · token revocation cleanup |
+| **Tunnels** | Create, restart, delete · live status · log tail · auto-revive on container restart · SIGHUP reload |
+| **Hosts (Cloudflare mode)** | DNS CNAME auto-create · tunnel-config rewrite · HEAD-probe test · enable/disable toggle |
+| **Hosts (local nginx mode)** | Per-host conf with `nginx -t` validation · Let's Encrypt via DNS-01 · auto-renewal cron |
+| **Security** | Argon2id passwords · AES-256-GCM token encryption · 2FA TOTP · per-route rate limiting · audit log |
+| **Self-update** | 6h GitHub polling · GPG signature verification · atomic in-place install with auto-rollback |
+| **Resilience** | Recovery UI fallback (no blank pages) · DB snapshots per update · sacred-path persistence contract |
+| **UX** | i18n DE+EN · light/dark theme · live dashboard · SSE-driven cache invalidation |
+
+## Architecture
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│  Browser ──http→ nginx :80 ──┬─→ React SPA (static)            │
+│                              └─→ /api → backend :3000          │
+└────────────────────────────────────────────────────────────────┘
+                                  │
+        ┌─────────────────────────┴───────────────────────────┐
+        │  CloudGate container (s6-overlay supervised)        │
+        │                                                     │
+        │  bootstrap (oneshot, idempotent) ─► success ─► main │
+        │                                  └─► failure ─► recovery-ui
+        │                                                     │
+        │  backend  ┌──► spawns cloudflared ──tunnels──→ CF   │
+        │           ├──► writes /data/cloudflared/config.yml  │
+        │           ├──► writes /data/nginx/hosts/*.conf      │
+        │           ├──► self-updater (GitHub polling)        │
+        │           └──► ACME cert renewal cron               │
+        └─────────────────────────────────────────────────────┘
+                                  │
+              ┌───────────────────┴───────────────────┐
+              │  /data volume — sacred                 │
+              │  secrets/  db/  cloudflared/           │
+              │  nginx/{hosts,certs,custom}  logs/     │
+              │  updates/{staging,backups}             │
+              │                                        │
+              │  NEVER overwritten by updates          │
+              │  (see CLAUDE.md §10.3)                 │
+              └────────────────────────────────────────┘
+```
 
 ## Documentation
 
