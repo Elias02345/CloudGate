@@ -42,11 +42,11 @@ function buildLogger(): pino.Logger {
 		}
 	}
 
+	// pino's transport.targets is incompatible with custom level formatters
+	// (formatters can't be serialised to worker threads). Drop the level
+	// formatter and keep default numeric levels (10/20/30/40/50/60).
 	return pino({
 		level: cfg.LOG_LEVEL,
-		formatters: {
-			level: (label) => ({ level: label }),
-		},
 		timestamp: pino.stdTimeFunctions.isoTime,
 		transport: { targets },
 	});
