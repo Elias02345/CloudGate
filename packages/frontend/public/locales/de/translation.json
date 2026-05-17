@@ -51,7 +51,9 @@
     "state_verifying": "Prüft Signatur…",
     "state_installing": "Installiert…",
     "state_rolling_back": "Rollback läuft",
-    "state_failed": "Fehlgeschlagen"
+    "state_failed": "Fehlgeschlagen",
+    "banner_label": "Update {{version}}",
+    "banner_tooltip": "Klicken zum Installieren von Version {{version}}"
   },
   "login": {
     "title": "Anmelden",

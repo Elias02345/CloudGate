@@ -16,6 +16,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import { useLogout, useMe } from './api/auth.js';
 import { useEventStream } from './api/events.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
+import { UpdateBanner } from './components/UpdateBanner.js';
 import { AuditLogPage } from './pages/AuditLogPage.js';
 import { CloudflarePage } from './pages/CloudflarePage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -55,7 +56,9 @@ export function App() {
 						</Text>
 					</Group>
 					{me?.user && (
-						<Menu shadow="md" position="bottom-end">
+						<Group gap="sm">
+							<UpdateBanner />
+							<Menu shadow="md" position="bottom-end">
 							<Menu.Target>
 								<ActionIcon variant="subtle" size="lg" aria-label={t('header.user_menu')}>
 									<IconUser size={18} />
@@ -75,6 +78,7 @@ export function App() {
 								</Menu.Item>
 							</Menu.Dropdown>
 						</Menu>
+						</Group>
 					)}
 				</Group>
 			</AppShell.Header>

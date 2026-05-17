@@ -51,7 +51,9 @@
     "state_verifying": "Verifying signature…",
     "state_installing": "Installing…",
     "state_rolling_back": "Rolling back",
-    "state_failed": "Failed"
+    "state_failed": "Failed",
+    "banner_label": "Update {{version}}",
+    "banner_tooltip": "Click to install version {{version}}"
   },
   "login": {
     "title": "Sign in",
