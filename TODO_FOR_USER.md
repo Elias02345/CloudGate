@@ -25,6 +25,9 @@
 | Deep `/api/health/deep` endpoint | ✅ | — |
 | Update banner in header | ✅ | — |
 | Bulk CSV import for hosts | ✅ | — |
+| Donate page (PayPal + BTC + ETH + SOL with QR codes) | ✅ | — |
+| First-login account setup (set your own email + name + password) | ✅ | — |
+| GitHub Sponsor button (FUNDING.yml + SPONSORING.md) | ✅ | — |
 | Audit-middleware on all writing routes | ✅ | — |
 | Log rotation (pino-roll 7-day, 10MB) | ✅ | — |
 | Docker HEALTHCHECK | ✅ | — |
