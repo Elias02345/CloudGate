@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useLogout, useMe } from './api/auth.js';
 import { useEventStream } from './api/events.js';
+import { AppTourProvider } from './components/AppTour.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
 import { UpdateBanner } from './components/UpdateBanner.js';
 import { AuditLogPage } from './pages/AuditLogPage.js';
@@ -45,6 +46,7 @@ export function App() {
 	useEventStream();
 
 	return (
+		<AppTourProvider>
 		<AppShell
 			header={{ height: 56 }}
 			navbar={showShell ? { width: 220, breakpoint: 'sm' } : undefined}
@@ -52,7 +54,7 @@ export function App() {
 		>
 			<AppShell.Header>
 				<Group h="100%" px="md" justify="space-between">
-					<Group gap="xs">
+					<Group gap="xs" data-tour="app-logo">
 						<IconCloudComputing size={26} color="#ff9966" />
 						<Title order={3}>CloudGate</Title>
 						<Text size="xs" c="dimmed">
@@ -89,7 +91,7 @@ export function App() {
 
 			{showShell && (
 				<AppShell.Navbar p="xs">
-					<Stack gap={4}>
+					<Stack gap={4} data-tour="sidebar-nav">
 						<NavLink
 							label={t('nav.dashboard')}
 							leftSection={<IconHome size={16} />}
@@ -238,5 +240,6 @@ export function App() {
 				</Routes>
 			</AppShell.Main>
 		</AppShell>
+		</AppTourProvider>
 	);
 }

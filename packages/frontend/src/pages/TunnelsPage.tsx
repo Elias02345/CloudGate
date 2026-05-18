@@ -112,7 +112,7 @@ export function TunnelsPage() {
 				</Button>
 			</Group>
 
-			<Card withBorder>
+			<Card withBorder data-tour="tunnels-list">
 				<Stack>
 					{tunnels.isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
 					{tunnels.data?.tunnels.length === 0 && (

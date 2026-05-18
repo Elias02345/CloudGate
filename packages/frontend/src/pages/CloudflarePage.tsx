@@ -81,7 +81,7 @@ export function CloudflarePage() {
 				</Button>
 			</Group>
 
-			<Card withBorder>
+			<Card withBorder data-tour="cloudflare-accounts">
 				<Stack>
 					<Text size="sm" c="dimmed">
 						{t('cloudflare.hint')}{' '}

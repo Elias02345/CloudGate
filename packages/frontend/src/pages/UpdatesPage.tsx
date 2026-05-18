@@ -95,7 +95,7 @@ export function UpdatesPage() {
 		<Stack>
 			<Title order={2}>{t('updates.title')}</Title>
 
-			<Card withBorder>
+			<Card withBorder data-tour="updates-status">
 				<Stack>
 					<Group justify="space-between">
 						<Stack gap={0}>

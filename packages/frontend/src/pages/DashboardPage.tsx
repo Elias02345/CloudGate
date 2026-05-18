@@ -112,7 +112,7 @@ export function DashboardPage() {
 				</Alert>
 			)}
 
-			<Grid>
+			<Grid data-tour="dashboard-health">
 				<Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
 					<StatCard
 						icon={<IconCloudCheck size={28} />}

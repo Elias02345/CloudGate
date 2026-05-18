@@ -1,0 +1,157 @@
+/* Onboarding step animations — pure CSS keyframes, no JS animation lib. */
+
+@keyframes cg-pulse-soft {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.06);
+		opacity: 0.92;
+	}
+}
+
+@keyframes cg-arrow-slide {
+	0% {
+		transform: translateX(-12px);
+		opacity: 0;
+	}
+	30% {
+		opacity: 1;
+	}
+	70% {
+		opacity: 1;
+	}
+	100% {
+		transform: translateX(12px);
+		opacity: 0;
+	}
+}
+
+@keyframes cg-key-glide {
+	0% {
+		transform: translate(-40px, -10px) rotate(-25deg);
+		opacity: 0;
+	}
+	30% {
+		opacity: 1;
+	}
+	100% {
+		transform: translate(40px, 10px) rotate(10deg);
+		opacity: 0;
+	}
+}
+
+@keyframes cg-tunnel-flow {
+	0% {
+		stroke-dashoffset: 240;
+	}
+	100% {
+		stroke-dashoffset: 0;
+	}
+}
+
+@keyframes cg-checkmark-draw {
+	0% {
+		stroke-dashoffset: 60;
+	}
+	100% {
+		stroke-dashoffset: 0;
+	}
+}
+
+@keyframes cg-spin {
+	from {
+		transform: rotate(0deg);
+	}
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes cg-confetti-pop {
+	0% {
+		transform: translateY(0) scale(0);
+		opacity: 1;
+	}
+	100% {
+		transform: translateY(-60px) scale(1);
+		opacity: 0;
+	}
+}
+
+@keyframes cg-bounce-in {
+	0% {
+		transform: scale(0.4);
+		opacity: 0;
+	}
+	60% {
+		transform: scale(1.12);
+		opacity: 1;
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+
+.cg-anim-pulse {
+	animation: cg-pulse-soft 2.4s ease-in-out infinite;
+	transform-origin: center;
+}
+
+.cg-anim-arrow {
+	animation: cg-arrow-slide 1.8s ease-in-out infinite;
+}
+
+.cg-anim-arrow-delay {
+	animation-delay: 0.6s;
+}
+
+.cg-anim-key {
+	animation: cg-key-glide 2.8s ease-in-out infinite;
+}
+
+.cg-anim-tunnel {
+	stroke-dasharray: 8 8;
+	animation: cg-tunnel-flow 1.4s linear infinite;
+}
+
+.cg-anim-check {
+	stroke-dasharray: 60;
+	stroke-dashoffset: 60;
+	animation: cg-checkmark-draw 0.8s ease-out 0.3s forwards;
+}
+
+.cg-anim-spin {
+	animation: cg-spin 1.2s linear infinite;
+	transform-origin: center;
+}
+
+.cg-anim-bounce {
+	animation: cg-bounce-in 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.cg-confetti {
+	position: absolute;
+	width: 8px;
+	height: 8px;
+	border-radius: 2px;
+	animation: cg-confetti-pop 1.4s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.cg-anim-pulse,
+	.cg-anim-arrow,
+	.cg-anim-key,
+	.cg-anim-tunnel,
+	.cg-anim-spin,
+	.cg-anim-bounce,
+	.cg-confetti {
+		animation: none;
+	}
+	.cg-anim-check {
+		stroke-dashoffset: 0;
+		animation: none;
+	}
+}

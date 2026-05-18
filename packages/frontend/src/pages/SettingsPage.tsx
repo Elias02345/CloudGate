@@ -15,17 +15,26 @@ import {
 	TextInput,
 	Title,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
 import { useMantineColorScheme } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconCheck, IconDownload, IconHeartFilled, IconShieldCheck } from '@tabler/icons-react';
+import {
+	IconBook,
+	IconCheck,
+	IconCompass,
+	IconDownload,
+	IconHeartFilled,
+	IconShieldCheck,
+	IconSparkles,
+} from '@tabler/icons-react';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { useMe } from '../api/auth.js';
+import { Link, useNavigate } from 'react-router-dom';
+import { useMe, usePatchUserFlags } from '../api/auth.js';
 import { api, getStoredToken } from '../api/client.js';
 import { useTotpDisable, useTotpEnable, useTotpSetup } from '../api/totp.js';
+import { useAppTour } from '../components/AppTour.js';
 
 interface HealthResponse {
 	status: string;
@@ -52,6 +61,8 @@ export function SettingsPage() {
 			<Title order={2}>{t('settings.title')}</Title>
 
 			<ProfileCard />
+
+			<HelpCard />
 
 			<TwoFactorCard />
 
@@ -90,6 +101,71 @@ export function SettingsPage() {
 			</Card>
 		);
 	}
+}
+
+// ===========================================================================
+// Help & Tour Card
+// ===========================================================================
+
+function HelpCard() {
+	const { t } = useTranslation();
+	const navigate = useNavigate();
+	const patchFlags = usePatchUserFlags();
+	const tour = useAppTour();
+
+	const onReplayTour = async () => {
+		try {
+			await patchFlags.mutateAsync({ tour_completed_at: null, tour_dismissed: false });
+		} catch {
+			/* non-blocking */
+		}
+		navigate('/');
+		// Small delay so the dashboard mounts before the spotlight tries to find
+		// its target.
+		setTimeout(() => tour.start(), 400);
+	};
+
+	const onReplayOnboarding = () => {
+		navigate('/onboarding');
+	};
+
+	return (
+		<Card withBorder>
+			<Stack>
+				<Group>
+					<IconCompass size={20} color="#22d3ee" />
+					<Title order={4}>{t('settings.help_title')}</Title>
+				</Group>
+				<Text size="sm" c="dimmed">
+					{t('settings.help_body')}
+				</Text>
+				<Group gap="xs">
+					<Button variant="light" leftSection={<IconSparkles size={16} />} onClick={onReplayOnboarding}>
+						{t('settings.help_replay_onboarding')}
+					</Button>
+					<Button
+						variant="light"
+						color="cyan"
+						leftSection={<IconCompass size={16} />}
+						onClick={onReplayTour}
+						loading={patchFlags.isPending}
+					>
+						{t('settings.help_replay_tour')}
+					</Button>
+					<Button
+						component="a"
+						href="https://github.com/Elias02345/CloudGate#documentation"
+						target="_blank"
+						rel="noreferrer"
+						variant="subtle"
+						leftSection={<IconBook size={16} />}
+					>
+						{t('settings.help_docs')}
+					</Button>
+				</Group>
+			</Stack>
+		</Card>
+	);
 }
 
 // ===========================================================================
@@ -147,7 +223,7 @@ function TwoFactorCard() {
 	};
 
 	return (
-		<Card withBorder>
+		<Card withBorder data-tour="settings-2fa">
 			<Stack>
 				<Group justify="space-between">
 					<Group>
@@ -280,7 +356,8 @@ function BackupCard() {
 			const blob = await res.blob();
 			const a = document.createElement('a');
 			a.href = URL.createObjectURL(blob);
-			const name = res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ?? 'cloudgate-backup.cgbk';
+			const name =
+				res.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] ?? 'cloudgate-backup.cgbk';
 			a.download = name;
 			a.click();
 			URL.revokeObjectURL(a.href);
@@ -296,7 +373,7 @@ function BackupCard() {
 	};
 
 	return (
-		<Card withBorder>
+		<Card withBorder data-tour="settings-backup">
 			<Stack>
 				<Group justify="space-between">
 					<Title order={4}>{t('settings.backup_title')}</Title>
@@ -380,7 +457,9 @@ function AboutCard(props: { version?: string; uptime?: number }) {
 					<Text size="sm" c="dimmed">
 						{t('settings.uptime')}
 					</Text>
-					<Text ff="monospace">{props.uptime !== undefined ? `${Math.floor(props.uptime / 60)} min` : '…'}</Text>
+					<Text ff="monospace">
+						{props.uptime !== undefined ? `${Math.floor(props.uptime / 60)} min` : '…'}
+					</Text>
 				</Group>
 				<Group justify="space-between">
 					<Text size="sm" c="dimmed">
