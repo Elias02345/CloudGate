@@ -5,7 +5,7 @@
 > credentials, your Cloudflare account, etc.). Code changes are committed to
 > `dev` by Claude directly.
 
-**Last updated:** 2026-05-17 — all pre-test polish complete, CI green
+**Last updated:** 2026-05-18 — M6 (Guided Onboarding) + M7 (Shell API) merged on `dev`, M8 (AI Assistant) in PR #3
 
 ---
 
@@ -28,6 +28,9 @@
 | Donate page (PayPal + BTC + ETH + SOL with QR codes) | ✅ | — |
 | First-login account setup (set your own email + name + password) | ✅ | — |
 | GitHub Sponsor button (FUNDING.yml + SPONSORING.md) | ✅ | — |
+| **M6** Guided Onboarding + react-joyride App-Tour | ✅ merged (PR #1) | Test the smooth wizard + tour after Starlink is up |
+| **M7** Shell API (long-lived `cgk_*` keys) + OpenAPI 3.1 + AGENT.md | ✅ merged (PR #2) | Try the curl recipes in `docs/AGENT.md` Recipe A–G |
+| **M8** Optional in-app AI assistant (Anthropic + OpenAI + custom) | 🟡 PR #3 (CI running) | Bring your own LLM key, pick autonomy mode (suggest_only recommended) |
 | Audit-middleware on all writing routes | ✅ | — |
 | Log rotation (pino-roll 7-day, 10MB) | ✅ | — |
 | Docker HEALTHCHECK | ✅ | — |
@@ -42,7 +45,33 @@
 | GPG release signing | ⬜ workflow ready, secret missing | Optional: create GPG key + add as secret |
 | Branch protection on `main` | ⬜ | One-time GitHub settings click |
 
-**Total commits on `dev`:** ~50 · **CI runs:** consistently green for the last batch.
+**Total commits on `dev`:** ~63 · **CI runs:** consistently green for the last batch.
+
+### M6/M7/M8 short summary
+
+**M6 Guided Onboarding** ([PR #1](https://github.com/Elias02345/CloudGate/pull/1) merged):
+- 6 steps with inline SVG animations (welcome cloud, key glide, tunnel flow, server check, spinner, confetti)
+- Step 5 runs `/api/health/deep` live + shows per-subsystem pass/fail with "fix this" hints
+- After Done → react-joyride spotlight tour through all 12 main pages
+- Settings → "Help & guided tour" card replays anything at any time
+- Persisted in DB as `user.{id}.onboarding_completed_at` / `tour_completed_at` / `tour_dismissed`
+
+**M7 Shell API** ([PR #2](https://github.com/Elias02345/CloudGate/pull/2) merged):
+- Long-lived `cgk_<prefix>_<secret>` keys, scoped `admin` | `read`, optional expiry
+- `requireAuth` accepts JWT OR API key — SPA unaffected
+- Per-key rate limit (60 admin / 120 read per minute)
+- CORS conditional: `Authorization: Bearer cgk_*` → `Access-Control-Allow-Origin: *`
+- `/api/openapi.json` live spec + `/api-docs` UI
+- `docs/AGENT.md` 470-line copy-paste guide for AI agents (Recipes A–G)
+- `Settings → API keys` page with create/rotate/revoke + shown-once plaintext modal
+
+**M8 In-App AI Assistant** ([PR #3](https://github.com/Elias02345/CloudGate/pull/3) — CI running):
+- Multi-provider: Anthropic (Claude) · OpenAI · Custom Base URL (OpenRouter, LMStudio, Ollama, vLLM)
+- 3 autonomy modes — `off` (default) · `suggest_only` (writes need click-confirm) · `autonomous`
+- 9 read tools + 4 write tools (create_host, toggle_host, delete_host, restart_tunnel)
+- Floating chat drawer with Markdown rendering (remark-gfm) and inline confirmation cards
+- API key stored AES-256-GCM-encrypted; never returned to the browser
+- New routes: `/api/ai/{settings,chat,conversations,confirm-action}`
 
 ---
 
