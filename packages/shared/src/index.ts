@@ -5,3 +5,4 @@ export * from './types/cloudflare.js';
 export * from './types/update.js';
 export * from './types/bootstrap.js';
 export * from './types/common.js';
+export * from './types/api-key.js';

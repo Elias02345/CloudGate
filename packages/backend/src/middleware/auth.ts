@@ -10,8 +10,9 @@
  */
 
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
-import { findUserById, publicUser, verifyAccessToken, type DbUser } from '../services/auth.js';
 import { childLogger } from '../logger.js';
+import { type DbUser, findUserById, publicUser, verifyAccessToken } from '../services/auth.js';
+import { looksLikeApiKey, tryApiKey } from './api-key.js';
 
 const log = childLogger('middleware:auth');
 
@@ -33,6 +34,26 @@ function extractToken(req: Request): string | null {
 }
 
 export const requireAuth: RequestHandler = async (req: Request, res: Response, next: NextFunction) => {
+	// Eager-auth (see index.ts) may have already authenticated this request
+	// via API key — req.user/req.apiKey are set. Skip duplicate work.
+	if (req.user) {
+		next();
+		return;
+	}
+
+	// API-key path: only attempted when the token starts with `cgk_`. Lets us
+	// give cleaner errors when the call shape is wrong (read-only scope used
+	// for a write etc.).
+	if (looksLikeApiKey(req)) {
+		const ok = await tryApiKey(req);
+		if (!ok) {
+			res.status(401).json({ error: 'Invalid API key', code: 'INVALID_API_KEY' });
+			return;
+		}
+		next();
+		return;
+	}
+
 	const token = extractToken(req);
 	if (!token) {
 		res.status(401).json({ error: 'Missing or malformed Authorization header', code: 'UNAUTHENTICATED' });

@@ -18,19 +18,22 @@ import pinoHttpDefault from 'pino-http';
 // biome-ignore lint/suspicious/noExplicitAny: see above
 const pinoHttp: (opts?: any) => RequestHandler = pinoHttpDefault as any;
 import { runBootstrap } from './bootstrap.js';
-import { getConfig, VERSION } from './config.js';
+import { VERSION, getConfig } from './config.js';
 import { closeDb } from './db/db.js';
 import { childLogger, logger } from './logger.js';
-import { globalLimiter } from './middleware/rate-limit.js';
+import { looksLikeApiKey, tryApiKey } from './middleware/api-key.js';
+import { apiKeyLimiter, globalLimiter } from './middleware/rate-limit.js';
 import { acmeRouter } from './routes/acme.js';
+import { apiKeysRouter } from './routes/api-keys.js';
 import { auditRouter } from './routes/audit.js';
 import { authRouter } from './routes/auth.js';
 import { backupRouter } from './routes/backup.js';
 import { cloudflareRouter } from './routes/cloudflare.js';
 import { eventsRouter } from './routes/events.js';
 import { healthRouter } from './routes/health.js';
-import { hostsRouter } from './routes/hosts.js';
 import { hostsBulkRouter } from './routes/hosts-bulk.js';
+import { hostsRouter } from './routes/hosts.js';
+import { openapiRouter } from './routes/openapi.js';
 import { restoreRouter } from './routes/restore.js';
 import { totpRouter } from './routes/totp.js';
 import { tunnelsRouter } from './routes/tunnels.js';
@@ -84,7 +87,41 @@ async function main(): Promise<void> {
 		})
 	);
 	app.use(compression());
-	app.use(cors({ origin: cfg.NODE_ENV === 'development' ? true : false, credentials: true }));
+	// CORS: browsers (cookie/JWT path) only see the SPA's own origin.
+	// API-key callers (Authorization: Bearer cgk_*) are allowed cross-origin
+	// because they explicitly authenticate per-request and have no implicit
+	// browser credentials.
+	app.use(
+		cors({
+			origin: (origin, cb) => {
+				if (cfg.NODE_ENV === 'development') {
+					cb(null, true);
+					return;
+				}
+				// Same-origin browser requests have no Origin header; allow.
+				if (!origin) {
+					cb(null, true);
+					return;
+				}
+				// In production, only allow same-origin (cors lib treats this as
+				// "echo the origin back"). Cross-origin browser requests stay
+				// blocked unless a curl client sets Authorization: Bearer cgk_*.
+				cb(null, origin === undefined);
+			},
+			credentials: true,
+			allowedHeaders: ['Content-Type', 'Authorization'],
+		})
+	);
+	// Allow API-key bearers from anywhere — overrides CORS for routes that
+	// will be hit by curl / AI agents.
+	app.use((req, res, next) => {
+		const auth = req.header('authorization');
+		if (auth && auth.toLowerCase().startsWith('bearer cgk_')) {
+			res.header('Access-Control-Allow-Origin', '*');
+			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+		}
+		next();
+	});
 	app.use(pinoHttp({ logger }));
 
 	// Restore endpoint accepts raw octet-stream (.cgbk file). Must be wired
@@ -93,7 +130,32 @@ async function main(): Promise<void> {
 
 	app.use(express.json({ limit: '1mb' }));
 
-	app.use('/api', globalLimiter);
+	// Eager API-key auth — if Authorization: Bearer cgk_... is present, resolve
+	// the user + scope BEFORE the rate limiter so the API-key tier kicks in.
+	app.use('/api', async (req, _res, next) => {
+		if (looksLikeApiKey(req)) {
+			await tryApiKey(req);
+			// silent on fail — requireAuth on the route will surface the 401
+		}
+		next();
+	});
+
+	app.use('/api', globalLimiter, apiKeyLimiter);
+
+	// Global write-scope guard: read-only API keys cannot perform non-GET ops.
+	app.use('/api', (req, res, next) => {
+		if (
+			req.apiKey?.scope === 'read' &&
+			req.method !== 'GET' &&
+			req.method !== 'HEAD' &&
+			req.method !== 'OPTIONS'
+		) {
+			res.status(403).json({ error: 'API key has read-only scope', code: 'INSUFFICIENT_SCOPE' });
+			return;
+		}
+		next();
+	});
+
 	app.use('/api/health', healthRouter);
 	app.use('/api/auth', authRouter);
 	app.use('/api/cloudflare', cloudflareRouter);
@@ -106,9 +168,13 @@ async function main(): Promise<void> {
 	app.use('/api/totp', totpRouter);
 	app.use('/api/updates', updatesRouter);
 	app.use('/api/acme', acmeRouter);
+	app.use('/api/api-keys', apiKeysRouter);
+	app.use('/api/openapi.json', openapiRouter);
 
 	// Revive any tunnels marked as running before previous shutdown
-	void initTunnelManager().catch((err) => log.warn({ err: (err as Error).message }, 'Tunnel manager init failed'));
+	void initTunnelManager().catch((err) =>
+		log.warn({ err: (err as Error).message }, 'Tunnel manager init failed')
+	);
 	void initUpdater().catch((err) => log.warn({ err: (err as Error).message }, 'Updater init failed'));
 	initRenewalCron();
 
