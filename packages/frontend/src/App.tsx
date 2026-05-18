@@ -1,11 +1,13 @@
 import { ActionIcon, AppShell, Group, Menu, NavLink, Stack, Text, Title } from '@mantine/core';
 import {
 	IconArrowUp,
+	IconBook,
 	IconClipboardList,
 	IconCloudCheck,
 	IconCloudComputing,
 	IconHeart,
 	IconHome,
+	IconKey,
 	IconLogout,
 	IconRoute,
 	IconServer2,
@@ -19,6 +21,8 @@ import { useEventStream } from './api/events.js';
 import { AppTourProvider } from './components/AppTour.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
 import { UpdateBanner } from './components/UpdateBanner.js';
+import { ApiDocsPage } from './pages/ApiDocsPage.js';
+import { ApiKeysPage } from './pages/ApiKeysPage.js';
 import { AuditLogPage } from './pages/AuditLogPage.js';
 import { CloudflarePage } from './pages/CloudflarePage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
@@ -28,8 +32,8 @@ import { HostsPage } from './pages/HostsPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { OnboardingPage } from './pages/OnboardingPage.js';
 import { PasswordChangePage } from './pages/PasswordChangePage.js';
-import { SettingsPage } from './pages/SettingsPage.js';
 import { RestorePage } from './pages/RestorePage.js';
+import { SettingsPage } from './pages/SettingsPage.js';
 import { TunnelsPage } from './pages/TunnelsPage.js';
 import { UpdatesPage } from './pages/UpdatesPage.js';
 
@@ -65,25 +69,25 @@ export function App() {
 						<Group gap="sm">
 							<UpdateBanner />
 							<Menu shadow="md" position="bottom-end">
-							<Menu.Target>
-								<ActionIcon variant="subtle" size="lg" aria-label={t('header.user_menu')}>
-									<IconUser size={18} />
-								</ActionIcon>
-							</Menu.Target>
-							<Menu.Dropdown>
-								<Menu.Label>{me.user.email}</Menu.Label>
-								<Menu.Divider />
-								<Menu.Item
-									leftSection={<IconLogout size={16} />}
-									onClick={async () => {
-										await logout.mutateAsync();
-										navigate('/login', { replace: true });
-									}}
-								>
-									{t('header.logout')}
-								</Menu.Item>
-							</Menu.Dropdown>
-						</Menu>
+								<Menu.Target>
+									<ActionIcon variant="subtle" size="lg" aria-label={t('header.user_menu')}>
+										<IconUser size={18} />
+									</ActionIcon>
+								</Menu.Target>
+								<Menu.Dropdown>
+									<Menu.Label>{me.user.email}</Menu.Label>
+									<Menu.Divider />
+									<Menu.Item
+										leftSection={<IconLogout size={16} />}
+										onClick={async () => {
+											await logout.mutateAsync();
+											navigate('/login', { replace: true });
+										}}
+									>
+										{t('header.logout')}
+									</Menu.Item>
+								</Menu.Dropdown>
+							</Menu>
 						</Group>
 					)}
 				</Group>
@@ -133,6 +137,18 @@ export function App() {
 							leftSection={<IconSettings size={16} />}
 							active={location.pathname.startsWith('/settings')}
 							onClick={() => navigate('/settings')}
+						/>
+						<NavLink
+							label={t('nav.api_keys')}
+							leftSection={<IconKey size={16} />}
+							active={location.pathname.startsWith('/api-keys')}
+							onClick={() => navigate('/api-keys')}
+						/>
+						<NavLink
+							label={t('nav.api_docs')}
+							leftSection={<IconBook size={16} />}
+							active={location.pathname.startsWith('/api-docs')}
+							onClick={() => navigate('/api-docs')}
 						/>
 						<NavLink
 							label={t('nav.donate')}
@@ -233,6 +249,22 @@ export function App() {
 						element={
 							<ProtectedRoute>
 								<DonatePage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/api-keys"
+						element={
+							<ProtectedRoute>
+								<ApiKeysPage />
+							</ProtectedRoute>
+						}
+					/>
+					<Route
+						path="/api-docs"
+						element={
+							<ProtectedRoute>
+								<ApiDocsPage />
 							</ProtectedRoute>
 						}
 					/>
