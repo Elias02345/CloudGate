@@ -9,6 +9,7 @@ import {
 	IconHome,
 	IconKey,
 	IconLogout,
+	IconRobot,
 	IconRoute,
 	IconServer2,
 	IconSettings,
@@ -18,9 +19,11 @@ import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useLogout, useMe } from './api/auth.js';
 import { useEventStream } from './api/events.js';
+import { AiChatFab } from './components/AiChat.js';
 import { AppTourProvider } from './components/AppTour.js';
 import { ProtectedRoute } from './components/ProtectedRoute.js';
 import { UpdateBanner } from './components/UpdateBanner.js';
+import { AiSettingsPage } from './pages/AiSettingsPage.js';
 import { ApiDocsPage } from './pages/ApiDocsPage.js';
 import { ApiKeysPage } from './pages/ApiKeysPage.js';
 import { AuditLogPage } from './pages/AuditLogPage.js';
@@ -151,6 +154,12 @@ export function App() {
 							onClick={() => navigate('/api-docs')}
 						/>
 						<NavLink
+							label={t('nav.ai')}
+							leftSection={<IconRobot size={16} color="#22d3ee" />}
+							active={location.pathname.startsWith('/ai')}
+							onClick={() => navigate('/ai')}
+						/>
+						<NavLink
 							label={t('nav.donate')}
 							leftSection={<IconHeart size={16} color="#ff6620" />}
 							active={location.pathname.startsWith('/donate')}
@@ -268,9 +277,18 @@ export function App() {
 							</ProtectedRoute>
 						}
 					/>
+					<Route
+						path="/ai"
+						element={
+							<ProtectedRoute>
+								<AiSettingsPage />
+							</ProtectedRoute>
+						}
+					/>
 					<Route path="*" element={<Navigate to="/" replace />} />
 				</Routes>
 			</AppShell.Main>
+			{showShell && <AiChatFab />}
 		</AppShell>
 		</AppTourProvider>
 	);
