@@ -13,6 +13,37 @@ export const UserSchema = z.object({
 });
 export type User = z.infer<typeof UserSchema>;
 
+/**
+ * Per-user UX flags. Stored in the `settings` table under the
+ * `user.{id}.<flag>` namespace. Returned from GET /me so the frontend can
+ * decide whether to auto-trigger onboarding, the app-tour, etc.
+ */
+export const UserFlagsSchema = z.object({
+	onboarding_completed_at: z.string().datetime().nullable(),
+	tour_completed_at: z.string().datetime().nullable(),
+	tour_dismissed: z.boolean(),
+});
+export type UserFlags = z.infer<typeof UserFlagsSchema>;
+
+export const MeResponseSchema = z.object({
+	user: UserSchema,
+	flags: UserFlagsSchema,
+});
+export type MeResponse = z.infer<typeof MeResponseSchema>;
+
+/**
+ * Patch one or more user flags. Frontend uses this to mark onboarding
+ * complete, dismiss the app-tour, etc. Missing keys are left untouched.
+ */
+export const PatchUserFlagsRequestSchema = z
+	.object({
+		onboarding_completed_at: z.string().datetime().nullable().optional(),
+		tour_completed_at: z.string().datetime().nullable().optional(),
+		tour_dismissed: z.boolean().optional(),
+	})
+	.refine((v) => Object.keys(v).length > 0, { message: 'At least one flag required' });
+export type PatchUserFlagsRequest = z.infer<typeof PatchUserFlagsRequestSchema>;
+
 export const LoginRequestSchema = z.object({
 	email: z.string().email(),
 	password: z.string().min(1),

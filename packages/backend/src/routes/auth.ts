@@ -11,9 +11,13 @@
  */
 
 import { unlink } from 'node:fs/promises';
+import {
+	ChangePasswordRequestSchema,
+	LoginRequestSchema,
+	PatchUserFlagsRequestSchema,
+} from '@cloudgate/shared';
 import { Router, type Router as RouterType } from 'express';
 import { authenticator } from 'otplib';
-import { ChangePasswordRequestSchema, LoginRequestSchema } from '@cloudgate/shared';
 import { dataPath } from '../config.js';
 import { childLogger } from '../logger.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -28,6 +32,7 @@ import {
 	verifyPassword,
 } from '../services/auth.js';
 import { decryptJson } from '../services/crypto.js';
+import { getUserFlags, patchUserFlags } from '../services/user-flags.js';
 
 interface EncryptedTotpSecret {
 	type: 'totp';
@@ -43,7 +48,9 @@ export const authRouter: RouterType = Router();
 authRouter.post('/login', authLimiter, async (req, res) => {
 	const parsed = LoginRequestSchema.safeParse(req.body);
 	if (!parsed.success) {
-		res.status(400).json({ error: 'Invalid login payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
+		res
+			.status(400)
+			.json({ error: 'Invalid login payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
 		return;
 	}
 	const { email, password } = parsed.data;
@@ -119,7 +126,33 @@ authRouter.get('/me', requireAuth, async (req, res) => {
 		res.status(500).json({ error: 'User missing on authenticated request', code: 'INTERNAL' });
 		return;
 	}
-	res.json({ user: publicUser(req.user) });
+	const flags = await getUserFlags(req.user.id);
+	res.json({ user: publicUser(req.user), flags });
+});
+
+// ---------------------------------------------------------------------------
+// PATCH /me/flags — set UX flags (onboarding progress, tour state)
+// ---------------------------------------------------------------------------
+authRouter.patch('/me/flags', requireAuth, async (req, res) => {
+	if (!req.user) {
+		res.status(500).json({ error: 'User missing on authenticated request', code: 'INTERNAL' });
+		return;
+	}
+	const parsed = PatchUserFlagsRequestSchema.safeParse(req.body);
+	if (!parsed.success) {
+		res
+			.status(400)
+			.json({ error: 'Invalid flag payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
+		return;
+	}
+	const flags = await patchUserFlags(req.user.id, parsed.data);
+	record({
+		user_id: req.user.id,
+		action: 'user.flag_set',
+		meta: parsed.data,
+		ip: req.ip ?? null,
+	});
+	res.json({ flags });
 });
 
 // ---------------------------------------------------------------------------
@@ -134,7 +167,11 @@ authRouter.post('/password', requireAuth, async (req, res) => {
 	if (!parsed.success) {
 		res
 			.status(400)
-			.json({ error: 'Invalid password change payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
+			.json({
+				error: 'Invalid password change payload',
+				code: 'BAD_REQUEST',
+				details: parsed.error.flatten(),
+			});
 		return;
 	}
 	const { current_password, new_password, email, name } = parsed.data;
@@ -158,7 +195,10 @@ authRouter.post('/password', requireAuth, async (req, res) => {
 		const updates: Record<string, string> = { updated_at: new Date().toISOString() };
 		if (email && email !== req.user.email) {
 			// Email-uniqueness check
-			const existing = await knex('users').where({ email: email.toLowerCase() }).whereNot({ id: req.user.id }).first();
+			const existing = await knex('users')
+				.where({ email: email.toLowerCase() })
+				.whereNot({ id: req.user.id })
+				.first();
 			if (existing) {
 				res.status(409).json({ error: 'Email already in use', code: 'CONFLICT' });
 				return;

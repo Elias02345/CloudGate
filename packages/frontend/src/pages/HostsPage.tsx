@@ -48,7 +48,7 @@ export function HostsPage() {
 		<Stack>
 			<Group justify="space-between">
 				<Title order={2}>{t('hosts.title')}</Title>
-				<Group gap="xs">
+				<Group gap="xs" data-tour="hosts-add-btn">
 					<Button variant="default" leftSection={<IconUpload size={16} />} onClick={bulkModal.open}>
 						{t('bulk.button')}
 					</Button>
@@ -59,7 +59,7 @@ export function HostsPage() {
 			</Group>
 			<BulkImportModal opened={bulkOpened} onClose={bulkModal.close} />
 
-			<Card withBorder>
+			<Card withBorder data-tour="hosts-mode-switch">
 				<Stack>
 					{hosts.isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
 					{hosts.data?.hosts.length === 0 && (

@@ -25,7 +25,7 @@ export function AuditLogPage() {
 				{t('audit.description')}
 			</Text>
 
-			<Card withBorder>
+			<Card withBorder data-tour="audit-filters">
 				<Stack>
 					{isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
 					{data && data.data.length === 0 && (

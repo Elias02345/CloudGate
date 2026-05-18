@@ -101,7 +101,7 @@ export function DonatePage() {
 				{t('donate.thanks')}
 			</Text>
 
-			<SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="sm">
+			<SimpleGrid cols={{ base: 1, sm: 2 }} spacing="md" mt="sm" data-tour="donate-cards">
 				{OPTIONS.map((opt) => (
 					<DonationCard key={opt.key} option={opt} />
 				))}
