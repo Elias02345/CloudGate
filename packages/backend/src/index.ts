@@ -24,6 +24,7 @@ import { childLogger, logger } from './logger.js';
 import { looksLikeApiKey, tryApiKey } from './middleware/api-key.js';
 import { apiKeyLimiter, globalLimiter } from './middleware/rate-limit.js';
 import { acmeRouter } from './routes/acme.js';
+import { aiRouter } from './routes/ai.js';
 import { apiKeysRouter } from './routes/api-keys.js';
 import { auditRouter } from './routes/audit.js';
 import { authRouter } from './routes/auth.js';
@@ -170,6 +171,7 @@ async function main(): Promise<void> {
 	app.use('/api/acme', acmeRouter);
 	app.use('/api/api-keys', apiKeysRouter);
 	app.use('/api/openapi.json', openapiRouter);
+	app.use('/api/ai', aiRouter);
 
 	// Revive any tunnels marked as running before previous shutdown
 	void initTunnelManager().catch((err) =>
