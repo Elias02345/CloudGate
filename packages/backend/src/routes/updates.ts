@@ -10,7 +10,14 @@
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { requireAdmin, requireAuth, requirePasswordSet } from '../middleware/auth.js';
-import { getStatus, triggerCheck, triggerInstall, updateChannel } from '../services/updater.js';
+import {
+	getStatus,
+	readLastUpdateMarker,
+	readUpdateLog,
+	triggerCheck,
+	triggerInstall,
+	updateChannel,
+} from '../services/updater.js';
 
 export const updatesRouter: RouterType = Router();
 
@@ -54,4 +61,28 @@ updatesRouter.post('/settings', requireAuth, requirePasswordSet, requireAdmin, a
 	}
 	await updateChannel(parsed.data.channel, parsed.data.mode);
 	res.json(getStatus());
+});
+
+/**
+ * Tail of /data/logs/update-history.log. Frontend uses this AFTER the
+ * backend restart to replay what the apply-update.sh script did while
+ * the backend was down.
+ */
+updatesRouter.get('/log', requireAuth, requirePasswordSet, async (req, res) => {
+	const lines = Math.max(1, Math.min(2000, Number.parseInt(String(req.query.lines ?? '300'), 10) || 300));
+	const result = await readUpdateLog(lines);
+	res.json(result);
+});
+
+/**
+ * Latest /data/updates/.last-update-*.json marker. Frontend reads this
+ * after reconnect to confirm `succeeded` / `rolled_back` / `failed`.
+ */
+updatesRouter.get('/last', requireAuth, requirePasswordSet, async (_req, res) => {
+	const marker = await readLastUpdateMarker();
+	if (!marker) {
+		res.status(404).json({ error: 'No previous update marker', code: 'NOT_FOUND' });
+		return;
+	}
+	res.json(marker);
 });

@@ -13,13 +13,8 @@ import {
 	Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import {
-	IconAlertCircle,
-	IconArrowUp,
-	IconCheck,
-	IconCircleCheck,
-	IconRefresh,
-} from '@tabler/icons-react';
+import { IconAlertCircle, IconArrowUp, IconCircleCheck, IconRefresh } from '@tabler/icons-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
 	type UpdateStatus,
@@ -28,6 +23,7 @@ import {
 	useUpdateSettings,
 	useUpdateStatus,
 } from '../api/updates.js';
+import { UpdateProgressModal, shouldShowModalForStatus } from '../components/UpdateProgressModal.js';
 
 function stateColor(s: UpdateStatus['state']): string {
 	switch (s) {
@@ -50,10 +46,22 @@ function stateColor(s: UpdateStatus['state']): string {
 
 export function UpdatesPage() {
 	const { t } = useTranslation();
-	const { data, isLoading } = useUpdateStatus();
+	// Poll every 2s while the modal is open so the install progress stays fresh
+	const [modalOpen, setModalOpen] = useState(false);
+	const [modalTarget, setModalTarget] = useState<string | null>(null);
+	const [modalStarting, setModalStarting] = useState<string | null>(null);
+	const { data, isLoading } = useUpdateStatus({ refetchInterval: modalOpen ? 2_000 : 30_000 });
 	const check = useCheckUpdates();
 	const install = useInstallUpdate();
 	const settings = useUpdateSettings();
+
+	// Auto-open modal if the backend reports an install is already in flight
+	// (e.g. user navigated to /updates mid-update from elsewhere).
+	if (!modalOpen && shouldShowModalForStatus(data) && data?.target_version && data?.current_version) {
+		setModalTarget(data.target_version);
+		setModalStarting(data.current_version);
+		setModalOpen(true);
+	}
 
 	const onCheck = async () => {
 		try {
@@ -66,14 +74,14 @@ export function UpdatesPage() {
 	const onInstall = async () => {
 		if (!data?.latest_version) return;
 		if (!confirm(t('updates.confirm_install', { version: data.latest_version }))) return;
+		// Open the progress modal *before* the install RPC returns — the RPC
+		// resolves quickly (it spawns a detached child) and we want the SSE
+		// subscription up before backend events start firing.
+		setModalTarget(data.latest_version);
+		setModalStarting(data.current_version);
+		setModalOpen(true);
 		try {
-			const r = await install.mutateAsync(data.latest_version);
-			notifications.show({
-				color: 'green',
-				icon: <IconCheck size={18} />,
-				title: t('updates.install_dispatched_title'),
-				message: r.message,
-			});
+			await install.mutateAsync(data.latest_version);
 		} catch (err) {
 			notifications.show({ color: 'red', message: (err as Error).message });
 		}
@@ -94,6 +102,15 @@ export function UpdatesPage() {
 	return (
 		<Stack>
 			<Title order={2}>{t('updates.title')}</Title>
+
+			{modalTarget && modalStarting && (
+				<UpdateProgressModal
+					opened={modalOpen}
+					onClose={() => setModalOpen(false)}
+					targetVersion={modalTarget}
+					startingVersion={modalStarting}
+				/>
+			)}
 
 			<Card withBorder data-tour="updates-status">
 				<Stack>
@@ -155,7 +172,12 @@ export function UpdatesPage() {
 					)}
 
 					<Box>
-						<Button variant="light" leftSection={<IconRefresh size={16} />} onClick={onCheck} loading={check.isPending}>
+						<Button
+							variant="light"
+							leftSection={<IconRefresh size={16} />}
+							onClick={onCheck}
+							loading={check.isPending}
+						>
 							{t('updates.check_now')}
 						</Button>
 					</Box>

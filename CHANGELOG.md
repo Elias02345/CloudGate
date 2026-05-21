@@ -9,6 +9,26 @@ _Nothing yet._
 
 ---
 
+## [0.1.2] — 2026-05-21
+
+### Added
+
+- **Interactive update modal.** Clicking "Install update" now opens a full progress dialog instead of firing a toast and leaving the user blind:
+  - **Real progress bar** with accurate stage-by-stage percentages (download = 50% weight, verify = 8%, apply = 30%). Download phase tracks live bytes-downloaded / total, including a human-readable byte counter (e.g. `1.4 MB / 12.7 MB`).
+  - **9-stage list** with running spinner / done checkmark / pending circle per step (acquire lock → download tarball → download SHA → download GPG sig → verify SHA → verify GPG → spawn applier → apply → done).
+  - **Collapsible terminal view** with live log lines from the backend during the download/verify phase, then the historical `/data/logs/update-history.log` tail after the apply finishes.
+  - **Auto-reconnect on container restart**: when the SSE drops mid-update, the modal switches to a 2-second `/api/health` poll, interpolates progress 65→95 % via wall clock, and detects success by comparing the returned version to the starting version.
+  - **Auto-reload to new frontend** with a 5-second countdown once the new backend is reachable.
+  - **Rollback / failure detection** via the `.last-update-*.json` marker: shows the reason from `apply-update.sh` so the user understands what triggered the rollback.
+- **`GET /api/updates/log?lines=N`** — tails `/data/logs/update-history.log` so the SPA can replay the apply phase after reconnect.
+- **`GET /api/updates/last`** — returns the most recent `.last-update-*.json` marker for outcome detection.
+- **New SSE topic `update.progress`** with fine-grained step + percent + download bytes.
+
+### Changed
+- `services/updater.ts` now tracks `step`, `step_label`, `overall_progress`, `download_bytes`, `download_total`, `started_at`, `target_version` on the status payload. All optional — older frontends ignore them.
+
+---
+
 ## [0.1.1] — 2026-05-18
 
 ### Fixed

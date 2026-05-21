@@ -27,6 +27,7 @@ export type EventTopic =
 	| 'tunnel.deleted'
 	| 'update.available'
 	| 'update.installing'
+	| 'update.progress'
 	| 'update.completed'
 	| 'update.failed';
 
