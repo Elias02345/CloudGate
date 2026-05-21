@@ -9,6 +9,14 @@ _Nothing yet._
 
 ---
 
+## [0.1.1] — 2026-05-18
+
+### Fixed
+
+- **Tunnel creation crashed with `cf.zeroTrust.tunnels.create is not a function (TUNNEL_CREATE_FAILED)`.** The `cloudflare` npm SDK moved the `cfd_tunnel` endpoints under `.cloudflared` one level deeper. Tunnel create + delete now use the correct SDK path. ([8f5b987](https://github.com/Elias02345/CloudGate/commit/8f5b987))
+
+---
+
 ## [0.1.0] — 2026-05-18
 
 First user-facing release. Everything from M0 through M8 — `:latest` images now exist on GHCR and the one-liner installer picks them up.
