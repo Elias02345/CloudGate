@@ -108,8 +108,10 @@ tunnelsRouter.post('/', requireAuth, requirePasswordSet, audit({
 	try {
 		const cf = clientFor(creds.token);
 		// SDK call — Cloudflare returns the created tunnel object with .id (UUID).
+		// In cloudflare@4.x the cfd_tunnel endpoints live under .cloudflared,
+		// not directly on .tunnels.
 		// biome-ignore lint/suspicious/noExplicitAny: SDK types are loose around tunnel_secret param
-		const created = (await (cf.zeroTrust.tunnels as any).create({
+		const created = (await (cf.zeroTrust.tunnels.cloudflared as any).create({
 			account_id: account.account_tag,
 			name,
 			tunnel_secret: tunnelSecret,
@@ -215,7 +217,9 @@ tunnelsRouter.delete('/:id', requireAuth, requirePasswordSet, audit({
 			if (creds.type === 'api_token') {
 				const cf = clientFor(creds.token);
 				// biome-ignore lint/suspicious/noExplicitAny: SDK types
-				await (cf.zeroTrust.tunnels as any).delete(row.tunnel_id, { account_id: row.account_tag });
+				await (cf.zeroTrust.tunnels.cloudflared as any).delete(row.tunnel_id, {
+					account_id: row.account_tag,
+				});
 			}
 		} catch (err) {
 			log.warn({ err: (err as Error).message, tunnel_id: row.tunnel_id }, 'CF tunnel delete failed (continuing)');
