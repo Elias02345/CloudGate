@@ -68,3 +68,12 @@ export function useTestHost() {
 		mutationFn: (id: number) => api<{ ok?: boolean; status?: number; reachable?: false; error?: string }>(`/hosts/${id}/test`),
 	});
 }
+
+export function useRedeployHost() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) => api<{ ok: true }>(`/hosts/${id}/redeploy`, { method: 'POST' }),
+		onSuccess: () => qc.invalidateQueries({ queryKey: ['hosts'] }),
+		onError: () => qc.invalidateQueries({ queryKey: ['hosts'] }), // refresh so user sees new last_error
+	});
+}

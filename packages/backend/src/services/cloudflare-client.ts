@@ -35,11 +35,14 @@ export interface CloudflareZoneSummary {
 export class CloudflareApiError extends Error {
 	status: number;
 	code: string;
-	constructor(status: number, code: string, message: string) {
+	/** Cloudflare's own numeric error code (10000 = auth, 1009 = forbidden, etc.) */
+	cfErrorCode: number | null;
+	constructor(status: number, code: string, message: string, cfErrorCode: number | null = null) {
 		super(message);
 		this.name = 'CloudflareApiError';
 		this.status = status;
 		this.code = code;
+		this.cfErrorCode = cfErrorCode;
 	}
 }
 
@@ -108,13 +111,39 @@ export async function listZones(token: string): Promise<CloudflareZoneSummary[]>
 }
 
 /**
- * Convert SDK errors into a clean CloudflareApiError that routes can serialise.
+ * Convert SDK errors into a clean CloudflareApiError that routes can
+ * serialise. We dig into the SDK's structured `.errors` array (when present)
+ * to extract Cloudflare's own numeric code so callers can react to specific
+ * failure modes (10000 = auth, 1004 = invalid arg, 1009 = forbidden, etc.).
  */
 function mapError(err: unknown, what: string): CloudflareApiError {
-	const e = err as { status?: number; statusCode?: number; message?: string; code?: string };
+	const e = err as {
+		status?: number;
+		statusCode?: number;
+		message?: string;
+		code?: string;
+		errors?: Array<{ code?: number | string; message?: string }>;
+	};
 	const status = e.status ?? e.statusCode ?? 500;
-	const code = e.code ?? (status === 401 || status === 403 ? 'CF_AUTH_FAILED' : 'CF_API_ERROR');
-	const message = e.message ?? `Cloudflare API error during ${what}`;
-	log.warn({ status, code, message, what }, 'Cloudflare API call failed');
-	return new CloudflareApiError(status, code, message);
+
+	// Try to surface the most specific CF error
+	const cfErr = e.errors?.[0];
+	const cfCode = cfErr?.code !== undefined ? Number(cfErr.code) : null;
+	const cfMessage = cfErr?.message ?? null;
+
+	let code = e.code ?? 'CF_API_ERROR';
+	if (cfCode === 10000) code = 'CF_AUTH_REJECTED';
+	else if (cfCode === 9109) code = 'CF_TOKEN_INVALID';
+	else if (cfCode === 81057) code = 'CF_RECORD_ALREADY_EXISTS';
+	else if (cfCode === 1004) code = 'CF_INVALID_ARG';
+	else if (status === 401 || status === 403) code = 'CF_AUTH_FAILED';
+
+	// Compose a useful message: prefer CF's text, fall back to SDK message.
+	let message = cfMessage ?? e.message ?? `Cloudflare API error during ${what}`;
+	if (cfCode !== null) {
+		message = `${message} (cf:${cfCode})`;
+	}
+
+	log.warn({ status, code, cfCode, message, what }, 'Cloudflare API call failed');
+	return new CloudflareApiError(status, code, message, cfCode);
 }

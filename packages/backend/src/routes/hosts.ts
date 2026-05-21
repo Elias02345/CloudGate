@@ -272,6 +272,35 @@ hostsRouter.post('/:id/toggle', requireAuth, requirePasswordSet, async (req, res
 });
 
 // ---------------------------------------------------------------------------
+// POST /:id/redeploy — retry a failed deploy
+// ---------------------------------------------------------------------------
+hostsRouter.post('/:id/redeploy', requireAuth, requirePasswordSet, async (req, res) => {
+	if (!req.user) {
+		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+		return;
+	}
+	const id = Number.parseInt(String(req.params.id ?? ''), 10);
+	const row = await ownsHost(req.user.id, id);
+	if (!row) {
+		res.status(404).json({ error: 'Host not found', code: 'NOT_FOUND' });
+		return;
+	}
+	const knex = getDb();
+	// Clear stale error so the UI knows the retry is in flight
+	await knex('proxy_hosts').where({ id }).update({ last_error: null });
+	try {
+		await deployHost(id);
+		res.json({ ok: true });
+	} catch (err) {
+		// deployHost already wrote last_error; surface the message synchronously
+		res.status(502).json({
+			error: (err as Error).message,
+			code: 'DEPLOY_FAILED',
+		});
+	}
+});
+
+// ---------------------------------------------------------------------------
 // GET /:id/test
 // ---------------------------------------------------------------------------
 hostsRouter.get('/:id/test', requireAuth, requirePasswordSet, async (req, res) => {

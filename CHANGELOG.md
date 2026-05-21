@@ -9,6 +9,20 @@ _Nothing yet._
 
 ---
 
+## [0.1.3] — 2026-05-21
+
+### Added
+- **Retry-deploy button** for hosts in error state. A small orange refresh icon appears next to errored hosts; clicking it re-runs the deploy without deleting + recreating the host. Endpoint: `POST /api/hosts/:id/redeploy`.
+
+### Changed
+- **Cloudflare DNS errors are now human-readable.** The raw `403 {"success":false,"errors":[{"code":10000,...}]}` JSON dump that used to show up in the host's `last_error` field is replaced with actionable messages. Specifically:
+  - `cf:10000` (Authentication error) → "Cloudflare rejected the DNS record write for `<host>`. Token is missing the 'Zone → DNS → Edit' permission on zone `<zoneId>`, OR the token's 'Zone Resources' scope excludes this zone. Fix it at dash.cloudflare.com/profile/api-tokens, then click Re-deploy."
+  - `cf:81057` (record already exists) → "A DNS record for `<host>` already exists in Cloudflare. Delete the conflicting record from your CF dashboard, then click Re-deploy."
+  - 401/403 (generic) → "Cloudflare rejected the DNS request: `<message>`. Verify the API token in Settings → Cloudflare."
+- `CloudflareApiError` now carries a `cfErrorCode` field with Cloudflare's own numeric code, extracted from the SDK's `.errors[]` array. Future code paths can branch on this for finer-grained handling.
+
+---
+
 ## [0.1.2] — 2026-05-21
 
 ### Added

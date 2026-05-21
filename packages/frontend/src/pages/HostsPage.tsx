@@ -11,14 +11,22 @@ import {
 	Text,
 	Title,
 } from '@mantine/core';
-import { IconAlertCircle, IconCertificate, IconCirclePlus, IconExternalLink, IconTrash, IconUpload } from '@tabler/icons-react';
+import {
+	IconAlertCircle,
+	IconCertificate,
+	IconCirclePlus,
+	IconExternalLink,
+	IconRefresh,
+	IconTrash,
+	IconUpload,
+} from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@mantine/core';
 import { useIssueCert } from '../api/acme.js';
-import { useDeleteHost, useHosts, useToggleHost } from '../api/hosts.js';
+import { useDeleteHost, useHosts, useRedeployHost, useToggleHost } from '../api/hosts.js';
 import { BulkImportModal } from '../components/BulkImportModal.js';
 
 export function HostsPage() {
@@ -27,8 +35,26 @@ export function HostsPage() {
 	const hosts = useHosts();
 	const toggleMutation = useToggleHost();
 	const deleteMutation = useDeleteHost();
+	const redeployMutation = useRedeployHost();
 	const issueCert = useIssueCert();
 	const [bulkOpened, bulkModal] = useDisclosure(false);
+
+	const onRedeploy = async (id: number, hostname: string) => {
+		try {
+			await redeployMutation.mutateAsync(id);
+			notifications.show({
+				color: 'green',
+				title: t('hosts.redeploy_ok_title'),
+				message: t('hosts.redeploy_ok_message', { hostname }),
+			});
+		} catch (err) {
+			notifications.show({
+				color: 'red',
+				title: t('hosts.redeploy_failed_title'),
+				message: (err as Error).message,
+			});
+		}
+	};
 
 	const onIssue = async (hostname: string) => {
 		if (!confirm(t('hosts.confirm_issue_cert', { hostname }))) return;
@@ -129,6 +155,17 @@ export function HostsPage() {
 										</Table.Td>
 										<Table.Td>
 											<Group gap={4} justify="flex-end">
+												{h.last_error && (
+													<ActionIcon
+														variant="subtle"
+														color="orange"
+														onClick={() => void onRedeploy(h.id, h.hostname)}
+														loading={redeployMutation.isPending}
+														title={t('hosts.redeploy')}
+													>
+														<IconRefresh size={16} />
+													</ActionIcon>
+												)}
 												{h.mode === 'local_nginx' && (
 													<ActionIcon
 														variant="subtle"

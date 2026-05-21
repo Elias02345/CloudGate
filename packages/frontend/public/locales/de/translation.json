@@ -538,6 +538,10 @@
     "issue_cert": "Let's-Encrypt-Zertifikat ausstellen (DNS-01)",
     "confirm_issue_cert": "Let's-Encrypt-Zertifikat für {{hostname}} via DNS-01 anfordern? CloudGate legt einen temporären TXT-Eintrag in Cloudflare an, prüft ihn, speichert das Zertifikat. Dauert ~1 Minute.",
     "cert_issued_title": "Zertifikat ausgestellt",
-    "cert_issued_message": "{{hostname}} hat jetzt TLS bis {{expires}}."
+    "cert_issued_message": "{{hostname}} hat jetzt TLS bis {{expires}}.",
+    "redeploy": "Deploy erneut versuchen (nach Token-/DNS-Fix)",
+    "redeploy_ok_title": "Deploy erneut versucht",
+    "redeploy_ok_message": "{{hostname}} erfolgreich ausgerollt.",
+    "redeploy_failed_title": "Erneutes Deploy fehlgeschlagen"
   }
 }

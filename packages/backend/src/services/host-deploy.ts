@@ -116,28 +116,33 @@ export async function deployHost(hostId: number): Promise<void> {
 		const target = `${tunnelRow.tunnel_id}.cfargotunnel.com`;
 		let dnsRecordId = host.dns_record_id;
 
-		if (dnsRecordId) {
-			// Update existing record (in case of edits)
-			// biome-ignore lint/suspicious/noExplicitAny: CF SDK types
-			await (cf.dns.records as any).update(dnsRecordId, {
-				zone_id: zoneRow.zone_id,
-				type: 'CNAME',
-				name: host.hostname,
-				content: target,
-				proxied: true,
-				ttl: 1,
-			});
-		} else {
-			// biome-ignore lint/suspicious/noExplicitAny: CF SDK types
-			const created = (await (cf.dns.records as any).create({
-				zone_id: zoneRow.zone_id,
-				type: 'CNAME',
-				name: host.hostname,
-				content: target,
-				proxied: true,
-				ttl: 1,
-			})) as { id: string };
-			dnsRecordId = created.id;
+		try {
+			if (dnsRecordId) {
+				// biome-ignore lint/suspicious/noExplicitAny: CF SDK types
+				await (cf.dns.records as any).update(dnsRecordId, {
+					zone_id: zoneRow.zone_id,
+					type: 'CNAME',
+					name: host.hostname,
+					content: target,
+					proxied: true,
+					ttl: 1,
+				});
+			} else {
+				// biome-ignore lint/suspicious/noExplicitAny: CF SDK types
+				const created = (await (cf.dns.records as any).create({
+					zone_id: zoneRow.zone_id,
+					type: 'CNAME',
+					name: host.hostname,
+					content: target,
+					proxied: true,
+					ttl: 1,
+				})) as { id: string };
+				dnsRecordId = created.id;
+			}
+		} catch (cfErr) {
+			// Translate SDK errors into actionable messages so the user
+			// knows exactly what to fix without having to read JSON.
+			throw translateDnsError(cfErr, host.hostname, zoneRow.zone_id);
 		}
 
 		await knex('proxy_hosts').where({ id: hostId }).update({
@@ -157,6 +162,65 @@ export async function deployHost(hostId: number): Promise<void> {
 		publish('host.deploy_failed', { id: hostId, hostname: host.hostname, error: msg });
 		throw err;
 	}
+}
+
+/**
+ * Map a raw Cloudflare SDK error from a DNS-record call into a user-readable
+ * `last_error` message. The previous behaviour just dumped the raw 403 JSON
+ * payload which is technically true but useless ("Authentication error"
+ * doesn't tell the user what to fix).
+ */
+function translateDnsError(cfErr: unknown, hostname: string, zoneId: string): CloudflareApiError {
+	const e = cfErr as {
+		status?: number;
+		statusCode?: number;
+		message?: string;
+		errors?: Array<{ code?: number | string; message?: string }>;
+	};
+	const status = e.status ?? e.statusCode ?? 500;
+	const first = e.errors?.[0];
+	const code = first?.code !== undefined ? Number(first.code) : null;
+	const cfMsg = first?.message ?? '';
+
+	if (code === 10000) {
+		// CF rejected the token for this specific DNS call. Most likely the
+		// token has no DNS:Edit scope for this zone (despite working for
+		// tunnel creation, which uses Account.Cloudflare-Tunnel scope).
+		return new CloudflareApiError(
+			403,
+			'CF_DNS_PERMISSION',
+			`Cloudflare rejected the DNS record write for ${hostname}. ` +
+				`Token is missing the "Zone → DNS → Edit" permission on zone ${zoneId}, ` +
+				`OR the token's "Zone Resources" scope excludes this zone. ` +
+				`Fix it at dash.cloudflare.com/profile/api-tokens, then click Re-deploy.`,
+			10000,
+		);
+	}
+	if (code === 81057) {
+		// CF says "An A, AAAA, or CNAME record with that host already exists"
+		return new CloudflareApiError(
+			409,
+			'CF_RECORD_ALREADY_EXISTS',
+			`A DNS record for ${hostname} already exists in Cloudflare. ` +
+				`Delete the conflicting record from your CF dashboard, then click Re-deploy.`,
+			81057,
+		);
+	}
+	if (status === 403 || status === 401) {
+		return new CloudflareApiError(
+			status,
+			'CF_AUTH_FAILED',
+			`Cloudflare rejected the DNS request: ${cfMsg || e.message || 'auth failed'}. ` +
+				`Verify the API token in Settings → Cloudflare.`,
+			code,
+		);
+	}
+	return new CloudflareApiError(
+		status,
+		'CF_DNS_ERROR',
+		`DNS record write failed for ${hostname}: ${cfMsg || e.message || 'unknown error'}`,
+		code,
+	);
 }
 
 /**
