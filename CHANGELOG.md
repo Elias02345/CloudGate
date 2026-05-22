@@ -9,6 +9,39 @@ _Nothing yet._
 
 ---
 
+## [0.1.5] — 2026-05-22
+
+### Fixed
+
+**Self-updater was broken** — every install attempt (since v0.1.0) rolled back. Three intertwined bugs:
+
+- **Release tarball was missing `node_modules`.** The release workflow did `cp -r packages/backend/dist` which packed only the compiled JavaScript — but `apply-update.sh` needs `./node_modules/.bin/knex` to run the database migration step. After the swap, the new `/app/backend/` had no node_modules → `knex` not found → migrations failed → rollback.
+  - **Fix**: release.yml now runs `pnpm --filter @cloudgate/backend deploy --prod` (and same for recovery-ui) to bundle a self-contained directory with `dist/` + `package.json` + production-only `node_modules/`. The same command the Dockerfile already used for the runtime image — release tarballs now match.
+  - **Sanity check**: build fails fast if `backend/node_modules/.bin/knex` is missing from the staging dir.
+
+- **`apply-update.sh` had no fallback for incomplete tarballs.** If a future release tarball ever ships incomplete, it would brick the same way.
+  - **Fix**: after the swap, if `/app/backend/node_modules/` is missing but `/app/backend.old/node_modules/` exists, the script carries it forward (same Node ABI across releases). This unblocks even broken tarballs from v0.1.0 → v0.1.4.
+  - **Fix**: `KNEX_BIN` is now resolved at runtime — looks at `node_modules/.bin/knex` then `node_modules/knex/bin/knex.js`. Bails clearly with "knex CLI not found … release tarball appears incomplete" if both miss, instead of cryptic "migrations failed".
+
+- **Rollback marker reason was useless.** The `.last-update-*.json` always said `"reason": "see /data/logs/update-history.log"` no matter what actually went wrong. The Update modal then displayed that text in the UI.
+  - **Fix**: `rollback()` now accepts the actual bail-reason and writes it to the marker. The Update modal also auto-opens the Terminal-Output panel when a rollback is detected, so the user sees the real story without clicking around.
+
+### Upgrade path
+
+The currently-running container has the broken `apply-update.sh`. The in-app updater **cannot** apply this fix to itself (it would just roll back again with the same bug). One-time manual pull:
+
+```bash
+docker stop cloudgate && docker rm cloudgate
+docker pull ghcr.io/elias02345/cloudgate:latest
+docker run -d --name cloudgate -p 80:80 -p 443:443 \
+  -v cloudgate-data:/data --restart unless-stopped \
+  ghcr.io/elias02345/cloudgate:latest
+```
+
+All future updates will work end-to-end through the WebUI.
+
+---
+
 ## [0.1.4] — 2026-05-21
 
 ### Added

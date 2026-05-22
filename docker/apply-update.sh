@@ -63,7 +63,8 @@ cleanup_lock() {
 }
 
 rollback() {
-  log "ROLLBACK starting"
+  local reason="${1:-rollback triggered}"
+  log "ROLLBACK starting: ${reason}"
   s6-svc -d /run/service/backend 2>/dev/null || true
 
   # Restore code from .old aside-moves first, snapshot dir as second resort
@@ -85,7 +86,7 @@ rollback() {
   fi
 
   s6-svc -u /run/service/backend 2>/dev/null || true
-  write_marker "rolled_back" "see ${LOG}"
+  write_marker "rolled_back" "${reason}"
   cleanup_lock
   log "ROLLBACK complete"
 }
@@ -101,7 +102,7 @@ bail() {
 bail_with_rollback() {
   local why="$1"
   log "FATAL: ${why} — rolling back"
-  rollback
+  rollback "${why}"
   exit 1
 }
 
@@ -196,12 +197,47 @@ done
 echo "${TARGET_VERSION#v}" > /data/.version 2>/dev/null || true
 
 # -----------------------------------------------------------------------------
+# node_modules fallback
+#
+# Newer release tarballs are built with `pnpm deploy --prod` so the
+# extracted backend/ has its own production node_modules. Older tarballs
+# (≤ v0.1.3) shipped only dist/ → the swap leaves /app/backend without
+# its native modules and migrations fail. We carry the old node_modules
+# forward as a fallback so the install can complete instead of rolling
+# back. ABI mismatches are rare since we pin node 22 across releases.
+# -----------------------------------------------------------------------------
+
+for sub in backend recovery-ui; do
+  if [[ -d "/app/${sub}" && ! -d "/app/${sub}/node_modules" && -d "/app/${sub}.old/node_modules" ]]; then
+    log "node_modules missing in new ${sub}/ — carrying forward from ${sub}.old/ (fallback)"
+    cp -a "/app/${sub}.old/node_modules" "/app/${sub}/node_modules" \
+      || log "WARN: copying ${sub}.old/node_modules failed (continuing — likely will fail later)"
+  fi
+done
+
+# -----------------------------------------------------------------------------
 # Migrate
 # -----------------------------------------------------------------------------
 
 log "Running migrations"
 cd /app/backend || bail_with_rollback "cd /app/backend failed"
-NODE_ENV=production timeout 60 node ./node_modules/.bin/knex \
+
+# Locate the knex CLI binary. pnpm deploy puts it in node_modules/.bin/knex.
+# As a safety net, look for it elsewhere if the layout changed.
+KNEX_BIN=""
+for candidate in ./node_modules/.bin/knex ./node_modules/knex/bin/knex.js; do
+  if [[ -x "${candidate}" || -f "${candidate}" ]]; then
+    KNEX_BIN="${candidate}"
+    break
+  fi
+done
+
+if [[ -z "${KNEX_BIN}" ]]; then
+  bail_with_rollback "knex CLI not found in new /app/backend — release tarball appears incomplete (missing node_modules)"
+fi
+
+log "Using knex at ${KNEX_BIN}"
+NODE_ENV=production timeout 60 node "${KNEX_BIN}" \
   --knexfile dist/db/knexfile.js \
   migrate:latest 2>&1 | tee -a "${LOG}" \
   || bail_with_rollback "migrations failed"

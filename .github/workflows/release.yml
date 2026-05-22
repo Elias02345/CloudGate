@@ -40,12 +40,38 @@ jobs:
 
       - name: Build release tarball
         run: |
+          set -e
           mkdir -p release-staging/cloudgate
-          cp -r packages/backend/dist release-staging/cloudgate/backend
+
+          # backend + recovery-ui are Node services — they need their
+          # production-only node_modules included so apply-update.sh can
+          # run `node ./node_modules/.bin/knex migrate:latest` against the
+          # new /app/backend/ without falling back to the old copy.
+          #
+          # `pnpm deploy --prod` produces a self-contained directory with
+          # dist/, package.json, and node_modules/ (production deps only),
+          # which is exactly what apply-update.sh expects after swap.
+          pnpm --filter @cloudgate/backend deploy --prod release-staging/cloudgate/backend
+          pnpm --filter @cloudgate/recovery-ui deploy --prod release-staging/cloudgate/recovery-ui
+
+          # frontend is a SPA — just static dist/.
           cp -r packages/frontend/dist release-staging/cloudgate/frontend
-          cp -r packages/recovery-ui/dist release-staging/cloudgate/recovery-ui
-          cp packages/backend/.version release-staging/cloudgate/ 2>/dev/null || echo "${{ steps.version.outputs.version }}" > release-staging/cloudgate/.version
-          cp CHANGELOG.md release-staging/cloudgate/ 2>/dev/null || echo "(no CHANGELOG yet)" > release-staging/cloudgate/CHANGELOG.md
+
+          # version + changelog
+          cp packages/backend/.version release-staging/cloudgate/ 2>/dev/null \
+            || echo "${{ steps.version.outputs.version }}" > release-staging/cloudgate/.version
+          cp CHANGELOG.md release-staging/cloudgate/ 2>/dev/null \
+            || echo "(no CHANGELOG yet)" > release-staging/cloudgate/CHANGELOG.md
+
+          # Sanity check — the apply-update.sh contract is "backend has knex"
+          if [ ! -x release-staging/cloudgate/backend/node_modules/.bin/knex ]; then
+            echo "::error::release tarball missing backend/node_modules/.bin/knex — apply-update.sh would fail"
+            ls -la release-staging/cloudgate/backend/
+            exit 1
+          fi
+          echo "tarball staging:"
+          du -sh release-staging/cloudgate/* | sort -k2
+
           cd release-staging
           tar -czf ../cloudgate-${{ steps.version.outputs.tag }}.tar.gz cloudgate
 

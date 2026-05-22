@@ -261,6 +261,9 @@ export function UpdateProgressModal({
 					if (cancelled) return;
 					if (log.lines.length > 0) {
 						setLogLines((prev) => [...prev, '— historical log —', ...log.lines]);
+						// Auto-open the terminal so the user sees the actual rollback reason
+						// without having to click around.
+						setTerminalOpen(true);
 					}
 					return;
 				}
