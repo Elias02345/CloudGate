@@ -73,6 +73,21 @@ export async function writeConfig(ctx: RenderContext): Promise<string> {
 }
 
 /**
+ * Read the currently-rendered config.yml from disk. Used by the UI's
+ * config inspector — gives the user "what cloudflared sees right now"
+ * without having to exec into the container.
+ */
+export async function readCurrentConfig(): Promise<string> {
+	const { readFile } = await import('node:fs/promises');
+	const outPath = dataPath('cloudflared', 'config.yml');
+	try {
+		return await readFile(outPath, 'utf8');
+	} catch (err) {
+		return `# config.yml not yet written\n# error: ${(err as Error).message}\n`;
+	}
+}
+
+/**
  * Build the render context for a given tunnel by pulling its enabled hosts from DB.
  */
 export async function buildContext(tunnelRow: {

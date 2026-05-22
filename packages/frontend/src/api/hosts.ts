@@ -95,3 +95,21 @@ export function useUpdateHost() {
 		onSuccess: () => qc.invalidateQueries({ queryKey: ['hosts'] }),
 	});
 }
+
+export interface DnsVerifyResponse {
+	hostname: string;
+	expected: string;
+	result:
+		| { kind: 'ok'; cname: string; ttl: number; latency_ms: number }
+		| { kind: 'wrong_target'; expected: string; got: string }
+		| { kind: 'no_record'; message: string }
+		| { kind: 'nxdomain'; message: string }
+		| { kind: 'timeout'; message: string }
+		| { kind: 'error'; message: string };
+}
+
+export function useVerifyDns() {
+	return useMutation({
+		mutationFn: (id: number) => api<DnsVerifyResponse>(`/hosts/${id}/verify-dns`),
+	});
+}

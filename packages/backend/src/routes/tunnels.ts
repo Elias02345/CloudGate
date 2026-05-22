@@ -18,12 +18,15 @@ import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { getAccountById, decryptCredentials } from '../services/cf-account.js';
 import { CloudflareApiError, clientFor } from '../services/cloudflare-client.js';
 import { encryptJson } from '../services/crypto.js';
+import { deployHost } from '../services/host-deploy.js';
 import {
 	logsOf as managerLogs,
+	reloadTunnel,
 	startTunnel,
 	statusOf as managerStatus,
 	stopTunnel,
 } from '../services/tunnel-manager.js';
+import { readCurrentConfig } from '../services/tunnel-config-writer.js';
 
 const log = childLogger('routes:tunnels');
 export const tunnelsRouter: RouterType = Router();
@@ -274,4 +277,92 @@ tunnelsRouter.get('/:id/logs', requireAuth, requirePasswordSet, async (req, res)
 		return;
 	}
 	res.json({ logs: managerLogs(id) });
+});
+
+// ---------------------------------------------------------------------------
+// GET /:id/config — the actual rendered /data/cloudflared/config.yml
+// What cloudflared is currently using. Critical for diagnosing
+// "DNS works but request 404s" type bugs.
+// ---------------------------------------------------------------------------
+tunnelsRouter.get('/:id/config', requireAuth, requirePasswordSet, async (req, res) => {
+	if (!req.user) {
+		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+		return;
+	}
+	const id = Number.parseInt(String(req.params.id ?? ''), 10);
+	const knex = getDb();
+	const row = await knex<TunnelRow>('tunnels')
+		.join('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
+		.where({ 'tunnels.id': id, 'cloudflare_accounts.user_id': req.user.id })
+		.select('tunnels.id', 'tunnels.tunnel_id', 'tunnels.name')
+		.first();
+	if (!row) {
+		res.status(404).json({ error: 'Tunnel not found', code: 'NOT_FOUND' });
+		return;
+	}
+
+	// Also list the hosts this tunnel SHOULD have, so the user can
+	// cross-check the rendered config against expectation.
+	const hosts = await knex('proxy_hosts')
+		.where({ tunnel_id: id, mode: 'cloudflare_tunnel' })
+		.select('id', 'hostname', 'forward_scheme', 'forward_host', 'forward_port', 'enabled', 'last_deployed_at', 'last_error');
+
+	const yaml = await readCurrentConfig();
+	res.json({
+		tunnel: { id: row.id, tunnel_id: row.tunnel_id, name: row.name },
+		hosts,
+		yaml,
+	});
+});
+
+// ---------------------------------------------------------------------------
+// POST /:id/redeploy-all — force-rerender config.yml + redeploy every host
+// of this tunnel. Use when the ingress list got out of sync (e.g. a
+// previous deploy crashed before reloadTunnel was called).
+// ---------------------------------------------------------------------------
+tunnelsRouter.post('/:id/redeploy-all', requireAuth, requirePasswordSet, async (req, res) => {
+	if (!req.user) {
+		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+		return;
+	}
+	const id = Number.parseInt(String(req.params.id ?? ''), 10);
+	const knex = getDb();
+	const row = await knex<TunnelRow>('tunnels')
+		.join('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
+		.where({ 'tunnels.id': id, 'cloudflare_accounts.user_id': req.user.id })
+		.select('tunnels.id')
+		.first();
+	if (!row) {
+		res.status(404).json({ error: 'Tunnel not found', code: 'NOT_FOUND' });
+		return;
+	}
+
+	const hosts = await knex('proxy_hosts')
+		.where({ tunnel_id: id, mode: 'cloudflare_tunnel' })
+		.select('id', 'hostname');
+
+	let ok = 0;
+	let failed = 0;
+	const errors: Array<{ hostname: string; error: string }> = [];
+
+	// Render the config + send SIGHUP once first — this re-applies the
+	// current DB state to cloudflared. Cheap.
+	try {
+		await reloadTunnel(id);
+	} catch (err) {
+		log.warn({ err: (err as Error).message }, 'redeploy-all: reload failed (continuing)');
+	}
+
+	// Then re-deploy each host so DNS records get re-created if missing.
+	for (const host of hosts) {
+		try {
+			await deployHost(host.id);
+			ok++;
+		} catch (err) {
+			failed++;
+			errors.push({ hostname: host.hostname, error: (err as Error).message });
+		}
+	}
+
+	res.json({ ok, failed, errors });
 });

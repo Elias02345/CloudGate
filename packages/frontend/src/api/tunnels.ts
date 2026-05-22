@@ -54,3 +54,41 @@ export function useTunnelLogs(id: number | null) {
 		refetchInterval: id !== null ? 3_000 : false,
 	});
 }
+
+export interface TunnelConfigResponse {
+	tunnel: { id: number; tunnel_id: string; name: string };
+	hosts: Array<{
+		id: number;
+		hostname: string;
+		forward_scheme: string;
+		forward_host: string;
+		forward_port: number;
+		enabled: boolean | number;
+		last_deployed_at: string | null;
+		last_error: string | null;
+	}>;
+	yaml: string;
+}
+
+export function useTunnelConfig(id: number | null) {
+	return useQuery<TunnelConfigResponse>({
+		queryKey: ['tunnels', 'config', id],
+		queryFn: () => api(`/tunnels/${id}/config`),
+		enabled: id !== null,
+	});
+}
+
+export function useRedeployAllHosts() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) =>
+			api<{ ok: number; failed: number; errors: Array<{ hostname: string; error: string }> }>(
+				`/tunnels/${id}/redeploy-all`,
+				{ method: 'POST' },
+			),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: ['hosts'] });
+			qc.invalidateQueries({ queryKey: ['tunnels'] });
+		},
+	});
+}

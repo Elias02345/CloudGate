@@ -9,6 +9,29 @@ _Nothing yet._
 
 ---
 
+## [0.1.6] — 2026-05-22
+
+### Added
+
+- **DNS verification via DoH against `1.1.1.1`.** After every host deploy, CloudGate now actively queries Cloudflare's public DoH endpoint for the host's CNAME — bypassing the container's local resolver cache, so we see what the rest of the internet sees. Five typed outcomes turn into actionable warnings written to `last_error`:
+  - **`nxdomain`** — "Cloudflare's resolver returned NXDOMAIN. The CNAME was NOT created — re-deploy."
+  - **`no_record`** — "No CNAME after 12s — propagation lag or silent create failure. Click Re-deploy."
+  - **`wrong_target`** — "Resolves to X but should point to Y. Delete the conflicting record in CF."
+  - **`timeout`** — "Couldn't reach 1.1.1.1 — outbound DoH may be blocked."
+  - **`ok`** — record verified, then upstream probe runs next.
+- **`GET /api/hosts/:id/verify-dns`** — manual DoH check button in the UI (purple globe icon next to each cloudflare_tunnel host). On success: toast with the resolved target + TTL + a "if your browser still fails, it's local DNS cache, try Ctrl+Shift+R" hint.
+- **Config Inspector for tunnels.** Purple file-icon on each tunnel row opens a side drawer showing:
+  - **All hosts in DB** for this tunnel, each with `IN CONFIG` / `MISSING` / `DISABLED` badges
+  - **Currently rendered `/data/cloudflared/config.yml`** as a live read from disk
+  - Critical for diagnosing "DNS resolves but the browser shows 400 / nothing": almost always means the hostname isn't in the ingress YAML, which this drawer makes obvious.
+- **`POST /api/tunnels/:id/redeploy-all`** — cyan refresh-dot icon on each tunnel row. Re-renders the config + re-runs `deployHost()` for every host attached to this tunnel. Recovers from cases where a previous deploy crashed before `reloadTunnel()` could finalize. Reports `{ok, failed, errors[]}` in the response.
+
+### Why this matters
+
+User-reported case: one host worked, three others returned Cloudflare 400 / blank pages from the browser despite DNS records visibly present in the Cloudflare dashboard. Root cause hypothesized: ingress list in `config.yml` out of sync with DB (one host got into it, others didn't because of a race between sequential creates). The Config Inspector immediately shows whether this is what's happening, and Re-deploy-all fixes it without losing data.
+
+---
+
 ## [0.1.5] — 2026-05-22
 
 ### Fixed

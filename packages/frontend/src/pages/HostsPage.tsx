@@ -20,6 +20,7 @@ import {
 	IconRefresh,
 	IconTrash,
 	IconUpload,
+	IconWorldSearch,
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
@@ -28,7 +29,14 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@mantine/core';
 import { useIssueCert } from '../api/acme.js';
-import { type HostDto, useDeleteHost, useHosts, useRedeployHost, useToggleHost } from '../api/hosts.js';
+import {
+	type HostDto,
+	useDeleteHost,
+	useHosts,
+	useRedeployHost,
+	useToggleHost,
+	useVerifyDns,
+} from '../api/hosts.js';
 import { BulkImportModal } from '../components/BulkImportModal.js';
 import { EditHostModal } from '../components/EditHostModal.js';
 
@@ -39,9 +47,35 @@ export function HostsPage() {
 	const toggleMutation = useToggleHost();
 	const deleteMutation = useDeleteHost();
 	const redeployMutation = useRedeployHost();
+	const verifyDns = useVerifyDns();
 	const issueCert = useIssueCert();
 	const [bulkOpened, bulkModal] = useDisclosure(false);
 	const [editingHost, setEditingHost] = useState<HostDto | null>(null);
+
+	const onVerifyDns = async (id: number, hostname: string) => {
+		try {
+			const result = await verifyDns.mutateAsync(id);
+			if (result.result.kind === 'ok') {
+				notifications.show({
+					color: 'green',
+					title: t('hosts.dns_verify_ok_title'),
+					message: t('hosts.dns_verify_ok_message', { hostname, target: result.result.cname, ttl: result.result.ttl }),
+				});
+			} else {
+				notifications.show({
+					color: 'orange',
+					title: t('hosts.dns_verify_warn_title'),
+					message:
+						'message' in result.result
+							? result.result.message
+							: t('hosts.dns_verify_warn_message', { kind: result.result.kind }),
+					autoClose: 8000,
+				});
+			}
+		} catch (err) {
+			notifications.show({ color: 'red', message: (err as Error).message });
+		}
+	};
 
 	const onRedeploy = async (id: number, hostname: string) => {
 		try {
@@ -159,6 +193,17 @@ export function HostsPage() {
 										</Table.Td>
 										<Table.Td>
 											<Group gap={4} justify="flex-end">
+												{h.mode === 'cloudflare_tunnel' && (
+													<ActionIcon
+														variant="subtle"
+														color="grape"
+														onClick={() => void onVerifyDns(h.id, h.hostname)}
+														loading={verifyDns.isPending}
+														title={t('hosts.verify_dns')}
+													>
+														<IconWorldSearch size={16} />
+													</ActionIcon>
+												)}
 												<ActionIcon
 													variant="subtle"
 													color="blue"

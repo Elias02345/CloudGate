@@ -17,6 +17,7 @@ import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { audit } from '../middleware/audit.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
+import { verifyDns } from '../services/dns-verify.js';
 import { deployHost, undeployHost } from '../services/host-deploy.js';
 import { publish } from '../services/events.js';
 
@@ -370,6 +371,42 @@ hostsRouter.post('/:id/redeploy', requireAuth, requirePasswordSet, async (req, r
 			code: 'DEPLOY_FAILED',
 		});
 	}
+});
+
+// ---------------------------------------------------------------------------
+// GET /:id/verify-dns — query 1.1.1.1 DoH to confirm the CNAME has
+// propagated. Used by the UI to show a clear DNS status badge.
+// ---------------------------------------------------------------------------
+hostsRouter.get('/:id/verify-dns', requireAuth, requirePasswordSet, async (req, res) => {
+	if (!req.user) {
+		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+		return;
+	}
+	const id = Number.parseInt(String(req.params.id ?? ''), 10);
+	const row = await ownsHost(req.user.id, id);
+	if (!row) {
+		res.status(404).json({ error: 'Host not found', code: 'NOT_FOUND' });
+		return;
+	}
+	if (row.mode !== 'cloudflare_tunnel') {
+		res.status(400).json({ error: 'verify-dns only applies to cloudflare_tunnel hosts', code: 'BAD_REQUEST' });
+		return;
+	}
+	// Need the tunnel's CF UUID to know what the CNAME should target
+	const knex = getDb();
+	if (!row.tunnel_id) {
+		res.status(400).json({ error: 'host has no tunnel attached', code: 'BAD_REQUEST' });
+		return;
+	}
+	const tunnelRow = await knex<{ tunnel_id: string }>('tunnels').where({ id: row.tunnel_id }).first();
+	if (!tunnelRow) {
+		res.status(400).json({ error: 'tunnel not found', code: 'BAD_REQUEST' });
+		return;
+	}
+	const expected = `${tunnelRow.tunnel_id}.cfargotunnel.com`;
+	// Fast probe — single attempt, no retry; manual button click should be snappy
+	const result = await verifyDns(row.hostname, expected, { attempts: 1, intervalMs: 0 });
+	res.json({ hostname: row.hostname, expected, result });
 });
 
 // ---------------------------------------------------------------------------

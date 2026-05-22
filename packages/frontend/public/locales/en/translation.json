@@ -473,7 +473,19 @@
     "restart": "Restart",
     "logs_title": "Tunnel daemon logs",
     "no_logs": "(no logs yet)",
-    "confirm_delete": "Delete tunnel {{name}}? It will also be removed from Cloudflare."
+    "confirm_delete": "Delete tunnel {{name}}? It will also be removed from Cloudflare.",
+    "show_config": "Show rendered cloudflared config",
+    "config_title": "cloudflared config.yml (live)",
+    "config_hosts_in_db": "Hosts attached to this tunnel in DB",
+    "config_no_hosts": "No hosts attached to this tunnel yet.",
+    "config_rendered_yaml": "Currently rendered /data/cloudflared/config.yml",
+    "config_hint": "If a host shows MISSING here but exists in DB, click 'Re-deploy all' on the tunnel to rebuild the ingress list. Cloudflare 400/404 in the browser usually means the hostname isn't in this YAML.",
+    "redeploy_all": "Re-deploy all hosts of this tunnel (rebuilds ingress + DNS)",
+    "confirm_redeploy_all": "Re-deploy every host of tunnel '{{name}}'? This re-creates DNS records (idempotent) and re-renders the ingress list. Existing traffic isn't dropped — cloudflared reloads via SIGHUP.",
+    "redeploy_ok_title": "Re-deploy complete",
+    "redeploy_ok_message": "{{ok}} host(s) re-deployed successfully.",
+    "redeploy_partial_title": "Re-deploy partially failed",
+    "redeploy_partial_message": "{{ok}} ok / {{failed}} failed. Click each errored host to see details."
   },
   "bulk": {
     "button": "Bulk import",
@@ -549,6 +561,11 @@
     "edit_saved_message": "{{hostname}} settings saved — re-deploying with new config…",
     "edit_immutable_note": "Editing forwarding for {{hostname}}. To change the hostname, mode, tunnel or zone, delete + recreate the host.",
     "edit_scheme_hint": "Port suggests this is an HTTPS-only service (Proxmox / TrueNAS / etc). Switch scheme to https and tick the no-TLS-verify box.",
-    "path_prefix_field": "Path prefix"
+    "path_prefix_field": "Path prefix",
+    "verify_dns": "Verify DNS at 1.1.1.1 (bypasses browser cache)",
+    "dns_verify_ok_title": "DNS verified",
+    "dns_verify_ok_message": "{{hostname}} resolves to {{target}} (TTL {{ttl}}s). Cloudflare's resolver sees it — if your browser still fails, it's a local DNS cache. Try Ctrl+Shift+R or `chrome://net-internals/#dns → Clear host cache`.",
+    "dns_verify_warn_title": "DNS issue detected",
+    "dns_verify_warn_message": "DNS verification returned: {{kind}}"
   }
 }

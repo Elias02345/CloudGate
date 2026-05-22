@@ -9,6 +9,7 @@ import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { decryptCredentials } from './cf-account.js';
 import { CloudflareApiError, clientFor } from './cloudflare-client.js';
+import { verifyDns } from './dns-verify.js';
 import { publish } from './events.js';
 import { removeHostConfig, writeHostConfig } from './nginx-config.js';
 import { reloadTunnel } from './tunnel-manager.js';
@@ -162,19 +163,64 @@ export async function deployHost(hostId: number): Promise<void> {
 		publish('host.deployed', { id: hostId, hostname: host.hostname });
 		log.info({ id: hostId, hostname: host.hostname }, 'Host deployed');
 
-		// Upstream-Probe — catches the common Homelab gotcha where the user
-		// pointed CloudGate at https://proxmox:8006 with `http://` (or vice
-		// versa). We write the diagnostic to last_error as a warning even
-		// though the deploy itself "succeeded" — better visibility than
-		// pretending everything's fine.
-		void probeAndDiagnose(hostId, host).catch((err) =>
-			log.warn({ err: (err as Error).message, hostId }, 'upstream probe crashed'),
+		// Background diagnostics: verify the CNAME actually propagated to
+		// public DNS, then probe the upstream service. Either may write a
+		// warning into last_error — they don't fail the deploy itself.
+		const cnameTarget = `${tunnelRow.tunnel_id}.cfargotunnel.com`;
+		void verifyDnsAndProbe(hostId, host, cnameTarget).catch((err) =>
+			log.warn({ err: (err as Error).message, hostId }, 'post-deploy diagnostics crashed'),
 		);
 	} catch (err) {
 		const msg = err instanceof CloudflareApiError ? err.message : (err as Error).message;
 		await knex('proxy_hosts').where({ id: hostId }).update({ last_error: msg });
 		publish('host.deploy_failed', { id: hostId, hostname: host.hostname, error: msg });
 		throw err;
+	}
+}
+
+/**
+ * Background post-deploy diagnostics: verify the CNAME resolved publicly
+ * (via DoH to 1.1.1.1 — bypasses the container's local cache), then probe
+ * the upstream service to catch scheme/port mismatches.
+ *
+ * If DNS verification fails we DON'T continue to the upstream probe —
+ * there's no point. The DNS message is written to last_error.
+ */
+async function verifyDnsAndProbe(hostId: number, host: HostRow, expectedCnameTarget: string): Promise<void> {
+	const knex = getDb();
+
+	// 1) DNS verification — does the CNAME actually resolve from outside?
+	const dnsResult = await verifyDns(host.hostname, expectedCnameTarget, { attempts: 6, intervalMs: 2000 });
+	log.info({ hostId, hostname: host.hostname, dns: dnsResult.kind }, 'DNS verification done');
+
+	if (dnsResult.kind !== 'ok') {
+		const msg = formatDnsWarning(dnsResult, host.hostname, expectedCnameTarget);
+		await knex('proxy_hosts').where({ id: hostId }).update({ last_error: msg });
+		publish('host.deploy_failed', { id: hostId, hostname: host.hostname, error: msg });
+		return; // skip upstream probe — DNS is broken, no point testing the backend
+	}
+
+	// 2) Upstream connectivity probe — catches scheme/port mismatches
+	await probeAndDiagnose(hostId, host);
+}
+
+/** Turn a DnsVerifyOutcome into a human-readable warning for last_error. */
+function formatDnsWarning(
+	result: { kind: string; message?: string; expected?: string; got?: string },
+	hostname: string,
+	expectedSuffix: string,
+): string {
+	switch (result.kind) {
+		case 'nxdomain':
+			return `⚠ DNS: Cloudflare's resolver (1.1.1.1) returned NXDOMAIN for ${hostname}. The CNAME was NOT created — check the host's status and re-deploy.`;
+		case 'no_record':
+			return `⚠ DNS: No CNAME for ${hostname} after 12s of polling. Either the create call silently dropped, or your zone's nameservers haven't picked up the new record yet (rare — usually <60s). Retry "Re-deploy".`;
+		case 'wrong_target':
+			return `⚠ DNS: ${hostname} resolves to "${result.got}" but should point to "${expectedSuffix}". Another DNS record (probably from before) is taking precedence — delete it in your Cloudflare dashboard.`;
+		case 'timeout':
+			return `⚠ DNS: CloudGate couldn't reach 1.1.1.1 to verify ${hostname}. Outbound DNS-over-HTTPS may be blocked. The record might still work — open the host's URL to test.`;
+		default:
+			return `⚠ DNS verification failed: ${result.message ?? 'unknown'}`;
 	}
 }
 

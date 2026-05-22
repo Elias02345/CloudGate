@@ -21,8 +21,10 @@ import { notifications } from '@mantine/notifications';
 import {
 	IconAlertCircle,
 	IconCheck,
-	IconRefresh,
 	IconCirclePlus,
+	IconFileText,
+	IconRefresh,
+	IconRefreshDot,
 	IconTerminal2,
 	IconTrash,
 } from '@tabler/icons-react';
@@ -34,7 +36,9 @@ import {
 	type TunnelDto,
 	useCreateTunnel,
 	useDeleteTunnel,
+	useRedeployAllHosts,
 	useRestartTunnel,
+	useTunnelConfig,
 	useTunnelLogs,
 	useTunnels,
 } from '../api/tunnels.js';
@@ -64,11 +68,43 @@ export function TunnelsPage() {
 
 	const [modalOpened, modal] = useDisclosure(false);
 	const [drawerOpened, drawer] = useDisclosure(false);
+	const [configDrawerOpened, configDrawer] = useDisclosure(false);
 	const [logsForId, setLogsForId] = useState<number | null>(null);
+	const [configForId, setConfigForId] = useState<number | null>(null);
 	const [name, setName] = useState('');
 	const [accountId, setAccountId] = useState<string | null>(null);
 
 	const logs = useTunnelLogs(logsForId);
+	const config = useTunnelConfig(configForId);
+	const redeployAll = useRedeployAllHosts();
+
+	const onShowConfig = (id: number) => {
+		setConfigForId(id);
+		configDrawer.open();
+	};
+
+	const onRedeployAll = async (id: number, name: string) => {
+		if (!confirm(t('tunnels.confirm_redeploy_all', { name }))) return;
+		try {
+			const r = await redeployAll.mutateAsync(id);
+			if (r.failed > 0) {
+				notifications.show({
+					color: 'orange',
+					title: t('tunnels.redeploy_partial_title'),
+					message: t('tunnels.redeploy_partial_message', { ok: r.ok, failed: r.failed }),
+					autoClose: 8000,
+				});
+			} else {
+				notifications.show({
+					color: 'green',
+					title: t('tunnels.redeploy_ok_title'),
+					message: t('tunnels.redeploy_ok_message', { ok: r.ok }),
+				});
+			}
+		} catch (err) {
+			notifications.show({ color: 'red', message: (err as Error).message });
+		}
+	};
 
 	const onCreate = async () => {
 		if (!accountId) return;
@@ -150,6 +186,23 @@ export function TunnelsPage() {
 										</Table.Td>
 										<Table.Td>
 											<Group gap="xs" justify="flex-end">
+												<ActionIcon
+													variant="subtle"
+													color="grape"
+													onClick={() => onShowConfig(row.id)}
+													title={t('tunnels.show_config')}
+												>
+													<IconFileText size={16} />
+												</ActionIcon>
+												<ActionIcon
+													variant="subtle"
+													color="cyan"
+													onClick={() => void onRedeployAll(row.id, row.name)}
+													loading={redeployAll.isPending}
+													title={t('tunnels.redeploy_all')}
+												>
+													<IconRefreshDot size={16} />
+												</ActionIcon>
 												<ActionIcon variant="subtle" onClick={() => openLogs(row)} title={t('tunnels.logs')}>
 													<IconTerminal2 size={16} />
 												</ActionIcon>
@@ -242,6 +295,73 @@ export function TunnelsPage() {
 						<Code block style={{ maxHeight: '70vh', overflow: 'auto' }}>
 							{logs.data.logs.length === 0 ? t('tunnels.no_logs') : logs.data.logs.join('\n')}
 						</Code>
+					)}
+				</Stack>
+			</Drawer>
+
+			<Drawer
+				opened={configDrawerOpened}
+				onClose={() => {
+					configDrawer.close();
+					setConfigForId(null);
+				}}
+				title={t('tunnels.config_title')}
+				size="xl"
+				position="right"
+			>
+				<Stack>
+					{config.isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
+					{config.data && (
+						<>
+							<Box>
+								<Text size="sm" fw={600}>
+									{t('tunnels.config_hosts_in_db')} ({config.data.hosts.length})
+								</Text>
+								<Stack gap={4} mt={4}>
+									{config.data.hosts.length === 0 ? (
+										<Text size="xs" c="dimmed">
+											{t('tunnels.config_no_hosts')}
+										</Text>
+									) : (
+										config.data.hosts.map((h) => {
+											const inYaml = config.data?.yaml.includes(`hostname: ${h.hostname}`) ?? false;
+											return (
+												<Group key={h.id} gap="xs">
+													{inYaml ? (
+														<Badge color="green" size="xs">
+															IN CONFIG
+														</Badge>
+													) : (
+														<Badge color="red" size="xs">
+															MISSING
+														</Badge>
+													)}
+													<Text size="xs" ff="monospace">
+														{h.hostname} → {h.forward_scheme}://{h.forward_host}:{h.forward_port}
+													</Text>
+													{!h.enabled && (
+														<Badge color="gray" size="xs">
+															DISABLED
+														</Badge>
+													)}
+												</Group>
+											);
+										})
+									)}
+								</Stack>
+							</Box>
+							<Box>
+								<Text size="sm" fw={600}>
+									{t('tunnels.config_rendered_yaml')}
+								</Text>
+								<Code block style={{ maxHeight: '50vh', overflow: 'auto' }} mt={4}>
+									{config.data.yaml}
+								</Code>
+							</Box>
+							<Text size="xs" c="dimmed">
+								{t('tunnels.config_hint')}
+							</Text>
+						</>
 					)}
 				</Stack>
 			</Drawer>
