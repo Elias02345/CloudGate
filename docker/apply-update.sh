@@ -217,30 +217,79 @@ done
 
 # -----------------------------------------------------------------------------
 # Migrate
+#
+# Strategy:
+#   1. Pre-flight check: db file exists + readable + integrity_check ok.
+#   2. Prefer the standalone migration runner (dist/db/run-migrations.js)
+#      — it ships compiled with every backend build from v0.1.7+ and uses
+#      absolute paths derived from import.meta.url so it can't pick the
+#      wrong CWD.
+#   3. Fallback to the knex CLI (older tarballs that don't have the
+#      runner yet).
+#   4. Capture stderr/stdout — last 50 lines go into the rollback marker
+#      so the UI shows the actual error, not just "migrations failed".
 # -----------------------------------------------------------------------------
 
 log "Running migrations"
 cd /app/backend || bail_with_rollback "cd /app/backend failed"
 
-# Locate the knex CLI binary. pnpm deploy puts it in node_modules/.bin/knex.
-# As a safety net, look for it elsewhere if the layout changed.
-KNEX_BIN=""
-for candidate in ./node_modules/.bin/knex ./node_modules/knex/bin/knex.js; do
-  if [[ -x "${candidate}" || -f "${candidate}" ]]; then
-    KNEX_BIN="${candidate}"
-    break
-  fi
-done
+# DB pre-check — fail fast with clear message rather than letting knex
+# crash on a corrupt db.
+if [[ ! -r /data/db/db.sqlite ]]; then
+  bail_with_rollback "DB at /data/db/db.sqlite missing or unreadable"
+fi
+DB_INTEGRITY="$(timeout 10 sqlite3 /data/db/db.sqlite 'PRAGMA integrity_check;' 2>&1 || echo 'check-failed')"
+if [[ "${DB_INTEGRITY}" != "ok" ]]; then
+  log "WARN: sqlite integrity_check returned: ${DB_INTEGRITY}"
+  # We don't bail — the snapshot we already took has the same data.
+  # Migrations may still succeed on corruption that integrity_check
+  # is picky about.
+fi
+log "Pre-flight: db readable, integrity=${DB_INTEGRITY}"
 
-if [[ -z "${KNEX_BIN}" ]]; then
-  bail_with_rollback "knex CLI not found in new /app/backend — release tarball appears incomplete (missing node_modules)"
+MIGRATE_LOG="$(mktemp /tmp/cg-migrate.XXXXXX.log)"
+MIGRATE_EXIT=0
+MIGRATE_METHOD=""
+
+if [[ -f "./dist/db/run-migrations.js" ]]; then
+  MIGRATE_METHOD="run-migrations.js"
+  log "Using standalone migration runner (dist/db/run-migrations.js)"
+  NODE_ENV=production timeout 180 node ./dist/db/run-migrations.js \
+    >>"${MIGRATE_LOG}" 2>&1 || MIGRATE_EXIT=$?
+else
+  # Fallback for older tarballs: knex CLI. Same caveats apply (CWD
+  # resolution etc.) — we use absolute --knexfile path here.
+  KNEX_BIN=""
+  for candidate in ./node_modules/.bin/knex ./node_modules/knex/bin/knex.js; do
+    if [[ -x "${candidate}" || -f "${candidate}" ]]; then
+      KNEX_BIN="${candidate}"
+      break
+    fi
+  done
+  if [[ -z "${KNEX_BIN}" ]]; then
+    bail_with_rollback "neither dist/db/run-migrations.js nor knex CLI found — tarball is incomplete"
+  fi
+  MIGRATE_METHOD="knex-cli (${KNEX_BIN})"
+  log "Using ${MIGRATE_METHOD}"
+  NODE_ENV=production timeout 180 node "${KNEX_BIN}" \
+    --knexfile "$(pwd)/dist/db/knexfile.js" \
+    --cwd "$(pwd)/dist/db" \
+    migrate:latest >>"${MIGRATE_LOG}" 2>&1 || MIGRATE_EXIT=$?
 fi
 
-log "Using knex at ${KNEX_BIN}"
-NODE_ENV=production timeout 60 node "${KNEX_BIN}" \
-  --knexfile dist/db/knexfile.js \
-  migrate:latest 2>&1 | tee -a "${LOG}" \
-  || bail_with_rollback "migrations failed"
+# Echo the full migration output to the main log regardless of outcome
+cat "${MIGRATE_LOG}" | tee -a "${LOG}"
+
+if [[ "${MIGRATE_EXIT}" -ne 0 ]]; then
+  # Capture the last 50 lines for the rollback marker — gives UI users
+  # a real error message instead of just "migrations failed".
+  TAIL_LINES="$(tail -50 "${MIGRATE_LOG}" | tr '\n' ' ' | tr '"' "'" | head -c 1500)"
+  rm -f "${MIGRATE_LOG}" 2>/dev/null || true
+  bail_with_rollback "migrations failed (method=${MIGRATE_METHOD}, exit=${MIGRATE_EXIT}): ${TAIL_LINES}"
+fi
+
+log "Migrations OK (method=${MIGRATE_METHOD})"
+rm -f "${MIGRATE_LOG}" 2>/dev/null || true
 
 # -----------------------------------------------------------------------------
 # Restart + health-check
@@ -249,10 +298,14 @@ NODE_ENV=production timeout 60 node "${KNEX_BIN}" \
 log "Starting backend"
 s6-svc -u /run/service/backend 2>/dev/null || log "WARN: s6-svc -u failed"
 
-log "Health-check loop (max 30s)"
+# Generous health-check loop — 60s total. The first start of a fresh
+# backend can take 10-20s on slow disks; previous 30s was too tight.
+log "Health-check loop (max 60s)"
 healthy=no
-for _ in $(seq 1 15); do
-  if curl -fsS --max-time 2 http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
+HEALTH_LAST=""
+for _ in $(seq 1 30); do
+  HEALTH_LAST="$(curl -fsS --max-time 2 -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/health 2>/dev/null || echo 'connect-fail')"
+  if [[ "${HEALTH_LAST}" == "200" ]]; then
     healthy=yes
     break
   fi
@@ -260,7 +313,7 @@ for _ in $(seq 1 15); do
 done
 
 if [[ "${healthy}" != "yes" ]]; then
-  bail_with_rollback "new backend never became healthy"
+  bail_with_rollback "new backend never became healthy (last http_code=${HEALTH_LAST})"
 fi
 
 # -----------------------------------------------------------------------------

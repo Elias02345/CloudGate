@@ -9,6 +9,46 @@ _Nothing yet._
 
 ---
 
+## [0.1.7] — 2026-05-22
+
+### Fixed — self-updater "migrations failed" rollback
+
+Root cause: `knexfile.ts` had `directory: './migrations'` — a relative path that the Knex CLI resolves against the **process CWD**, not the knexfile location. `apply-update.sh` ran `cd /app/backend && node ./node_modules/.bin/knex --knexfile dist/db/knexfile.js migrate:latest`, so knex looked for migrations at `/app/backend/migrations/` (doesn't exist) instead of `/app/backend/dist/db/migrations/` (where they actually are). Every install since v0.1.0 hit this; v0.1.5+ surfaced it as the rollback marker reason because we fixed the marker, but the underlying bug was the same.
+
+### Changed — harder, more diagnosable updates
+
+**Dedicated migration runner** (`packages/backend/src/db/run-migrations.ts`):
+- Bypasses the Knex CLI entirely — no more `--knexfile` path resolution, no shell-wrapper / symlink fragility.
+- Migrations directory resolved against `import.meta.url` (the runner's own location). Cannot point at the wrong dir regardless of CWD.
+- Verbose pre-flight: prints db path, migrations dir, pending list, applied list with timings.
+- Falls back automatically — `apply-update.sh` uses the runner when present, the knex CLI when it's not.
+
+**apply-update.sh hardening**:
+- DB pre-flight: `sqlite3 PRAGMA integrity_check` before migrate; warns (doesn't fail) if not "ok".
+- Knex/runner output captured to a temp file, last 50 lines piped into the rollback marker reason — the UI now shows the **actual error**, not just "migrations failed".
+- Migration timeout 60s → 180s (native-modules can rebuild on first import).
+- Health-check loop 30s → 60s + reports last HTTP status code in the rollback reason (so you can tell `500 Internal Server Error` from `connection refused`).
+- `--cwd $(pwd)/dist/db` and absolute `--knexfile` path in the CLI fallback so the CWD bug can't recur even on the legacy path.
+
+**knexfile.ts**:
+- `directory:` now uses an absolute path via `dirname(fileURLToPath(import.meta.url))` — robust against any CWD knex chooses to resolve from.
+- `loadExtensions: ['.js']` in production / `['.ts']` in dev — prevents `.d.ts` from being misinterpreted as migrations.
+- Per-env config block, no shared cross-env state.
+
+### Hardening summary
+
+The update pipeline is now defensive at every step:
+
+| Layer | What protects you |
+|---|---|
+| Tarball | Sanity-check fails CI if `backend/node_modules/.bin/knex` missing (v0.1.5+) |
+| Apply | `node_modules` fallback from `.old/` if tarball is incomplete (v0.1.5+) |
+| Migrate | Standalone runner with absolute paths + verbose logging (this release) |
+| Rollback marker | Actual error tail (last 50 lines of migrate stderr) instead of "see log" |
+| Health-check | 60s window + reports actual HTTP code on failure |
+
+---
+
 ## [0.1.6] — 2026-05-22
 
 ### Added
