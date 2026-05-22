@@ -77,3 +77,21 @@ export function useRedeployHost() {
 		onError: () => qc.invalidateQueries({ queryKey: ['hosts'] }), // refresh so user sees new last_error
 	});
 }
+
+export interface UpdateHostInput {
+	forward_scheme?: 'http' | 'https';
+	forward_host?: string;
+	forward_port?: number;
+	path_prefix?: string;
+	tls_options?: { no_tls_verify?: boolean };
+	headers?: Record<string, string>;
+}
+
+export function useUpdateHost() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (args: { id: number; input: UpdateHostInput }) =>
+			api<{ host: HostDto }>(`/hosts/${args.id}`, { method: 'PUT', body: args.input }),
+		onSuccess: () => qc.invalidateQueries({ queryKey: ['hosts'] }),
+	});
+}

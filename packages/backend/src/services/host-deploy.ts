@@ -12,6 +12,7 @@ import { CloudflareApiError, clientFor } from './cloudflare-client.js';
 import { publish } from './events.js';
 import { removeHostConfig, writeHostConfig } from './nginx-config.js';
 import { reloadTunnel } from './tunnel-manager.js';
+import { probeUpstream } from './upstream-probe.js';
 
 const log = childLogger('host-deploy');
 
@@ -21,6 +22,10 @@ interface HostRow {
 	cf_zone_id: number | null;
 	mode: string;
 	hostname: string;
+	forward_scheme: string;
+	forward_host: string;
+	forward_port: number;
+	tls_options: string;
 	dns_record_id: string | null;
 }
 
@@ -156,12 +161,78 @@ export async function deployHost(hostId: number): Promise<void> {
 
 		publish('host.deployed', { id: hostId, hostname: host.hostname });
 		log.info({ id: hostId, hostname: host.hostname }, 'Host deployed');
+
+		// Upstream-Probe — catches the common Homelab gotcha where the user
+		// pointed CloudGate at https://proxmox:8006 with `http://` (or vice
+		// versa). We write the diagnostic to last_error as a warning even
+		// though the deploy itself "succeeded" — better visibility than
+		// pretending everything's fine.
+		void probeAndDiagnose(hostId, host).catch((err) =>
+			log.warn({ err: (err as Error).message, hostId }, 'upstream probe crashed'),
+		);
 	} catch (err) {
 		const msg = err instanceof CloudflareApiError ? err.message : (err as Error).message;
 		await knex('proxy_hosts').where({ id: hostId }).update({ last_error: msg });
 		publish('host.deploy_failed', { id: hostId, hostname: host.hostname, error: msg });
 		throw err;
 	}
+}
+
+/**
+ * Run the upstream probe and update last_error with a diagnostic if the
+ * service the user pointed CloudGate at is unreachable / mis-configured.
+ * Crucially, this does NOT mark the deploy as failed — the DNS + tunnel
+ * config are valid; we're just telling the user "the destination is dark".
+ */
+async function probeAndDiagnose(hostId: number, host: HostRow): Promise<void> {
+	const knex = getDb();
+	let tlsOpts: { no_tls_verify?: boolean } = {};
+	try {
+		tlsOpts = typeof host.tls_options === 'string' ? JSON.parse(host.tls_options) : {};
+	} catch {
+		/* ignore */
+	}
+	const outcome = await probeUpstream({
+		scheme: host.forward_scheme as 'http' | 'https',
+		host: host.forward_host,
+		port: host.forward_port,
+		no_tls_verify: tlsOpts.no_tls_verify,
+	});
+
+	log.info({ hostId, hostname: host.hostname, outcome: outcome.kind }, 'upstream probe done');
+
+	if (outcome.kind === 'ok') {
+		// Service is reachable → nothing to add. last_error was already cleared.
+		return;
+	}
+
+	// Compose a clear warning message
+	let label: string;
+	switch (outcome.kind) {
+		case 'tls_on_http_port':
+			label = '⚠ Wrong scheme';
+			break;
+		case 'http_on_tls_port':
+			label = '⚠ Wrong scheme';
+			break;
+		case 'tcp_refused':
+			label = '⚠ Upstream unreachable';
+			break;
+		case 'tcp_timeout':
+			label = '⚠ Upstream timed out';
+			break;
+		case 'self_signed_tls':
+			label = '⚠ Self-signed TLS';
+			break;
+		case 'http_error':
+			label = `⚠ Upstream returned ${outcome.statusCode}`;
+			break;
+		default:
+			label = '⚠ Upstream probe inconclusive';
+	}
+	const msg = `${label}: ${outcome.message}`;
+	await knex('proxy_hosts').where({ id: hostId }).update({ last_error: msg });
+	publish('host.deploy_failed', { id: hostId, hostname: host.hostname, error: msg });
 }
 
 /**

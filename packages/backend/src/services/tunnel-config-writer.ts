@@ -89,9 +89,15 @@ export async function buildContext(tunnelRow: {
 		forward_port: number;
 		tls_options: string;
 	};
+	// SQLite stores booleans as integers. We write `enabled: 1` everywhere
+	// (routes/hosts.ts) so we query with `1` here too — `true` worked in
+	// most setups but was fragile across SQLite/Knex combos.
 	const rows = await knex<HostRow>('proxy_hosts')
-		.where({ tunnel_id: tunnelRow.id, enabled: true, mode: 'cloudflare_tunnel' })
+		.where({ tunnel_id: tunnelRow.id, mode: 'cloudflare_tunnel' })
+		.where('enabled', 1)
 		.select('hostname', 'path_prefix', 'forward_scheme', 'forward_host', 'forward_port', 'tls_options');
+
+	log.info({ tunnel_id: tunnelRow.id, rows: rows.length }, 'buildContext: hosts found for tunnel');
 
 	const hosts: RenderHost[] = rows.map((r) => {
 		let tls: { no_tls_verify?: boolean } = {};

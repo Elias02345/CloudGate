@@ -9,6 +9,28 @@ _Nothing yet._
 
 ---
 
+## [0.1.4] — 2026-05-21
+
+### Added
+- **Upstream connectivity probe.** After a host deploys, CloudGate now TCP-sniffs `<scheme>://<host>:<port>` from inside the container — the same network namespace cloudflared lives in. The probe classifies the listener (HTTP vs TLS by the first response byte) and writes a clear warning to `last_error` if there's a mismatch:
+  - **`tls_on_http_port`** — "The service at X:Y speaks TLS but the host is configured with scheme 'http'. Edit the host, switch to https + tick 'Don't verify upstream TLS certificate'." Catches the #1 Homelab pitfall — pointing CloudGate at Proxmox/TrueNAS/Unifi with `http://` on a HTTPS-only port.
+  - **`http_on_tls_port`** — Reverse case: scheme=https against a plain-HTTP service.
+  - **`tcp_refused` / `tcp_timeout`** — Service down or unreachable from container.
+  - **`self_signed_tls`** — Suggests ticking no-TLS-verify.
+  - **`http_error`** — Service is reachable but returned 5xx.
+
+- **`PUT /api/hosts/:id`** — edit forward_scheme / forward_host / forward_port / path_prefix / tls_options without deleting + recreating the host. Re-runs deployHost() so the tunnel config + upstream probe are refreshed automatically.
+
+- **Edit-host modal in the UI.** Pencil icon in the actions column opens a small form to fix forwarding settings on an existing host. Includes a smart hint when the port matches a known HTTPS-default service (8006/8443/9090/9443) and the scheme is set to http — surfaces the most common fix-it case.
+
+### Fixed
+- **SQLite boolean robustness.** `buildContext` in `tunnel-config-writer.ts` used `.where({ enabled: true })` while the routes write `enabled: 1`. SQLite's behaviour here depends on Knex version + better-sqlite3 binding nuances. Switched to the explicit `.where('enabled', 1)` form which is unambiguous across all configurations. Now logs the host count per tunnel reload so config issues are visible in container logs.
+
+### Changed
+- `HostRow` in host-deploy.ts now carries `forward_scheme`, `forward_host`, `forward_port`, `tls_options` — needed by the new probe path.
+
+---
+
 ## [0.1.3] — 2026-05-21
 
 ### Added

@@ -542,6 +542,13 @@
     "redeploy": "Deploy erneut versuchen (nach Token-/DNS-Fix)",
     "redeploy_ok_title": "Deploy erneut versucht",
     "redeploy_ok_message": "{{hostname}} erfolgreich ausgerollt.",
-    "redeploy_failed_title": "Erneutes Deploy fehlgeschlagen"
+    "redeploy_failed_title": "Erneutes Deploy fehlgeschlagen",
+    "edit": "Weiterleitungs-Einstellungen bearbeiten",
+    "edit_title": "{{hostname}} bearbeiten",
+    "edit_saved_title": "Host aktualisiert",
+    "edit_saved_message": "{{hostname}} gespeichert — wird mit neuer Konfig deployed…",
+    "edit_immutable_note": "Bearbeite Forwarding für {{hostname}}. Hostname, Modus, Tunnel und Zone können nur durch Löschen + Neu-Anlegen geändert werden.",
+    "edit_scheme_hint": "Der Port deutet auf einen HTTPS-only Dienst (Proxmox / TrueNAS / o.ä.) hin. Wechsle das Schema auf https und aktiviere „TLS nicht prüfen“.",
+    "path_prefix_field": "Pfad-Präfix"
   }
 }

@@ -11,6 +11,7 @@
  */
 
 import { Router, type Router as RouterType } from 'express';
+import { z } from 'zod';
 import { CreateProxyHostRequestSchema } from '@cloudgate/shared';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
@@ -213,6 +214,77 @@ hostsRouter.get('/:id', requireAuth, requirePasswordSet, async (req, res) => {
 	}
 	res.json({ host: publicHost(row) });
 });
+
+// ---------------------------------------------------------------------------
+// PUT /:id — edit forward_scheme / forward_host / forward_port / tls_options
+// Hostname/mode/tunnel/zone are immutable — change those by delete+create.
+// ---------------------------------------------------------------------------
+const UpdateHostSchema = z.object({
+	forward_scheme: z.enum(['http', 'https']).optional(),
+	forward_host: z.string().min(1).optional(),
+	forward_port: z.number().int().min(1).max(65535).optional(),
+	path_prefix: z.string().min(1).optional(),
+	tls_options: z
+		.object({
+			no_tls_verify: z.boolean().optional(),
+		})
+		.optional(),
+	headers: z.record(z.string()).optional(),
+});
+
+hostsRouter.put(
+	'/:id',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'host.updated',
+		entityType: 'host',
+		entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+			return;
+		}
+		const id = Number.parseInt(String(req.params.id ?? ''), 10);
+		const row = await ownsHost(req.user.id, id);
+		if (!row) {
+			res.status(404).json({ error: 'Host not found', code: 'NOT_FOUND' });
+			return;
+		}
+		const parsed = UpdateHostSchema.safeParse(req.body);
+		if (!parsed.success) {
+			res
+				.status(400)
+				.json({ error: 'Invalid payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
+			return;
+		}
+		const input = parsed.data;
+		const knex = getDb();
+		const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+		if (input.forward_scheme !== undefined) updates.forward_scheme = input.forward_scheme;
+		if (input.forward_host !== undefined) updates.forward_host = input.forward_host;
+		if (input.forward_port !== undefined) updates.forward_port = input.forward_port;
+		if (input.path_prefix !== undefined) updates.path_prefix = input.path_prefix;
+		if (input.tls_options !== undefined) updates.tls_options = JSON.stringify(input.tls_options);
+		if (input.headers !== undefined) updates.headers = JSON.stringify(input.headers);
+
+		await knex('proxy_hosts').where({ id }).update(updates);
+
+		// Re-deploy so the tunnel config picks up the new scheme/port/etc.
+		// and the upstream probe re-runs.
+		void deployHost(id).catch((err) =>
+			log.warn({ err: (err as Error).message, host_id: id }, 'Re-deploy after edit failed'),
+		);
+
+		const fresh = await knex<HostRow>('proxy_hosts').where({ id }).first();
+		if (!fresh) {
+			res.status(500).json({ error: 'host vanished after update', code: 'INTERNAL' });
+			return;
+		}
+		res.json({ host: publicHost(fresh) });
+	},
+);
 
 // ---------------------------------------------------------------------------
 // DELETE /:id

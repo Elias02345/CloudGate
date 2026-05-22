@@ -542,6 +542,13 @@
     "redeploy": "Retry deploy (use after fixing a token / DNS issue)",
     "redeploy_ok_title": "Deploy retried",
     "redeploy_ok_message": "{{hostname}} deployed successfully.",
-    "redeploy_failed_title": "Deploy retry failed"
+    "redeploy_failed_title": "Deploy retry failed",
+    "edit": "Edit forwarding settings",
+    "edit_title": "Edit {{hostname}}",
+    "edit_saved_title": "Host updated",
+    "edit_saved_message": "{{hostname}} settings saved — re-deploying with new config…",
+    "edit_immutable_note": "Editing forwarding for {{hostname}}. To change the hostname, mode, tunnel or zone, delete + recreate the host.",
+    "edit_scheme_hint": "Port suggests this is an HTTPS-only service (Proxmox / TrueNAS / etc). Switch scheme to https and tick the no-TLS-verify box.",
+    "path_prefix_field": "Path prefix"
   }
 }

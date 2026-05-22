@@ -15,6 +15,7 @@ import {
 	IconAlertCircle,
 	IconCertificate,
 	IconCirclePlus,
+	IconEdit,
 	IconExternalLink,
 	IconRefresh,
 	IconTrash,
@@ -22,12 +23,14 @@ import {
 } from '@tabler/icons-react';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@mantine/core';
 import { useIssueCert } from '../api/acme.js';
-import { useDeleteHost, useHosts, useRedeployHost, useToggleHost } from '../api/hosts.js';
+import { type HostDto, useDeleteHost, useHosts, useRedeployHost, useToggleHost } from '../api/hosts.js';
 import { BulkImportModal } from '../components/BulkImportModal.js';
+import { EditHostModal } from '../components/EditHostModal.js';
 
 export function HostsPage() {
 	const { t } = useTranslation();
@@ -38,6 +41,7 @@ export function HostsPage() {
 	const redeployMutation = useRedeployHost();
 	const issueCert = useIssueCert();
 	const [bulkOpened, bulkModal] = useDisclosure(false);
+	const [editingHost, setEditingHost] = useState<HostDto | null>(null);
 
 	const onRedeploy = async (id: number, hostname: string) => {
 		try {
@@ -155,6 +159,14 @@ export function HostsPage() {
 										</Table.Td>
 										<Table.Td>
 											<Group gap={4} justify="flex-end">
+												<ActionIcon
+													variant="subtle"
+													color="blue"
+													onClick={() => setEditingHost(h)}
+													title={t('hosts.edit')}
+												>
+													<IconEdit size={16} />
+												</ActionIcon>
 												{h.last_error && (
 													<ActionIcon
 														variant="subtle"
@@ -206,6 +218,8 @@ export function HostsPage() {
 					</Anchor>
 				</Alert>
 			)}
+
+			<EditHostModal host={editingHost} opened={!!editingHost} onClose={() => setEditingHost(null)} />
 		</Stack>
 	);
 }
