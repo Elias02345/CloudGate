@@ -70,6 +70,17 @@ describe('bootstrap', () => {
 		expect(Number(rows?.c)).toBe(1);
 	});
 
+	it('migration 004 added playit_accounts table + new columns', async () => {
+		const { getDb } = await import('../src/db/db.js');
+		const knex = getDb();
+		expect(await knex.schema.hasTable('playit_accounts')).toBe(true);
+		expect(await knex.schema.hasColumn('tunnels', 'provider')).toBe(true);
+		expect(await knex.schema.hasColumn('tunnels', 'provider_meta')).toBe(true);
+		expect(await knex.schema.hasColumn('tunnels', 'playit_account_id')).toBe(true);
+		expect(await knex.schema.hasColumn('proxy_hosts', 'protocol')).toBe(true);
+		expect(await knex.schema.hasColumn('proxy_hosts', 'edge_endpoint')).toBe(true);
+	});
+
 	it('secrets dir has restrictive perms on POSIX', () => {
 		if (process.platform === 'win32') return;
 		const stat = statSync(join(tmpDir, 'secrets'));

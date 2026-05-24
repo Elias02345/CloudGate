@@ -7,3 +7,4 @@ export * from './types/bootstrap.js';
 export * from './types/common.js';
 export * from './types/api-key.js';
 export * from './types/ai.js';
+export * from './types/playit.js';

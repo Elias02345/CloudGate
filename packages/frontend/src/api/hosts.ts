@@ -1,3 +1,4 @@
+import type { HostProtocol, ProviderEdgeEndpoint } from '@cloudgate/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client.js';
 
@@ -6,12 +7,14 @@ export interface HostDto {
 	tunnel_id: number | null;
 	cf_zone_id: number | null;
 	mode: 'cloudflare_tunnel' | 'local_nginx';
+	protocol: HostProtocol;
 	hostname: string;
 	forward_scheme: 'http' | 'https';
 	forward_host: string;
 	forward_port: number;
 	path_prefix: string;
 	enabled: boolean;
+	edge_endpoint: ProviderEdgeEndpoint | null;
 	tls_options: { no_tls_verify?: boolean };
 	last_deployed_at: string | null;
 	last_error: string | null;
@@ -21,6 +24,7 @@ export interface HostDto {
 
 export interface CreateHostInput {
 	mode: 'cloudflare_tunnel' | 'local_nginx';
+	protocol?: HostProtocol;
 	hostname: string;
 	forward_scheme: 'http' | 'https';
 	forward_host: string;
@@ -65,7 +69,8 @@ export function useToggleHost() {
 
 export function useTestHost() {
 	return useMutation({
-		mutationFn: (id: number) => api<{ ok?: boolean; status?: number; reachable?: false; error?: string }>(`/hosts/${id}/test`),
+		mutationFn: (id: number) =>
+			api<{ ok?: boolean; status?: number; reachable?: false; error?: string }>(`/hosts/${id}/test`),
 	});
 }
 
