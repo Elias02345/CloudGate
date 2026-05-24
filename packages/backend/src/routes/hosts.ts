@@ -10,16 +10,16 @@
  *   GET    /:id/test    — HEAD request against the hostname to verify reachability
  */
 
+import { CreateProxyHostRequestSchema, HostAdvancedOptionsSchema } from '@cloudgate/shared';
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
-import { CreateProxyHostRequestSchema } from '@cloudgate/shared';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { audit } from '../middleware/audit.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { verifyDns } from '../services/dns-verify.js';
-import { deployHost, undeployHost } from '../services/host-deploy.js';
 import { publish } from '../services/events.js';
+import { deployHost, undeployHost } from '../services/host-deploy.js';
 
 const log = childLogger('routes:hosts');
 export const hostsRouter: RouterType = Router();
@@ -39,6 +39,7 @@ interface HostRow {
 	dns_record_id: string | null;
 	edge_endpoint: string | null;
 	tls_options: string;
+	advanced_options: string | null;
 	headers: string;
 	meta: string;
 	last_deployed_at: string | null;
@@ -63,6 +64,7 @@ function publicHost(row: HostRow): Record<string, unknown> {
 		dns_record_id: row.dns_record_id,
 		edge_endpoint: safeJson(row.edge_endpoint),
 		tls_options: safeJson(row.tls_options) ?? {},
+		advanced_options: safeJson(row.advanced_options) ?? {},
 		headers: safeJson(row.headers) ?? {},
 		meta: safeJson(row.meta) ?? {},
 		last_deployed_at: row.last_deployed_at,
@@ -107,133 +109,150 @@ async function ownsHost(userId: number, hostId: number): Promise<HostRow | null>
 // ---------------------------------------------------------------------------
 // POST /
 // ---------------------------------------------------------------------------
-hostsRouter.post('/', requireAuth, requirePasswordSet, audit({
-	action: 'host.created',
-	entityType: 'host',
-	meta: (req) => ({ hostname: req.body?.hostname, mode: req.body?.mode }),
-}), async (req, res) => {
-	if (!req.user) {
-		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
-		return;
-	}
-	const parsed = CreateProxyHostRequestSchema.safeParse(req.body);
-	if (!parsed.success) {
-		res.status(400).json({ error: 'Invalid payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
-		return;
-	}
-	const input = parsed.data;
-	const knex = getDb();
-
-	// Validate the tunnel/zone exists + belongs to the user
-	if (input.mode === 'cloudflare_tunnel') {
-		if (!input.tunnel_id) {
-			res.status(400).json({ error: 'cloudflare_tunnel mode requires tunnel_id', code: 'BAD_REQUEST' });
+hostsRouter.post(
+	'/',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'host.created',
+		entityType: 'host',
+		meta: (req) => ({ hostname: req.body?.hostname, mode: req.body?.mode }),
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
 			return;
 		}
-		// Look up the tunnel — owned by user via cloudflare_accounts OR playit_accounts.
-		// We do a left-join on both to cover both provider families.
-		const tunnel = await knex<{ id: number; provider: string }>('tunnels')
-			.leftJoin('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
-			.where('tunnels.id', input.tunnel_id)
-			.andWhere((b) => {
-				b.where('cloudflare_accounts.user_id', req.user!.id).orWhereNotNull('tunnels.provider_meta');
-			})
-			.select('tunnels.id', 'tunnels.provider')
-			.first();
-		if (!tunnel) {
-			res.status(400).json({ error: 'Tunnel not found or not yours', code: 'BAD_REQUEST' });
+		const parsed = CreateProxyHostRequestSchema.safeParse(req.body);
+		if (!parsed.success) {
+			res
+				.status(400)
+				.json({ error: 'Invalid payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
 			return;
 		}
+		const input = parsed.data;
+		const knex = getDb();
 
-		// Validate protocol matches the provider's capabilities.
-		const protocol = input.protocol ?? 'http';
-		const providerName = tunnel.provider ?? 'cloudflared';
-		const supportsByProvider: Record<string, string[]> = {
-			cloudflared: ['http', 'https'],
-			playit: ['tcp', 'udp'],
-		};
-		if (!supportsByProvider[providerName]?.includes(protocol)) {
-			res.status(400).json({
-				error: `Tunnel uses provider '${providerName}' which does not support protocol '${protocol}'.`,
-				code: 'PROTOCOL_PROVIDER_MISMATCH',
-			});
-			return;
-		}
-
-		// path_prefix is only meaningful for HTTP routing.
-		if (protocol !== 'http' && protocol !== 'https' && input.path_prefix && input.path_prefix !== '/') {
-			res.status(400).json({
-				error: `path_prefix is only valid for http/https protocols (got '${protocol}').`,
-				code: 'PATH_PREFIX_NOT_ALLOWED',
-			});
-			return;
-		}
-
-		// Zone is required for cloudflared (CNAME) and Java MC (SRV record),
-		// but optional for Bedrock UDP (host_port — no DNS record).
-		const needsZone = providerName === 'cloudflared' || (providerName === 'playit' && protocol === 'tcp');
-		if (needsZone && !input.cf_zone_id) {
-			res.status(400).json({
-				error: `Protocol '${protocol}' on provider '${providerName}' requires a cf_zone_id for the DNS record.`,
-				code: 'ZONE_REQUIRED',
-			});
-			return;
-		}
-
-		if (input.cf_zone_id) {
-			const zone = await knex<{ name: string }>('cf_zones').where({ id: input.cf_zone_id }).first();
-			if (!zone) {
-				res.status(400).json({ error: 'Zone not found', code: 'BAD_REQUEST' });
+		// Validate the tunnel/zone exists + belongs to the user
+		if (input.mode === 'cloudflare_tunnel') {
+			if (!input.tunnel_id) {
+				res.status(400).json({ error: 'cloudflare_tunnel mode requires tunnel_id', code: 'BAD_REQUEST' });
 				return;
 			}
-			if (!input.hostname.endsWith(zone.name)) {
+			// Look up the tunnel — must be owned by the user via cloudflare_accounts
+			// (cloudflared provider) or playit_accounts (playit provider).
+			const tunnel = await knex<{ id: number; provider: string }>('tunnels')
+				.leftJoin('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
+				.leftJoin('playit_accounts', 'playit_accounts.id', 'tunnels.playit_account_id')
+				.where('tunnels.id', input.tunnel_id)
+				.andWhere((b) => {
+					b.where('cloudflare_accounts.user_id', req.user!.id).orWhere(
+						'playit_accounts.user_id',
+						req.user!.id
+					);
+				})
+				.select('tunnels.id', 'tunnels.provider')
+				.first();
+			if (!tunnel) {
+				res.status(400).json({ error: 'Tunnel not found or not yours', code: 'BAD_REQUEST' });
+				return;
+			}
+
+			// Validate protocol matches the provider's capabilities.
+			const protocol = input.protocol ?? 'http';
+			const providerName = tunnel.provider ?? 'cloudflared';
+			const supportsByProvider: Record<string, string[]> = {
+				cloudflared: ['http', 'https'],
+				playit: ['tcp', 'udp'],
+			};
+			if (!supportsByProvider[providerName]?.includes(protocol)) {
 				res.status(400).json({
-					error: `Hostname must end with the chosen zone (${zone.name})`,
-					code: 'HOSTNAME_ZONE_MISMATCH',
+					error: `Tunnel uses provider '${providerName}' which does not support protocol '${protocol}'.`,
+					code: 'PROTOCOL_PROVIDER_MISMATCH',
 				});
 				return;
 			}
+
+			// path_prefix is only meaningful for HTTP routing.
+			if (protocol !== 'http' && protocol !== 'https' && input.path_prefix && input.path_prefix !== '/') {
+				res.status(400).json({
+					error: `path_prefix is only valid for http/https protocols (got '${protocol}').`,
+					code: 'PATH_PREFIX_NOT_ALLOWED',
+				});
+				return;
+			}
+
+			// Zone is required for cloudflared (CNAME) and Java MC (SRV record),
+			// but optional for Bedrock UDP (host_port — no DNS record).
+			const needsZone = providerName === 'cloudflared' || (providerName === 'playit' && protocol === 'tcp');
+			if (needsZone && !input.cf_zone_id) {
+				res.status(400).json({
+					error: `Protocol '${protocol}' on provider '${providerName}' requires a cf_zone_id for the DNS record.`,
+					code: 'ZONE_REQUIRED',
+				});
+				return;
+			}
+
+			if (input.cf_zone_id) {
+				const zone = await knex<{ name: string }>('cf_zones').where({ id: input.cf_zone_id }).first();
+				if (!zone) {
+					res.status(400).json({ error: 'Zone not found', code: 'BAD_REQUEST' });
+					return;
+				}
+				if (!input.hostname.endsWith(zone.name)) {
+					res.status(400).json({
+						error: `Hostname must end with the chosen zone (${zone.name})`,
+						code: 'HOSTNAME_ZONE_MISMATCH',
+					});
+					return;
+				}
+			}
+		}
+
+		const now = new Date().toISOString();
+		try {
+			const insertRow: Record<string, unknown> = {
+				tunnel_id: input.tunnel_id ?? null,
+				cf_zone_id: input.cf_zone_id ?? null,
+				mode: input.mode,
+				protocol: input.protocol ?? 'http',
+				hostname: input.hostname.toLowerCase(),
+				forward_scheme: input.forward_scheme,
+				forward_host: input.forward_host,
+				forward_port: input.forward_port,
+				path_prefix: input.path_prefix ?? '/',
+				enabled: 1,
+				tls_options: JSON.stringify(input.tls_options ?? {}),
+				headers: JSON.stringify(input.headers ?? {}),
+				meta: '{}',
+				created_at: now,
+				updated_at: now,
+			};
+			// Only include advanced_options if migration 006 has applied (column exists).
+			if (await knex.schema.hasColumn('proxy_hosts', 'advanced_options')) {
+				insertRow.advanced_options = JSON.stringify(input.advanced_options ?? {});
+			}
+			const [id] = await knex('proxy_hosts').insert(insertRow);
+
+			// Deploy async — don't block the response
+			void deployHost(Number(id)).catch((err) =>
+				log.warn({ err: (err as Error).message, host_id: id }, 'Initial deploy failed')
+			);
+
+			const row = await knex<HostRow>('proxy_hosts').where({ id }).first();
+			if (!row) throw new Error('inserted host disappeared');
+			res.status(201).json({ host: publicHost(row) });
+		} catch (err) {
+			// SQLite unique-violation on hostname
+			const msg = (err as { code?: string; message?: string }).message ?? '';
+			if (msg.includes('UNIQUE constraint')) {
+				res.status(409).json({ error: 'Hostname already exists', code: 'CONFLICT' });
+				return;
+			}
+			throw err;
 		}
 	}
-
-	const now = new Date().toISOString();
-	try {
-		const [id] = await knex('proxy_hosts').insert({
-			tunnel_id: input.tunnel_id ?? null,
-			cf_zone_id: input.cf_zone_id ?? null,
-			mode: input.mode,
-			protocol: input.protocol ?? 'http',
-			hostname: input.hostname.toLowerCase(),
-			forward_scheme: input.forward_scheme,
-			forward_host: input.forward_host,
-			forward_port: input.forward_port,
-			path_prefix: input.path_prefix ?? '/',
-			enabled: 1,
-			tls_options: JSON.stringify(input.tls_options ?? {}),
-			headers: JSON.stringify(input.headers ?? {}),
-			meta: '{}',
-			created_at: now,
-			updated_at: now,
-		});
-
-		// Deploy async — don't block the response
-		void deployHost(Number(id)).catch((err) =>
-			log.warn({ err: (err as Error).message, host_id: id }, 'Initial deploy failed')
-		);
-
-		const row = await knex<HostRow>('proxy_hosts').where({ id }).first();
-		if (!row) throw new Error('inserted host disappeared');
-		res.status(201).json({ host: publicHost(row) });
-	} catch (err) {
-		// SQLite unique-violation on hostname
-		const msg = (err as { code?: string; message?: string }).message ?? '';
-		if (msg.includes('UNIQUE constraint')) {
-			res.status(409).json({ error: 'Hostname already exists', code: 'CONFLICT' });
-			return;
-		}
-		throw err;
-	}
-});
+);
 
 // ---------------------------------------------------------------------------
 // GET /
@@ -291,6 +310,7 @@ const UpdateHostSchema = z.object({
 			no_tls_verify: z.boolean().optional(),
 		})
 		.optional(),
+	advanced_options: HostAdvancedOptionsSchema.optional(),
 	headers: z.record(z.string()).optional(),
 });
 
@@ -330,13 +350,18 @@ hostsRouter.put(
 		if (input.path_prefix !== undefined) updates.path_prefix = input.path_prefix;
 		if (input.tls_options !== undefined) updates.tls_options = JSON.stringify(input.tls_options);
 		if (input.headers !== undefined) updates.headers = JSON.stringify(input.headers);
+		if (input.advanced_options !== undefined) {
+			if (await knex.schema.hasColumn('proxy_hosts', 'advanced_options')) {
+				updates.advanced_options = JSON.stringify(input.advanced_options);
+			}
+		}
 
 		await knex('proxy_hosts').where({ id }).update(updates);
 
 		// Re-deploy so the tunnel config picks up the new scheme/port/etc.
 		// and the upstream probe re-runs.
 		void deployHost(id).catch((err) =>
-			log.warn({ err: (err as Error).message, host_id: id }, 'Re-deploy after edit failed'),
+			log.warn({ err: (err as Error).message, host_id: id }, 'Re-deploy after edit failed')
 		);
 
 		const fresh = await knex<HostRow>('proxy_hosts').where({ id }).first();
@@ -345,33 +370,39 @@ hostsRouter.put(
 			return;
 		}
 		res.json({ host: publicHost(fresh) });
-	},
+	}
 );
 
 // ---------------------------------------------------------------------------
 // DELETE /:id
 // ---------------------------------------------------------------------------
-hostsRouter.delete('/:id', requireAuth, requirePasswordSet, audit({
-	action: 'host.deleted',
-	entityType: 'host',
-	entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
-}), async (req, res) => {
-	if (!req.user) {
-		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
-		return;
+hostsRouter.delete(
+	'/:id',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'host.deleted',
+		entityType: 'host',
+		entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+			return;
+		}
+		const id = Number.parseInt(String(req.params.id ?? ''), 10);
+		const row = await ownsHost(req.user.id, id);
+		if (!row) {
+			res.status(404).json({ error: 'Host not found', code: 'NOT_FOUND' });
+			return;
+		}
+		await undeployHost(id);
+		const knex = getDb();
+		await knex('proxy_hosts').where({ id }).delete();
+		publish('host.deleted', { id, hostname: row.hostname });
+		res.status(204).end();
 	}
-	const id = Number.parseInt(String(req.params.id ?? ''), 10);
-	const row = await ownsHost(req.user.id, id);
-	if (!row) {
-		res.status(404).json({ error: 'Host not found', code: 'NOT_FOUND' });
-		return;
-	}
-	await undeployHost(id);
-	const knex = getDb();
-	await knex('proxy_hosts').where({ id }).delete();
-	publish('host.deleted', { id, hostname: row.hostname });
-	res.status(204).end();
-});
+);
 
 // ---------------------------------------------------------------------------
 // POST /:id/toggle
@@ -450,7 +481,9 @@ hostsRouter.get('/:id/verify-dns', requireAuth, requirePasswordSet, async (req, 
 		return;
 	}
 	if (row.mode !== 'cloudflare_tunnel') {
-		res.status(400).json({ error: 'verify-dns only applies to cloudflare_tunnel hosts', code: 'BAD_REQUEST' });
+		res
+			.status(400)
+			.json({ error: 'verify-dns only applies to cloudflare_tunnel hosts', code: 'BAD_REQUEST' });
 		return;
 	}
 	// Need the tunnel's CF UUID to know what the CNAME should target

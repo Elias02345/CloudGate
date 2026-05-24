@@ -5,6 +5,7 @@ import {
 	IconClipboardList,
 	IconCloudCheck,
 	IconCloudComputing,
+	IconDatabaseExport,
 	IconDeviceGamepad2,
 	IconHeart,
 	IconHome,
@@ -28,6 +29,7 @@ import { AiSettingsPage } from './pages/AiSettingsPage.js';
 import { ApiDocsPage } from './pages/ApiDocsPage.js';
 import { ApiKeysPage } from './pages/ApiKeysPage.js';
 import { AuditLogPage } from './pages/AuditLogPage.js';
+import { BackupPage } from './pages/BackupPage.js';
 import { CloudflarePage } from './pages/CloudflarePage.js';
 import { DashboardPage } from './pages/DashboardPage.js';
 import { DonatePage } from './pages/DonatePage.js';
@@ -150,6 +152,12 @@ export function App() {
 								onClick={() => navigate('/settings')}
 							/>
 							<NavLink
+								label="Backup"
+								leftSection={<IconDatabaseExport size={16} />}
+								active={location.pathname.startsWith('/backup')}
+								onClick={() => navigate('/backup')}
+							/>
+							<NavLink
 								label={t('nav.api_keys')}
 								leftSection={<IconKey size={16} />}
 								active={location.pathname.startsWith('/api-keys')}
@@ -250,6 +258,14 @@ export function App() {
 							element={
 								<ProtectedRoute>
 									<SettingsPage />
+								</ProtectedRoute>
+							}
+						/>
+						<Route
+							path="/backup"
+							element={
+								<ProtectedRoute>
+									<BackupPage />
 								</ProtectedRoute>
 							}
 						/>

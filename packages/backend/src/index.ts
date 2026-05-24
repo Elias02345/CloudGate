@@ -24,6 +24,7 @@ import { childLogger, logger } from './logger.js';
 import { looksLikeApiKey, tryApiKey } from './middleware/api-key.js';
 import { apiKeyLimiter, globalLimiter } from './middleware/rate-limit.js';
 import { acmeRouter } from './routes/acme.js';
+import { adminRouter } from './routes/admin.js';
 import { aiRouter } from './routes/ai.js';
 import { apiKeysRouter } from './routes/api-keys.js';
 import { auditRouter } from './routes/audit.js';
@@ -171,6 +172,7 @@ async function main(): Promise<void> {
 	app.use('/api/totp', totpRouter);
 	app.use('/api/updates', updatesRouter);
 	app.use('/api/acme', acmeRouter);
+	app.use('/api/admin', adminRouter);
 	app.use('/api/api-keys', apiKeysRouter);
 	app.use('/api/openapi.json', openapiRouter);
 	app.use('/api/ai', aiRouter);

@@ -9,6 +9,85 @@ _Nothing yet._
 
 ---
 
+## [0.2.1] — 2026-05-25
+
+### Fixed — broken tunnels after 0.2.0 upgrade
+
+Migration `004` made several `tunnels` columns nullable via knex's
+SQLite `.alter()` table-rebuild path, and some installs came out with
+cloudflared tunnel rows that ended up with `NULL` in
+`encrypted_tunnel_secret` / `account_tag` / `credentials_path`. The
+cloudflared daemon never started, every host returned an error, and
+the only available remedy was to wipe `/data` and start over. Not
+acceptable.
+
+This release contains both detection and recovery:
+
+- **`CloudflaredProvider.start` is now tolerant** — missing credentials
+  surface as `provider_meta.last_error` ("needs re-link") and the boot
+  sequence continues. One bad tunnel can no longer brick the whole
+  install.
+- **Migration `005` flags damaged tunnels** at upgrade time — it scans
+  for the breakage signature and marks affected rows `status='error'`
+  with an actionable message instead of leaving them in an unexplained
+  "stopped" state.
+- **New `POST /api/tunnels/:id/recreate`** + sidebar "🆘 Re-create"
+  button. Creates a fresh Cloudflare tunnel under the same account,
+  swaps the UUID + secret in place, and re-deploys every attached host
+  so DNS records point at the new `cfargotunnel.com` target. Hosts and
+  their configuration survive.
+- **`buildContext` silently skips hosts** with invalid `forward_host` /
+  `forward_port` so a single corrupt row can't drop the whole tunnel's
+  ingress.
+
+### Fixed — HomeAssistant "400 Bad Request" and similar proxied apps
+
+HomeAssistant rejects proxied requests it doesn't recognise via
+`trusted_proxies` + Host-header matching. CloudGate now exposes the
+relevant cloudflared `originRequest` knobs per host:
+
+- **HTTP Host header override** (`http_host_header`) — pin the Host
+  header sent to origin (`homeassistant.local:8123` or your LAN IP).
+- **Origin server name** (SNI) for HTTPS origins with mismatched certs.
+- **HTTP/2 origin**, **no Happy Eyeballs**, **disable chunked encoding**.
+- **Connect timeout** override.
+
+Surfaced via a new "Advanced (originRequest)" panel in the Edit Host
+modal. Schema lives in `proxy_hosts.advanced_options` (migration `006`).
+
+### Added — encrypted Backup &amp; Restore UI
+
+New `/backup` page (admin-only) with two cards:
+
+- **Export** — passphrase → `cloudgate-backup-YYYY-MM-DD….cgbk`. The
+  archive contains the SQLite DB, all secrets, Cloudflare tunnel
+  credentials, nginx custom snippets and Let's Encrypt certs.
+- **Import** — file upload + passphrase + explicit overwrite
+  confirmation. Calls the admin `POST /api/restore?force=true` path;
+  container restart required afterwards.
+
+The backup format itself was extended to include `nginx/custom` and
+`nginx/certs` (previously omitted) so a restored install boots with the
+user's full reverse-proxy state intact. `cloudflared/bin` and
+`playit/bin` are deliberately skipped — they're downloadable.
+
+### Added — `/api/admin/diagnostics`
+
+Admin-only endpoint that dumps SQLite `PRAGMA integrity_check`,
+migration history, row counts, null-column survey on critical tables,
+and `/data` path presence. No secrets. Intended as a "paste-into-issue"
+JSON when triaging post-upgrade problems.
+
+### Security
+
+- **Fixed an ownership-validation bug** on `POST /api/hosts` introduced
+  by 0.2.0: the `.orWhereNotNull('tunnels.provider_meta')` fallback
+  matched every tunnel (all rows have `provider_meta='{}'`), so an
+  authenticated user could attach a host to a tunnel they didn't own.
+  Single-user installs were unaffected in practice — fixed regardless.
+
+---
+
 ## [0.2.0] — 2026-05-24
 
 ### Added — pluggable tunnel-provider abstraction + Playit.gg for TCP/UDP

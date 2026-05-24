@@ -11,23 +11,23 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import { CreateTunnelRequestSchema, type TunnelProviderName } from '@cloudgate/shared';
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
-import { CreateTunnelRequestSchema, type TunnelProviderName } from '@cloudgate/shared';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { audit } from '../middleware/audit.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
-import { getAccountById, decryptCredentials } from '../services/cf-account.js';
+import { decryptCredentials, getAccountById } from '../services/cf-account.js';
 import { CloudflareApiError, clientFor } from '../services/cloudflare-client.js';
 import { encryptJson } from '../services/crypto.js';
 import { deployHost } from '../services/host-deploy.js';
 import { getAccountById as getPlayitAccountById } from '../services/playit-account.js';
 import {
 	logsOf as managerLogs,
+	statusOf as managerStatus,
 	reloadTunnel,
 	startTunnel,
-	statusOf as managerStatus,
 	stopTunnel,
 } from '../services/tunnel-manager.js';
 import { readCurrentConfig } from '../services/tunnel-providers/cloudflared/config-writer.js';
@@ -62,8 +62,19 @@ function publicTunnel(row: TunnelRow): {
 	live_status: string;
 	last_status_at: string | null;
 	created_at: string;
+	last_error: string | null;
+	recovery_needed: boolean;
 } {
 	const providerName = (row.provider ?? 'cloudflared') as TunnelProviderName;
+	let metaError: string | null = null;
+	let recoveryNeeded = false;
+	try {
+		const meta = JSON.parse(row.provider_meta || '{}') as { last_error?: string; recovery_needed?: boolean };
+		metaError = meta.last_error ?? null;
+		recoveryNeeded = Boolean(meta.recovery_needed);
+	} catch {
+		/* invalid JSON — leave error null */
+	}
 	return {
 		id: row.id,
 		provider: providerName,
@@ -76,38 +87,48 @@ function publicTunnel(row: TunnelRow): {
 		live_status: managerStatus(row.id, providerName),
 		last_status_at: row.last_status_at,
 		created_at: row.created_at,
+		last_error: metaError,
+		recovery_needed: recoveryNeeded,
 	};
 }
 
 // ---------------------------------------------------------------------------
 // POST /
 // ---------------------------------------------------------------------------
-tunnelsRouter.post('/', requireAuth, requirePasswordSet, audit({
-	action: 'tunnel.created',
-	entityType: 'tunnel',
-	meta: (req) => ({ name: req.body?.name, provider: req.body?.provider ?? 'cloudflared' }),
-}), async (req, res) => {
-	if (!req.user) {
-		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
-		return;
-	}
-	const parsed = CreateTunnelRequestSchema.safeParse(req.body);
-	if (!parsed.success) {
-		res.status(400).json({ error: 'Invalid payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
-		return;
-	}
+tunnelsRouter.post(
+	'/',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'tunnel.created',
+		entityType: 'tunnel',
+		meta: (req) => ({ name: req.body?.name, provider: req.body?.provider ?? 'cloudflared' }),
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+			return;
+		}
+		const parsed = CreateTunnelRequestSchema.safeParse(req.body);
+		if (!parsed.success) {
+			res
+				.status(400)
+				.json({ error: 'Invalid payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
+			return;
+		}
 
-	if (parsed.data.provider === 'playit') {
-		await createPlayitTunnel(req, res, parsed.data);
-		return;
+		if (parsed.data.provider === 'playit') {
+			await createPlayitTunnel(req, res, parsed.data);
+			return;
+		}
+		await createCloudflaredTunnel(req, res, parsed.data);
 	}
-	await createCloudflaredTunnel(req, res, parsed.data);
-});
+);
 
 async function createCloudflaredTunnel(
 	req: import('express').Request,
 	res: import('express').Response,
-	input: { cloudflare_account_id?: number; name: string },
+	input: { cloudflare_account_id?: number; name: string }
 ): Promise<void> {
 	if (!input.cloudflare_account_id) {
 		res.status(400).json({ error: 'cloudflared tunnels require cloudflare_account_id', code: 'BAD_REQUEST' });
@@ -175,7 +196,7 @@ async function createCloudflaredTunnel(
 async function createPlayitTunnel(
 	req: import('express').Request,
 	res: import('express').Response,
-	input: { playit_account_id?: number; name: string },
+	input: { playit_account_id?: number; name: string }
 ): Promise<void> {
 	if (!input.playit_account_id) {
 		res.status(400).json({ error: 'playit tunnels require playit_account_id', code: 'BAD_REQUEST' });
@@ -248,7 +269,7 @@ tunnelsRouter.get('/', requireAuth, requirePasswordSet, async (req, res) => {
 			'tunnels.provider_meta',
 			'tunnels.status',
 			'tunnels.last_status_at',
-			'tunnels.created_at',
+			'tunnels.created_at'
 		);
 	res.json({ tunnels: rows.map(publicTunnel) });
 });
@@ -271,59 +292,68 @@ async function findOwnedTunnel(userId: number, id: number): Promise<TunnelRow | 
 // ---------------------------------------------------------------------------
 // DELETE /:id
 // ---------------------------------------------------------------------------
-tunnelsRouter.delete('/:id', requireAuth, requirePasswordSet, audit({
-	action: 'tunnel.deleted',
-	entityType: 'tunnel',
-	entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
-}), async (req, res) => {
-	if (!req.user) {
-		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
-		return;
-	}
-	const id = Number.parseInt(String(req.params.id ?? ''), 10);
-	if (!Number.isFinite(id)) {
-		res.status(400).json({ error: 'Invalid id', code: 'BAD_REQUEST' });
-		return;
-	}
-	const row = await findOwnedTunnel(req.user.id, id);
-	if (!row) {
-		res.status(404).json({ error: 'Tunnel not found', code: 'NOT_FOUND' });
-		return;
-	}
+tunnelsRouter.delete(
+	'/:id',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'tunnel.deleted',
+		entityType: 'tunnel',
+		entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+			return;
+		}
+		const id = Number.parseInt(String(req.params.id ?? ''), 10);
+		if (!Number.isFinite(id)) {
+			res.status(400).json({ error: 'Invalid id', code: 'BAD_REQUEST' });
+			return;
+		}
+		const row = await findOwnedTunnel(req.user.id, id);
+		if (!row) {
+			res.status(404).json({ error: 'Tunnel not found', code: 'NOT_FOUND' });
+			return;
+		}
 
-	// Stop daemon first (provider-aware)
-	try {
-		await stopTunnel(id);
-	} catch (err) {
-		log.warn({ err: (err as Error).message }, 'tunnel stop failed (continuing)');
-	}
+		// Stop daemon first (provider-aware)
+		try {
+			await stopTunnel(id);
+		} catch (err) {
+			log.warn({ err: (err as Error).message }, 'tunnel stop failed (continuing)');
+		}
 
-	// Provider-specific upstream cleanup
-	if (row.provider === 'cloudflared' && row.cloudflare_account_id) {
-		const account = await getAccountById(row.cloudflare_account_id, req.user.id);
-		if (account) {
-			try {
-				const creds = decryptCredentials(account);
-				if (creds.type === 'api_token' && row.account_tag) {
-					const cf = clientFor(creds.token);
-					// biome-ignore lint/suspicious/noExplicitAny: SDK types
-					await (cf.zeroTrust.tunnels.cloudflared as any).delete(row.tunnel_id, {
-						account_id: row.account_tag,
-					});
+		// Provider-specific upstream cleanup
+		if (row.provider === 'cloudflared' && row.cloudflare_account_id) {
+			const account = await getAccountById(row.cloudflare_account_id, req.user.id);
+			if (account) {
+				try {
+					const creds = decryptCredentials(account);
+					if (creds.type === 'api_token' && row.account_tag) {
+						const cf = clientFor(creds.token);
+						// biome-ignore lint/suspicious/noExplicitAny: SDK types
+						await (cf.zeroTrust.tunnels.cloudflared as any).delete(row.tunnel_id, {
+							account_id: row.account_tag,
+						});
+					}
+				} catch (err) {
+					log.warn(
+						{ err: (err as Error).message, tunnel_id: row.tunnel_id },
+						'CF tunnel delete failed (continuing)'
+					);
 				}
-			} catch (err) {
-				log.warn({ err: (err as Error).message, tunnel_id: row.tunnel_id }, 'CF tunnel delete failed (continuing)');
 			}
 		}
-	}
-	// Playit: no upstream delete needed — the agent itself is shared, and
-	// per-host port mappings get deleted via undeployHost when the user
-	// removes their hosts.
+		// Playit: no upstream delete needed — the agent itself is shared, and
+		// per-host port mappings get deleted via undeployHost when the user
+		// removes their hosts.
 
-	const knex = getDb();
-	await knex('tunnels').where({ id }).delete();
-	res.status(204).end();
-});
+		const knex = getDb();
+		await knex('tunnels').where({ id }).delete();
+		res.status(204).end();
+	}
+);
 
 // ---------------------------------------------------------------------------
 // POST /:id/restart
@@ -389,7 +419,7 @@ tunnelsRouter.get('/:id/config', requireAuth, requirePasswordSet, async (req, re
 			'enabled',
 			'edge_endpoint',
 			'last_deployed_at',
-			'last_error',
+			'last_error'
 		);
 
 	const provider = (row.provider ?? 'cloudflared') as TunnelProviderName;
@@ -462,6 +492,165 @@ tunnelsRouter.post('/:id/redeploy-all', requireAuth, requirePasswordSet, async (
 
 	res.json({ ok, failed, errors });
 });
+
+// ---------------------------------------------------------------------------
+// POST /:id/recreate
+//
+// Recovery flow for cloudflared tunnels whose credentials were lost (DB
+// corruption after a botched upgrade, restored from incomplete backup,
+// etc). Creates a NEW Cloudflare tunnel under the SAME account and swaps
+// the UUID + secret on the row. Hosts attached to the tunnel keep their
+// configuration; the next deploy refreshes DNS records to point at the
+// new UUID's cfargotunnel.com.
+//
+// The old CF tunnel is best-effort deleted on the CF side; if it's
+// orphaned (e.g. user already deleted it via dashboard) we proceed.
+// ---------------------------------------------------------------------------
+tunnelsRouter.post(
+	'/:id/recreate',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'tunnel.recreated',
+		entityType: 'tunnel',
+		entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+			return;
+		}
+		const id = Number.parseInt(String(req.params.id ?? ''), 10);
+		const row = await findOwnedTunnel(req.user.id, id);
+		if (!row) {
+			res.status(404).json({ error: 'Tunnel not found', code: 'NOT_FOUND' });
+			return;
+		}
+		if (row.provider !== 'cloudflared') {
+			res.status(400).json({
+				error: 'recreate only applies to cloudflared tunnels',
+				code: 'WRONG_PROVIDER',
+			});
+			return;
+		}
+		if (!row.cloudflare_account_id) {
+			res.status(400).json({
+				error:
+					'Tunnel has no Cloudflare account binding to recreate against. Delete + recreate from scratch instead.',
+				code: 'NO_CF_ACCOUNT',
+			});
+			return;
+		}
+
+		const account = await getAccountById(row.cloudflare_account_id, req.user.id);
+		if (!account) {
+			res.status(404).json({ error: 'Cloudflare account not found', code: 'NOT_FOUND' });
+			return;
+		}
+		const creds = decryptCredentials(account);
+		if (creds.type !== 'api_token') {
+			res.status(400).json({ error: 'recreate requires api_token auth', code: 'CF_UNSUPPORTED_AUTH' });
+			return;
+		}
+
+		// Stop the broken daemon (no-op if it's not running).
+		try {
+			await stopTunnel(id);
+		} catch {
+			/* ignore — daemon may not even have started */
+		}
+
+		// Best-effort delete of the old CF tunnel. Doesn't matter if it 404s.
+		if (row.tunnel_id && row.account_tag) {
+			try {
+				const cf = clientFor(creds.token);
+				// biome-ignore lint/suspicious/noExplicitAny: SDK types
+				await (cf.zeroTrust.tunnels.cloudflared as any).delete(row.tunnel_id, {
+					account_id: row.account_tag,
+				});
+			} catch (err) {
+				log.warn(
+					{ err: (err as Error).message, old_uuid: row.tunnel_id },
+					'old CF tunnel delete failed during recreate (continuing)'
+				);
+			}
+		}
+
+		// Create the replacement tunnel.
+		const newSecret = randomBytes(32).toString('base64');
+		let created: { id: string; name: string };
+		try {
+			const cf = clientFor(creds.token);
+			// biome-ignore lint/suspicious/noExplicitAny: SDK types
+			created = (await (cf.zeroTrust.tunnels.cloudflared as any).create({
+				account_id: account.account_tag,
+				name: row.name,
+				tunnel_secret: newSecret,
+				config_src: 'local',
+			})) as { id: string; name: string };
+		} catch (err) {
+			if (err instanceof CloudflareApiError) {
+				res.status(502).json({ error: err.message, code: err.code });
+				return;
+			}
+			res.status(502).json({
+				error: (err as Error).message,
+				code: 'TUNNEL_CREATE_FAILED',
+			});
+			return;
+		}
+
+		// Swap UUID + secret in place. Hosts keep their tunnel_id (DB row id),
+		// only the underlying CF UUID changes.
+		const knex = getDb();
+		const encryptedSecret = encryptJson({ type: 'tunnel', secret: newSecret });
+		const now = new Date().toISOString();
+		await knex('tunnels').where({ id }).update({
+			tunnel_id: created.id,
+			account_tag: account.account_tag,
+			encrypted_tunnel_secret: encryptedSecret,
+			credentials_path: '', // will be re-rendered on startTunnel
+			status: 'starting',
+			last_status_at: now,
+			provider_meta: '{}', // clears the "needs relink" error
+		});
+
+		// Start the new daemon and re-deploy every host so DNS records update
+		// to the new UUID's cfargotunnel.com.
+		try {
+			await startTunnel(id);
+		} catch (err) {
+			log.warn({ err: (err as Error).message }, 'startTunnel after recreate failed');
+		}
+
+		const hosts = await knex('proxy_hosts')
+			.where({ tunnel_id: id, mode: 'cloudflare_tunnel' })
+			.select('id', 'hostname');
+		let redeployedOk = 0;
+		const errors: Array<{ hostname: string; error: string }> = [];
+		for (const host of hosts) {
+			try {
+				await deployHost(host.id);
+				redeployedOk++;
+			} catch (err) {
+				errors.push({ hostname: host.hostname, error: (err as Error).message });
+			}
+		}
+
+		log.info(
+			{ tunnelDbId: id, old_uuid: row.tunnel_id, new_uuid: created.id, hosts: hosts.length },
+			'cloudflared tunnel recreated'
+		);
+		res.json({
+			ok: true,
+			old_uuid: row.tunnel_id,
+			new_uuid: created.id,
+			hosts_total: hosts.length,
+			hosts_redeployed: redeployedOk,
+			host_errors: errors,
+		});
+	}
+);
 
 // The UpdateHostSchema still applies to PUT /:id but we want it self-contained;
 // re-export the unused z so eslint doesn't flag the import elsewhere.

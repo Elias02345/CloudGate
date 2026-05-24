@@ -50,17 +50,37 @@ export class CloudflaredProvider implements TunnelProvider {
 		const row = await knex<TunnelRow>('tunnels').where({ id: tunnelDbId }).first();
 		if (!row) throw new Error(`tunnel ${tunnelDbId} not found`);
 
-		const credsPath = await this.ensureCredentialsFile(row);
+		// Tolerate missing credentials — common after a botched
+		// upgrade or DB restore. We surface a clear "needs relink" error
+		// and leave hosts attached to the tunnel so the user can recover
+		// without losing their host configuration.
+		let credsPath: string;
+		try {
+			credsPath = await this.ensureCredentialsFile(row);
+		} catch (err) {
+			const message = (err as Error).message;
+			log.warn({ tunnelDbId, err: message }, 'cloudflared tunnel cannot start — credentials problem');
+			await this.persistRelinkNeeded(tunnelDbId, message);
+			return;
+		}
+
 		if (row.credentials_path !== credsPath) {
 			await knex('tunnels').where({ id: row.id }).update({ credentials_path: credsPath });
 		}
 
-		const ctx = await buildContext({
-			id: row.id,
-			tunnel_id: row.tunnel_id,
-			credentials_path: credsPath,
-		});
-		await writeConfig(ctx);
+		try {
+			const ctx = await buildContext({
+				id: row.id,
+				tunnel_id: row.tunnel_id,
+				credentials_path: credsPath,
+			});
+			await writeConfig(ctx);
+		} catch (err) {
+			const message = (err as Error).message;
+			log.warn({ tunnelDbId, err: message }, 'cloudflared config render failed');
+			await this.persistRelinkNeeded(tunnelDbId, `config render failed: ${message}`);
+			return;
+		}
 
 		let proc = this.processes.get(tunnelDbId);
 		if (!proc) {
@@ -162,7 +182,47 @@ export class CloudflaredProvider implements TunnelProvider {
 		await knex('tunnels')
 			.where({ id: tunnelDbId })
 			.update({ status, last_status_at: new Date().toISOString() });
-		if (err) log.warn({ tunnelDbId, status, err }, 'Tunnel status changed');
-		else log.info({ tunnelDbId, status }, 'Tunnel status changed');
+		if (err) {
+			log.warn({ tunnelDbId, status, err }, 'Tunnel status changed');
+			await this.recordError(tunnelDbId, err);
+		} else {
+			log.info({ tunnelDbId, status }, 'Tunnel status changed');
+			await this.recordError(tunnelDbId, null);
+		}
+	}
+
+	private async persistRelinkNeeded(tunnelDbId: number, reason: string): Promise<void> {
+		const knex = getDb();
+		await knex('tunnels')
+			.where({ id: tunnelDbId })
+			.update({ status: 'error', last_status_at: new Date().toISOString() });
+		await this.recordError(
+			tunnelDbId,
+			`Tunnel cannot start: ${reason}. Use "Re-link" to re-attach this tunnel to a Cloudflare account without losing its hosts.`
+		);
+	}
+
+	private async recordError(tunnelDbId: number, errorOrNull: string | null): Promise<void> {
+		const knex = getDb();
+		const row = await knex<{ provider_meta: string | null }>('tunnels')
+			.where({ id: tunnelDbId })
+			.select('provider_meta')
+			.first();
+		let meta: Record<string, unknown> = {};
+		try {
+			meta = JSON.parse(row?.provider_meta || '{}');
+		} catch {
+			meta = {};
+		}
+		if (errorOrNull === null) {
+			meta.last_error = undefined;
+			meta.last_error_at = undefined;
+		} else {
+			meta.last_error = errorOrNull;
+			meta.last_error_at = new Date().toISOString();
+		}
+		await knex('tunnels')
+			.where({ id: tunnelDbId })
+			.update({ provider_meta: JSON.stringify(meta) });
 	}
 }
