@@ -32,7 +32,7 @@ import {
 	IconWorld,
 	IconWorldSearch,
 } from '@tabler/icons-react';
-import { useState } from 'react';
+import { type ReactElement, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useIssueCert } from '../api/acme.js';
@@ -47,7 +47,7 @@ import {
 import { BulkImportModal } from '../components/BulkImportModal.js';
 import { EditHostModal } from '../components/EditHostModal.js';
 
-function protocolBadge(protocol: string): { icon: JSX.Element; label: string; color: string } {
+function protocolBadge(protocol: string): { icon: ReactElement; label: string; color: string } {
 	switch (protocol) {
 		case 'tcp':
 			return { icon: <IconNetwork size={12} />, label: 'TCP', color: 'cyan' };
