@@ -23,6 +23,7 @@ import {
 	IconCheck,
 	IconCirclePlus,
 	IconFileText,
+	IconLifebuoy,
 	IconRefresh,
 	IconRefreshDot,
 	IconTerminal2,
@@ -37,6 +38,7 @@ import {
 	type TunnelDto,
 	useCreateTunnel,
 	useDeleteTunnel,
+	useRecreateTunnel,
 	useRedeployAllHosts,
 	useRestartTunnel,
 	useTunnelConfig,
@@ -67,6 +69,29 @@ export function TunnelsPage() {
 	const createMutation = useCreateTunnel();
 	const deleteMutation = useDeleteTunnel();
 	const restartMutation = useRestartTunnel();
+	const recreateMutation = useRecreateTunnel();
+
+	const onRecreate = async (row: TunnelDto): Promise<void> => {
+		const ok = confirm(
+			`Re-create CF tunnel "${row.name}"?\n\n` +
+				'This deletes the broken tunnel from Cloudflare and creates a fresh one ' +
+				'under the same account. Your hosts stay attached and DNS records will be ' +
+				'updated to the new tunnel UUID on the next deploy.'
+		);
+		if (!ok) return;
+		try {
+			const r = await recreateMutation.mutateAsync(row.id);
+			notifications.show({
+				color: 'green',
+				icon: <IconCheck size={18} />,
+				title: 'Tunnel recreated',
+				message: `${r.hosts_redeployed}/${r.hosts_total} hosts re-deployed onto new UUID ${r.new_uuid.slice(0, 8)}…`,
+				autoClose: 8000,
+			});
+		} catch (err) {
+			notifications.show({ color: 'red', message: (err as Error).message, autoClose: 10000 });
+		}
+	};
 
 	const [modalOpened, modal] = useDisclosure(false);
 	const [drawerOpened, drawer] = useDisclosure(false);
@@ -185,6 +210,11 @@ export function TunnelsPage() {
 									<Table.Tr key={row.id}>
 										<Table.Td>
 											<Text fw={500}>{row.name}</Text>
+											{row.last_error && (
+												<Text size="xs" c="red" mt={2} style={{ maxWidth: 360 }}>
+													{row.last_error}
+												</Text>
+											)}
 										</Table.Td>
 										<Table.Td>
 											<Badge variant="light" color={row.provider === 'playit' ? 'orange' : 'blue'}>
@@ -204,6 +234,17 @@ export function TunnelsPage() {
 										</Table.Td>
 										<Table.Td>
 											<Group gap="xs" justify="flex-end">
+												{row.recovery_needed && row.provider === 'cloudflared' && (
+													<ActionIcon
+														variant="filled"
+														color="orange"
+														onClick={() => void onRecreate(row)}
+														loading={recreateMutation.isPending}
+														title="Re-create broken tunnel under same CF account"
+													>
+														<IconLifebuoy size={16} />
+													</ActionIcon>
+												)}
 												<ActionIcon
 													variant="subtle"
 													color="grape"

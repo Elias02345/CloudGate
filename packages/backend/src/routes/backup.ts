@@ -1,10 +1,24 @@
 /**
  * Backup endpoint.
  *
- *   GET /api/backup           — streams a tar.gz containing /data/db/db.sqlite
- *                                and /data/secrets/. The tar is then encrypted
- *                                with the user-supplied passphrase (PBKDF2 → AES-GCM).
- *                                Caller should pipe to file: `curl -o backup.cgbk ...`
+ *   GET  /api/backup            — streams an encrypted .cgbk archive
+ *   POST /api/backup            — same, accepts the passphrase in the body
+ *                                  (used by the UI Download button — query-
+ *                                  string passphrases would land in proxy
+ *                                  access logs).
+ *
+ * Tar contents:
+ *   db/db.sqlite          — all app state
+ *   secrets/              — encryption.key + jwt.key (needed to decrypt
+ *                            the per-row encrypted blobs in the DB)
+ *   cloudflared/<uuid>.json   — CF tunnel credentials files
+ *   cloudflared/config.yml    — rendered ingress (regenerable but cheap)
+ *   nginx/custom/         — user-authored snippets
+ *   nginx/certs/          — Let's Encrypt certs (rate-limited to re-issue)
+ *
+ * Skipped:
+ *   cloudflared/bin/, playit/bin/  — downloadable
+ *   logs/                          — large, low-value
  *
  * Format of the .cgbk file (single binary):
  *   magic(8)  = "CGBACKUP"
@@ -12,25 +26,22 @@
  *   salt(16)
  *   iv(12)
  *   ciphertext + auth-tag(16)
- *
- * Decryption is symmetric — user keeps the passphrase, no other key needed.
- * (This is a separate path from the at-rest encryption.key — backups must be
- *  portable across machines.)
  */
 
 import { createCipheriv, pbkdf2Sync, randomBytes } from 'node:crypto';
-import { Router, type Router as RouterType } from 'express';
+import { existsSync } from 'node:fs';
+import { type Request, type Response, Router, type Router as RouterType } from 'express';
 import { create as createTar } from 'tar';
 import { z } from 'zod';
 import { dataPath } from '../config.js';
 import { childLogger } from '../logger.js';
-import { requireAuth, requirePasswordSet, requireAdmin } from '../middleware/auth.js';
+import { requireAdmin, requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { record } from '../services/audit.js';
 
 const log = childLogger('routes:backup');
 export const backupRouter: RouterType = Router();
 
-const BackupQuerySchema = z.object({
+const BackupBodySchema = z.object({
 	passphrase: z.string().min(8),
 });
 
@@ -41,17 +52,18 @@ const KEY_LEN = 32; // AES-256
 const SALT_LEN = 16;
 const IV_LEN = 12;
 
-backupRouter.get('/', requireAuth, requirePasswordSet, requireAdmin, async (req, res) => {
-	const parsed = BackupQuerySchema.safeParse(req.query);
-	if (!parsed.success) {
-		res.status(400).json({
-			error: 'passphrase query parameter required (min 8 chars)',
-			code: 'BAD_REQUEST',
-		});
-		return;
-	}
-	const { passphrase } = parsed.data;
+/** All paths we ship in a backup, relative to /data. */
+const BACKUP_CANDIDATES = [
+	'db/db.sqlite',
+	'db/db.sqlite-wal',
+	'db/db.sqlite-shm',
+	'secrets',
+	'cloudflared',
+	'nginx/custom',
+	'nginx/certs',
+] as const;
 
+async function handleBackup(req: Request, res: Response, passphrase: string): Promise<void> {
 	const salt = randomBytes(SALT_LEN);
 	const iv = randomBytes(IV_LEN);
 	const key = pbkdf2Sync(passphrase, salt, PBKDF2_ITERATIONS, KEY_LEN, 'sha256');
@@ -61,25 +73,35 @@ backupRouter.get('/', requireAuth, requirePasswordSet, requireAdmin, async (req,
 	res.setHeader('Content-Type', 'application/octet-stream');
 	res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
 
-	// Stream header
 	const header = Buffer.concat([MAGIC, Buffer.from([FORMAT_VERSION]), salt, iv]);
 	res.write(header);
 
 	const cipher = createCipheriv('aes-256-gcm', key, iv);
-	// Build the tarball: include only the paths we want.
+
+	// Only pass paths that actually exist — tar errors on missing entries
+	// in some configurations, and we'd rather quietly skip than fail the
+	// whole backup because (e.g.) nginx/certs is empty on a fresh install.
+	const includePaths = BACKUP_CANDIDATES.filter((p) => existsSync(dataPath(p)));
+	if (includePaths.length === 0) {
+		res.status(500).json({ error: 'no backup-eligible files found', code: 'BACKUP_EMPTY' });
+		return;
+	}
+
+	// Cloudflared keeps the daemon binary under /data/cloudflared/bin which
+	// can be ~50MB and is downloadable anyway. Filter it out via tar's
+	// `filter` callback.
 	const tarStream = createTar(
 		{
 			cwd: dataPath(),
 			gzip: true,
 			portable: true,
 			noMtime: false,
+			filter: (path) => {
+				if (path.startsWith('cloudflared/bin') || path === 'cloudflared/bin') return false;
+				return true;
+			},
 		},
-		[
-			// Order matters only cosmetically. Sacred paths per CLAUDE.md §10.3.
-			'db/db.sqlite',
-			'secrets',
-			'cloudflared',
-		].filter((p) => p) // tar filters out non-existent on its own
+		[...includePaths]
 	);
 
 	tarStream.on('error', (err: unknown) => {
@@ -104,6 +126,34 @@ backupRouter.get('/', requireAuth, requirePasswordSet, requireAdmin, async (req,
 			entity_type: 'backup',
 			ip: req.ip ?? null,
 		});
-		log.info({ user: req.user?.email }, 'Backup exported');
+		log.info({ user: req.user?.email, includes: includePaths }, 'Backup exported');
 	});
+}
+
+// GET form — passphrase in query (legacy / curl convenience). Passphrase
+// will appear in access logs — POST is preferred from the UI.
+backupRouter.get('/', requireAuth, requirePasswordSet, requireAdmin, async (req, res) => {
+	const parsed = BackupBodySchema.safeParse(req.query);
+	if (!parsed.success) {
+		res.status(400).json({
+			error: 'passphrase query parameter required (min 8 chars)',
+			code: 'BAD_REQUEST',
+		});
+		return;
+	}
+	await handleBackup(req, res, parsed.data.passphrase);
+});
+
+// POST form — passphrase in body. Used by the SPA so the secret doesn't
+// land in proxy / nginx access logs.
+backupRouter.post('/', requireAuth, requirePasswordSet, requireAdmin, async (req, res) => {
+	const parsed = BackupBodySchema.safeParse(req.body);
+	if (!parsed.success) {
+		res.status(400).json({
+			error: 'passphrase body field required (min 8 chars)',
+			code: 'BAD_REQUEST',
+		});
+		return;
+	}
+	await handleBackup(req, res, parsed.data.passphrase);
 });

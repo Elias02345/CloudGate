@@ -1,4 +1,4 @@
-import type { HostProtocol, ProviderEdgeEndpoint } from '@cloudgate/shared';
+import type { HostAdvancedOptions, HostProtocol, ProviderEdgeEndpoint } from '@cloudgate/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client.js';
 
@@ -16,6 +16,7 @@ export interface HostDto {
 	enabled: boolean;
 	edge_endpoint: ProviderEdgeEndpoint | null;
 	tls_options: { no_tls_verify?: boolean };
+	advanced_options?: HostAdvancedOptions;
 	last_deployed_at: string | null;
 	last_error: string | null;
 	created_at: string;
@@ -89,6 +90,7 @@ export interface UpdateHostInput {
 	forward_port?: number;
 	path_prefix?: string;
 	tls_options?: { no_tls_verify?: boolean };
+	advanced_options?: HostAdvancedOptions;
 	headers?: Record<string, string>;
 }
 

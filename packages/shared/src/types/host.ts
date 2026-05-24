@@ -20,13 +20,7 @@ export type HostProtocol = z.infer<typeof HostProtocolSchema>;
  * srv_service). Kept here so the frontend and backend agree on the wire
  * value.
  */
-export const HostTypeSchema = z.enum([
-	'web',
-	'minecraft_java',
-	'minecraft_bedrock',
-	'raw_tcp',
-	'raw_udp',
-]);
+export const HostTypeSchema = z.enum(['web', 'minecraft_java', 'minecraft_bedrock', 'raw_tcp', 'raw_udp']);
 export type HostType = z.infer<typeof HostTypeSchema>;
 
 /** Edge endpoint shape returned by a tunnel provider after addHost(). */
@@ -52,6 +46,32 @@ export type ProviderEdgeEndpoint = z.infer<typeof ProviderEdgeEndpointSchema>;
 
 const HostnameRegex = /^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/;
 
+/**
+ * Per-host originRequest tuning — surfaces the most common cloudflared
+ * knobs real-world apps need. Stored as JSON in proxy_hosts.advanced_options.
+ *
+ * Naming kept snake_case at the API boundary; mapped to cloudflared's
+ * camelCase originRequest keys at config-render time.
+ */
+export const HostAdvancedOptionsSchema = z.object({
+	/** Override Host header sent to origin. Fixes "Bad Request" from apps
+	 * that check `trusted_proxies` (HomeAssistant, some Django setups). */
+	http_host_header: z.string().optional(),
+	/** SNI value for TLS to origin. Only meaningful when forward_scheme=https. */
+	origin_server_name: z.string().optional(),
+	/** Disable HappyEyeballs (IPv6 fallback) — set if your origin is IPv4-only. */
+	no_happy_eyeballs: z.boolean().optional(),
+	/** Force HTTP/2 to origin. Speeds up apps that support it. */
+	http2_origin: z.boolean().optional(),
+	/** Required for some old HTTP/1.0 origins that mishandle chunked encoding. */
+	disable_chunked_encoding: z.boolean().optional(),
+	/** TCP connect timeout in seconds. Default cloudflared is 30. */
+	connect_timeout_seconds: z.number().int().min(1).max(600).optional(),
+	/** TLS handshake timeout in seconds. */
+	tls_timeout_seconds: z.number().int().min(1).max(600).optional(),
+});
+export type HostAdvancedOptions = z.infer<typeof HostAdvancedOptionsSchema>;
+
 export const ProxyHostSchema = z.object({
 	id: z.number().int().positive(),
 	tunnel_id: z.number().int().positive().nullable(),
@@ -72,6 +92,7 @@ export const ProxyHostSchema = z.object({
 			origin_cert: z.string().optional(),
 		})
 		.default({}),
+	advanced_options: HostAdvancedOptionsSchema.default({}),
 	headers: z.record(z.string(), z.string()).default({}),
 	meta: z.record(z.string(), z.unknown()).default({}),
 	last_deployed_at: z.string().datetime().nullable(),
@@ -98,6 +119,7 @@ export const CreateProxyHostRequestSchema = z.object({
 			no_tls_verify: z.boolean().default(false),
 		})
 		.default({}),
+	advanced_options: HostAdvancedOptionsSchema.default({}),
 	headers: z.record(z.string(), z.string()).default({}),
 });
 export type CreateProxyHostRequest = z.infer<typeof CreateProxyHostRequestSchema>;

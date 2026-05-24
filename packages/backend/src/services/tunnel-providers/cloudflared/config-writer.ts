@@ -17,6 +17,12 @@ import { childLogger } from '../../../logger.js';
 const log = childLogger('tunnel-config');
 
 // Inlined so tsc build doesn't need to copy .liquid files into dist/.
+//
+// Note on `originRequest` block: we emit it once per host with whatever
+// keys the user set, plus noTLSVerify if forward_scheme=https + the toggle.
+// Order of keys doesn't matter to cloudflared, only indentation does
+// — Liquid's `{%- -%}` strips surrounding whitespace so the YAML stays
+// valid even when most fields are omitted.
 const CONFIG_TEMPLATE = `tunnel: {{ tunnel_id }}
 credentials-file: {{ credentials_path }}
 metrics: {{ metrics_addr }}
@@ -29,9 +35,32 @@ ingress:
     path: ^{{ host.path_prefix }}.*$
     {%- endif %}
     service: {{ host.forward_scheme }}://{{ host.forward_host }}:{{ host.forward_port }}
-    {%- if host.no_tls_verify %}
+    {%- if host.has_origin_request %}
     originRequest:
+      {%- if host.no_tls_verify %}
       noTLSVerify: true
+      {%- endif %}
+      {%- if host.http_host_header %}
+      httpHostHeader: "{{ host.http_host_header }}"
+      {%- endif %}
+      {%- if host.origin_server_name %}
+      originServerName: "{{ host.origin_server_name }}"
+      {%- endif %}
+      {%- if host.no_happy_eyeballs %}
+      noHappyEyeballs: true
+      {%- endif %}
+      {%- if host.http2_origin %}
+      http2Origin: true
+      {%- endif %}
+      {%- if host.disable_chunked_encoding %}
+      disableChunkedEncoding: true
+      {%- endif %}
+      {%- if host.connect_timeout %}
+      connectTimeout: {{ host.connect_timeout }}
+      {%- endif %}
+      {%- if host.tls_timeout %}
+      tlsTimeout: {{ host.tls_timeout }}
+      {%- endif %}
     {%- endif %}
 {%- endfor %}
   - service: http_status:404
@@ -46,6 +75,16 @@ export interface RenderHost {
 	forward_host: string;
 	forward_port: number;
 	no_tls_verify: boolean;
+	/** True if any originRequest field is set — drives the block emission. */
+	has_origin_request: boolean;
+	http_host_header?: string;
+	origin_server_name?: string;
+	no_happy_eyeballs?: boolean;
+	http2_origin?: boolean;
+	disable_chunked_encoding?: boolean;
+	/** Stringly-typed because cloudflared accepts duration strings like "30s". */
+	connect_timeout?: string;
+	tls_timeout?: string;
 }
 
 export interface RenderContext {
@@ -103,42 +142,99 @@ export async function buildContext(tunnelRow: {
 		forward_host: string;
 		forward_port: number;
 		tls_options: string;
+		advanced_options: string | null;
 		protocol: string;
 	};
 	// SQLite stores booleans as integers. We write `enabled: 1` everywhere
 	// (routes/hosts.ts) so we query with `1` here too.
-	const rows = await knex<HostRow>('proxy_hosts')
+	//
+	// advanced_options column was added in migration 006 and may not exist
+	// yet on installs that paused mid-migration — selectOptional() protects
+	// the cloudflared config render from booting into a blank state.
+	const hasAdvanced = await knex.schema.hasColumn('proxy_hosts', 'advanced_options');
+	const baseQuery = knex<HostRow>('proxy_hosts')
 		.where({ tunnel_id: tunnelRow.id, mode: 'cloudflare_tunnel' })
 		.where('enabled', 1)
-		.whereIn('protocol', ['http', 'https'])
-		.select(
-			'hostname',
-			'path_prefix',
-			'forward_scheme',
-			'forward_host',
-			'forward_port',
-			'tls_options',
-			'protocol'
-		);
+		.whereIn('protocol', ['http', 'https']);
+	const cols: Array<keyof HostRow> = [
+		'hostname',
+		'path_prefix',
+		'forward_scheme',
+		'forward_host',
+		'forward_port',
+		'tls_options',
+		'protocol',
+	];
+	if (hasAdvanced) cols.push('advanced_options');
+	const rows = await baseQuery.select(...cols);
 
 	log.info({ tunnel_id: tunnelRow.id, rows: rows.length }, 'buildContext: hosts found for tunnel');
 
-	const hosts: RenderHost[] = rows.map((r) => {
+	const hosts: RenderHost[] = [];
+	for (const r of rows) {
+		// Skip rows with corrupt forward_port / forward_host so a single bad
+		// host can't break the whole tunnel's ingress.
+		if (!r.forward_host || !Number.isFinite(r.forward_port) || r.forward_port < 1 || r.forward_port > 65535) {
+			log.warn(
+				{ hostname: r.hostname, forward_host: r.forward_host, forward_port: r.forward_port },
+				'skipping host with invalid forward target'
+			);
+			continue;
+		}
+
 		let tls: { no_tls_verify?: boolean } = {};
 		try {
 			tls = typeof r.tls_options === 'string' ? JSON.parse(r.tls_options) : (r.tls_options ?? {});
 		} catch {
 			tls = {};
 		}
-		return {
+
+		let adv: {
+			http_host_header?: string;
+			origin_server_name?: string;
+			no_happy_eyeballs?: boolean;
+			http2_origin?: boolean;
+			disable_chunked_encoding?: boolean;
+			connect_timeout_seconds?: number;
+			tls_timeout_seconds?: number;
+		} = {};
+		try {
+			adv =
+				typeof r.advanced_options === 'string' && r.advanced_options.length > 0
+					? JSON.parse(r.advanced_options)
+					: {};
+		} catch {
+			adv = {};
+		}
+
+		const noTlsVerify = Boolean(tls.no_tls_verify);
+		const hasOriginRequest =
+			noTlsVerify ||
+			!!adv.http_host_header ||
+			!!adv.origin_server_name ||
+			!!adv.no_happy_eyeballs ||
+			!!adv.http2_origin ||
+			!!adv.disable_chunked_encoding ||
+			!!adv.connect_timeout_seconds ||
+			!!adv.tls_timeout_seconds;
+
+		hosts.push({
 			hostname: r.hostname,
 			path_prefix: r.path_prefix,
 			forward_scheme: r.forward_scheme,
 			forward_host: r.forward_host,
 			forward_port: r.forward_port,
-			no_tls_verify: Boolean(tls.no_tls_verify),
-		};
-	});
+			no_tls_verify: noTlsVerify,
+			has_origin_request: hasOriginRequest,
+			http_host_header: adv.http_host_header,
+			origin_server_name: adv.origin_server_name,
+			no_happy_eyeballs: adv.no_happy_eyeballs,
+			http2_origin: adv.http2_origin,
+			disable_chunked_encoding: adv.disable_chunked_encoding,
+			connect_timeout: adv.connect_timeout_seconds ? `${adv.connect_timeout_seconds}s` : undefined,
+			tls_timeout: adv.tls_timeout_seconds ? `${adv.tls_timeout_seconds}s` : undefined,
+		});
+	}
 
 	return {
 		tunnel_id: tunnelRow.tunnel_id,

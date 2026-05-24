@@ -14,6 +14,9 @@ export interface TunnelDto {
 	live_status: string;
 	last_status_at: string | null;
 	created_at: string;
+	/** Optional — populated by the backend when a provider error has been recorded. */
+	last_error?: string | null;
+	recovery_needed?: boolean;
 }
 
 export function useTunnels() {
@@ -37,6 +40,26 @@ export function useCreateTunnel() {
 		mutationFn: (input: CreateTunnelInput) =>
 			api<{ tunnel: TunnelDto }>('/tunnels', { method: 'POST', body: input }),
 		onSuccess: () => qc.invalidateQueries({ queryKey: ['tunnels'] }),
+	});
+}
+
+export interface RecreateTunnelResult {
+	ok: true;
+	old_uuid: string;
+	new_uuid: string;
+	hosts_total: number;
+	hosts_redeployed: number;
+	host_errors: Array<{ hostname: string; error: string }>;
+}
+
+export function useRecreateTunnel() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) => api<RecreateTunnelResult>(`/tunnels/${id}/recreate`, { method: 'POST' }),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: ['tunnels'] });
+			qc.invalidateQueries({ queryKey: ['hosts'] });
+		},
 	});
 }
 
