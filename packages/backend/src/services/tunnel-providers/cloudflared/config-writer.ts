@@ -1,0 +1,149 @@
+/**
+ * Renders /data/cloudflared/config.yml from DB host records.
+ *
+ * Atomic write: temp file + fs.rename, never partial writes.
+ * Always re-renders the full file from current DB state — never mutates in place.
+ *
+ * cloudflared is HTTP-only — this writer skips hosts whose `protocol` is
+ * not http/https. Non-HTTP hosts route through a different provider entirely.
+ */
+
+import { rename, writeFile } from 'node:fs/promises';
+import { Liquid } from 'liquidjs';
+import { dataPath } from '../../../config.js';
+import { getDb } from '../../../db/db.js';
+import { childLogger } from '../../../logger.js';
+
+const log = childLogger('tunnel-config');
+
+// Inlined so tsc build doesn't need to copy .liquid files into dist/.
+const CONFIG_TEMPLATE = `tunnel: {{ tunnel_id }}
+credentials-file: {{ credentials_path }}
+metrics: {{ metrics_addr }}
+no-autoupdate: true
+
+ingress:
+{%- for host in hosts %}
+  - hostname: {{ host.hostname }}
+    {%- if host.path_prefix and host.path_prefix != '/' %}
+    path: ^{{ host.path_prefix }}.*$
+    {%- endif %}
+    service: {{ host.forward_scheme }}://{{ host.forward_host }}:{{ host.forward_port }}
+    {%- if host.no_tls_verify %}
+    originRequest:
+      noTLSVerify: true
+    {%- endif %}
+{%- endfor %}
+  - service: http_status:404
+`;
+
+const engine = new Liquid({ trimTagLeft: true });
+
+export interface RenderHost {
+	hostname: string;
+	path_prefix: string;
+	forward_scheme: string;
+	forward_host: string;
+	forward_port: number;
+	no_tls_verify: boolean;
+}
+
+export interface RenderContext {
+	tunnel_id: string;
+	credentials_path: string;
+	metrics_addr: string;
+	hosts: RenderHost[];
+}
+
+export async function renderConfig(ctx: RenderContext): Promise<string> {
+	return engine.parseAndRender(CONFIG_TEMPLATE, ctx);
+}
+
+/** Atomic write — temp + rename. Returns the path written. */
+export async function writeConfig(ctx: RenderContext): Promise<string> {
+	const outPath = dataPath('cloudflared', 'config.yml');
+	const tmpPath = `${outPath}.${process.pid}.tmp`;
+	const yaml = await renderConfig(ctx);
+	await writeFile(tmpPath, yaml, { encoding: 'utf8', mode: 0o600 });
+	await rename(tmpPath, outPath);
+	log.info({ outPath, hosts: ctx.hosts.length }, 'Wrote cloudflared config');
+	return outPath;
+}
+
+/**
+ * Read the currently-rendered config.yml from disk. Used by the UI's
+ * config inspector — gives the user "what cloudflared sees right now"
+ * without having to exec into the container.
+ */
+export async function readCurrentConfig(): Promise<string> {
+	const { readFile } = await import('node:fs/promises');
+	const outPath = dataPath('cloudflared', 'config.yml');
+	try {
+		return await readFile(outPath, 'utf8');
+	} catch (err) {
+		return `# config.yml not yet written\n# error: ${(err as Error).message}\n`;
+	}
+}
+
+/**
+ * Build the render context for a given tunnel by pulling its enabled http(s)
+ * hosts from DB. Non-HTTP hosts are routed via a different provider and
+ * never appear in cloudflared's config.
+ */
+export async function buildContext(tunnelRow: {
+	id: number;
+	tunnel_id: string;
+	credentials_path: string;
+}): Promise<RenderContext> {
+	const knex = getDb();
+	type HostRow = {
+		hostname: string;
+		path_prefix: string;
+		forward_scheme: string;
+		forward_host: string;
+		forward_port: number;
+		tls_options: string;
+		protocol: string;
+	};
+	// SQLite stores booleans as integers. We write `enabled: 1` everywhere
+	// (routes/hosts.ts) so we query with `1` here too.
+	const rows = await knex<HostRow>('proxy_hosts')
+		.where({ tunnel_id: tunnelRow.id, mode: 'cloudflare_tunnel' })
+		.where('enabled', 1)
+		.whereIn('protocol', ['http', 'https'])
+		.select(
+			'hostname',
+			'path_prefix',
+			'forward_scheme',
+			'forward_host',
+			'forward_port',
+			'tls_options',
+			'protocol'
+		);
+
+	log.info({ tunnel_id: tunnelRow.id, rows: rows.length }, 'buildContext: hosts found for tunnel');
+
+	const hosts: RenderHost[] = rows.map((r) => {
+		let tls: { no_tls_verify?: boolean } = {};
+		try {
+			tls = typeof r.tls_options === 'string' ? JSON.parse(r.tls_options) : (r.tls_options ?? {});
+		} catch {
+			tls = {};
+		}
+		return {
+			hostname: r.hostname,
+			path_prefix: r.path_prefix,
+			forward_scheme: r.forward_scheme,
+			forward_host: r.forward_host,
+			forward_port: r.forward_port,
+			no_tls_verify: Boolean(tls.no_tls_verify),
+		};
+	});
+
+	return {
+		tunnel_id: tunnelRow.tunnel_id,
+		credentials_path: tunnelRow.credentials_path,
+		metrics_addr: '127.0.0.1:36500',
+		hosts,
+	};
+}

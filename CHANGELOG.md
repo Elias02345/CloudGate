@@ -9,6 +9,48 @@ _Nothing yet._
 
 ---
 
+## [0.2.0] — 2026-05-24
+
+### Added — pluggable tunnel-provider abstraction + Playit.gg for TCP/UDP
+
+CloudGate can now host **Minecraft servers** (Java + Bedrock), SSH, and arbitrary TCP/UDP services that Cloudflare Tunnel can't deliver to vanilla clients on the free plan. Done via a new `TunnelProvider` interface so additional backends (ngrok, FRP, …) can be added without touching `host-deploy`.
+
+**New host types in the UI:**
+- **Web app (HTTP/HTTPS)** — existing behaviour, via cloudflared.
+- **Minecraft (Java Edition)** — TCP via Playit.gg. CloudGate auto-creates an SRV record (`_minecraft._tcp.<host>`) on your Cloudflare zone so vanilla Java clients connect with just the hostname.
+- **Minecraft (Bedrock Edition)** — UDP via Playit.gg. SRV is not supported by the Bedrock client; the UI shows the exact `host:port` players paste into the Servers tab.
+- **Raw TCP / Raw UDP** — anything else (SSH, game servers, custom services).
+
+**Under the hood:**
+- New `ManagedProcess` base class — shared supervisor (spawn, log ring buffer, exp-backoff restart, health FSM) for cloudflared and playit-agent.
+- `TunnelProvider` interface + registry resolves `tunnels.provider` to the right implementation.
+- `host-deploy.ts` dispatches via `provider.addHost()` and writes the right DNS record kind per returned `ProviderEdgeEndpoint` (CNAME / SRV / `host_port`).
+- Playit account-linking page with TCP/UDP quota bar (Playit free tier: 4 TCP + 4 UDP per account).
+- Playit-assigned external endpoint shown on the Hosts list with a copy button — critical for Bedrock since players need the literal `host:port`.
+
+### Database — migration `20260524_004_tunnel_providers.ts`
+
+Purely additive per `CLAUDE.md` §3:
+- `tunnels.provider` (default `'cloudflared'`), `tunnels.provider_meta` (JSON), `tunnels.playit_account_id` (nullable FK).
+- CF-specific tunnel columns (`cloudflare_account_id`, `encrypted_tunnel_secret`, `credentials_path`, `account_tag`) made nullable so Playit tunnels can co-exist.
+- `proxy_hosts.protocol` (default `'http'`), `proxy_hosts.edge_endpoint` (JSON snapshot).
+- New `playit_accounts` table (analog to `cloudflare_accounts`).
+- Idempotent, with working `down()`. Existing HTTP hosts continue to work with zero user action.
+
+### Bootstrap
+
+- New step `ensure-playit-binary` — idempotent download of `/data/playit/bin/playit-agent` with sha256 verification.
+- Skipped when `CLOUDGATE_PLAYIT_ENABLED=false` (locked-down installs).
+- `/data/playit/{bin,logs}` added to the sacred-path list — survives updates.
+
+### Honest limitations (documented in-app)
+
+- Bedrock players need the literal `host:port` — UI shows it.
+- Playit free tier: 4 TCP + 4 UDP per account. Quota bar surfaces usage; hitting the cap shows a clear upgrade link.
+- Playit-assigned ports may change on tunnel rebuild → SRV TTL kept at 60 s; CloudGate re-reads the assigned endpoint on every `provider.reload()`.
+
+---
+
 ## [0.1.7] — 2026-05-22
 
 ### Fixed — self-updater "migrations failed" rollback

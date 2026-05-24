@@ -44,6 +44,20 @@ describe('persistence contract — file outputs', () => {
 		expect(stat.size).toBeGreaterThan(0);
 	});
 
+	// Playit dirs come from bootstrap's ensureDataDirs. They live in /data/playit/
+	// per CLAUDE.md §1 — never overwritten during updates.
+	const playitDirs = [
+		['playit'],
+		['playit', 'bin'],
+		['playit', 'logs'],
+	] as const;
+
+	it.each(playitDirs)('playit data dir exists: %s', (...parts) => {
+		const path = join(tmpDir, ...parts);
+		const stat = statSync(path);
+		expect(stat.isDirectory()).toBe(true);
+	});
+
 	it('secret files have mode 0600 on POSIX', () => {
 		if (process.platform === 'win32') return;
 		for (const f of [['secrets', 'encryption.key'], ['secrets', 'jwt.key']] as const) {

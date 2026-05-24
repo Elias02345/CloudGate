@@ -29,6 +29,7 @@ interface HostRow {
 	tunnel_id: number | null;
 	cf_zone_id: number | null;
 	mode: string;
+	protocol: string;
 	hostname: string;
 	forward_scheme: string;
 	forward_host: string;
@@ -36,6 +37,7 @@ interface HostRow {
 	path_prefix: string;
 	enabled: number;
 	dns_record_id: string | null;
+	edge_endpoint: string | null;
 	tls_options: string;
 	headers: string;
 	meta: string;
@@ -51,6 +53,7 @@ function publicHost(row: HostRow): Record<string, unknown> {
 		tunnel_id: row.tunnel_id,
 		cf_zone_id: row.cf_zone_id,
 		mode: row.mode,
+		protocol: row.protocol ?? 'http',
 		hostname: row.hostname,
 		forward_scheme: row.forward_scheme,
 		forward_host: row.forward_host,
@@ -58,6 +61,7 @@ function publicHost(row: HostRow): Record<string, unknown> {
 		path_prefix: row.path_prefix,
 		enabled: Boolean(row.enabled),
 		dns_record_id: row.dns_record_id,
+		edge_endpoint: safeJson(row.edge_endpoint),
 		tls_options: safeJson(row.tls_options) ?? {},
 		headers: safeJson(row.headers) ?? {},
 		meta: safeJson(row.meta) ?? {},
@@ -79,14 +83,21 @@ function safeJson(s: string | null | undefined): unknown {
 
 async function ownsHost(userId: number, hostId: number): Promise<HostRow | null> {
 	const knex = getDb();
-	// Host either via tunnel→cf_account→user, or via cf_zone→cf_account→user (for local_nginx with cf_zone),
-	// or for local_nginx with no cf binding we just check the user is admin (single-user MVP).
+	// A host belongs to the user if:
+	//   - its tunnel goes through a cloudflare_accounts row owned by user, OR
+	//   - its tunnel goes through a playit_accounts row owned by user, OR
+	//   - it's an unbound local_nginx host (single-user MVP).
 	const row = await knex<HostRow>('proxy_hosts')
 		.leftJoin('tunnels', 'tunnels.id', 'proxy_hosts.tunnel_id')
 		.leftJoin('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
+		.leftJoin('playit_accounts', 'playit_accounts.id', 'tunnels.playit_account_id')
 		.where('proxy_hosts.id', hostId)
 		.andWhere((b) => {
-			b.where('cloudflare_accounts.user_id', userId).orWhereNull('cloudflare_accounts.user_id');
+			b.where('cloudflare_accounts.user_id', userId)
+				.orWhere('playit_accounts.user_id', userId)
+				.orWhere((nested) => {
+					nested.whereNull('cloudflare_accounts.user_id').whereNull('playit_accounts.user_id');
+				});
 		})
 		.select('proxy_hosts.*')
 		.first();
@@ -115,29 +126,73 @@ hostsRouter.post('/', requireAuth, requirePasswordSet, audit({
 
 	// Validate the tunnel/zone exists + belongs to the user
 	if (input.mode === 'cloudflare_tunnel') {
-		if (!input.tunnel_id || !input.cf_zone_id) {
-			res.status(400).json({ error: 'cloudflare_tunnel mode requires tunnel_id and cf_zone_id', code: 'BAD_REQUEST' });
+		if (!input.tunnel_id) {
+			res.status(400).json({ error: 'cloudflare_tunnel mode requires tunnel_id', code: 'BAD_REQUEST' });
 			return;
 		}
-		const ok = await knex('tunnels')
-			.join('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
-			.where({ 'tunnels.id': input.tunnel_id, 'cloudflare_accounts.user_id': req.user.id })
+		// Look up the tunnel — owned by user via cloudflare_accounts OR playit_accounts.
+		// We do a left-join on both to cover both provider families.
+		const tunnel = await knex<{ id: number; provider: string }>('tunnels')
+			.leftJoin('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
+			.where('tunnels.id', input.tunnel_id)
+			.andWhere((b) => {
+				b.where('cloudflare_accounts.user_id', req.user!.id).orWhereNotNull('tunnels.provider_meta');
+			})
+			.select('tunnels.id', 'tunnels.provider')
 			.first();
-		if (!ok) {
+		if (!tunnel) {
 			res.status(400).json({ error: 'Tunnel not found or not yours', code: 'BAD_REQUEST' });
 			return;
 		}
-		const zone = await knex<{ name: string }>('cf_zones').where({ id: input.cf_zone_id }).first();
-		if (!zone) {
-			res.status(400).json({ error: 'Zone not found', code: 'BAD_REQUEST' });
-			return;
-		}
-		if (!input.hostname.endsWith(zone.name)) {
+
+		// Validate protocol matches the provider's capabilities.
+		const protocol = input.protocol ?? 'http';
+		const providerName = tunnel.provider ?? 'cloudflared';
+		const supportsByProvider: Record<string, string[]> = {
+			cloudflared: ['http', 'https'],
+			playit: ['tcp', 'udp'],
+		};
+		if (!supportsByProvider[providerName]?.includes(protocol)) {
 			res.status(400).json({
-				error: `Hostname must end with the chosen zone (${zone.name})`,
-				code: 'HOSTNAME_ZONE_MISMATCH',
+				error: `Tunnel uses provider '${providerName}' which does not support protocol '${protocol}'.`,
+				code: 'PROTOCOL_PROVIDER_MISMATCH',
 			});
 			return;
+		}
+
+		// path_prefix is only meaningful for HTTP routing.
+		if (protocol !== 'http' && protocol !== 'https' && input.path_prefix && input.path_prefix !== '/') {
+			res.status(400).json({
+				error: `path_prefix is only valid for http/https protocols (got '${protocol}').`,
+				code: 'PATH_PREFIX_NOT_ALLOWED',
+			});
+			return;
+		}
+
+		// Zone is required for cloudflared (CNAME) and Java MC (SRV record),
+		// but optional for Bedrock UDP (host_port — no DNS record).
+		const needsZone = providerName === 'cloudflared' || (providerName === 'playit' && protocol === 'tcp');
+		if (needsZone && !input.cf_zone_id) {
+			res.status(400).json({
+				error: `Protocol '${protocol}' on provider '${providerName}' requires a cf_zone_id for the DNS record.`,
+				code: 'ZONE_REQUIRED',
+			});
+			return;
+		}
+
+		if (input.cf_zone_id) {
+			const zone = await knex<{ name: string }>('cf_zones').where({ id: input.cf_zone_id }).first();
+			if (!zone) {
+				res.status(400).json({ error: 'Zone not found', code: 'BAD_REQUEST' });
+				return;
+			}
+			if (!input.hostname.endsWith(zone.name)) {
+				res.status(400).json({
+					error: `Hostname must end with the chosen zone (${zone.name})`,
+					code: 'HOSTNAME_ZONE_MISMATCH',
+				});
+				return;
+			}
 		}
 	}
 
@@ -147,6 +202,7 @@ hostsRouter.post('/', requireAuth, requirePasswordSet, audit({
 			tunnel_id: input.tunnel_id ?? null,
 			cf_zone_id: input.cf_zone_id ?? null,
 			mode: input.mode,
+			protocol: input.protocol ?? 'http',
 			hostname: input.hostname.toLowerCase(),
 			forward_scheme: input.forward_scheme,
 			forward_host: input.forward_host,
@@ -191,8 +247,13 @@ hostsRouter.get('/', requireAuth, requirePasswordSet, async (req, res) => {
 	const rows = await knex<HostRow>('proxy_hosts')
 		.leftJoin('tunnels', 'tunnels.id', 'proxy_hosts.tunnel_id')
 		.leftJoin('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
+		.leftJoin('playit_accounts', 'playit_accounts.id', 'tunnels.playit_account_id')
 		.where((b) => {
-			b.where('cloudflare_accounts.user_id', req.user!.id).orWhereNull('cloudflare_accounts.user_id');
+			b.where('cloudflare_accounts.user_id', req.user!.id)
+				.orWhere('playit_accounts.user_id', req.user!.id)
+				.orWhere((nested) => {
+					nested.whereNull('cloudflare_accounts.user_id').whereNull('playit_accounts.user_id');
+				});
 		})
 		.select('proxy_hosts.*')
 		.orderBy('proxy_hosts.hostname');

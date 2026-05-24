@@ -35,6 +35,7 @@ import { healthRouter } from './routes/health.js';
 import { hostsBulkRouter } from './routes/hosts-bulk.js';
 import { hostsRouter } from './routes/hosts.js';
 import { openapiRouter } from './routes/openapi.js';
+import { playitRouter } from './routes/playit.js';
 import { restoreRouter } from './routes/restore.js';
 import { totpRouter } from './routes/totp.js';
 import { tunnelsRouter } from './routes/tunnels.js';
@@ -160,6 +161,7 @@ async function main(): Promise<void> {
 	app.use('/api/health', healthRouter);
 	app.use('/api/auth', authRouter);
 	app.use('/api/cloudflare', cloudflareRouter);
+	app.use('/api/playit', playitRouter);
 	app.use('/api/tunnels', tunnelsRouter);
 	app.use('/api/hosts', hostsBulkRouter);
 	app.use('/api/hosts', hostsRouter);

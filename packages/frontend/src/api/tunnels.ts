@@ -1,12 +1,15 @@
+import type { TunnelProviderName } from '@cloudgate/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client.js';
 
 export interface TunnelDto {
 	id: number;
-	cloudflare_account_id: number;
+	provider: TunnelProviderName;
+	cloudflare_account_id: number | null;
+	playit_account_id: number | null;
 	tunnel_id: string;
 	name: string;
-	account_tag: string;
+	account_tag: string | null;
 	status: string;
 	live_status: string;
 	last_status_at: string | null;
@@ -21,10 +24,17 @@ export function useTunnels() {
 	});
 }
 
+export interface CreateTunnelInput {
+	provider?: TunnelProviderName;
+	cloudflare_account_id?: number;
+	playit_account_id?: number;
+	name: string;
+}
+
 export function useCreateTunnel() {
 	const qc = useQueryClient();
 	return useMutation({
-		mutationFn: (input: { cloudflare_account_id: number; name: string }) =>
+		mutationFn: (input: CreateTunnelInput) =>
 			api<{ tunnel: TunnelDto }>('/tunnels', { method: 'POST', body: input }),
 		onSuccess: () => qc.invalidateQueries({ queryKey: ['tunnels'] }),
 	});
@@ -56,18 +66,21 @@ export function useTunnelLogs(id: number | null) {
 }
 
 export interface TunnelConfigResponse {
-	tunnel: { id: number; tunnel_id: string; name: string };
+	tunnel: { id: number; tunnel_id: string; name: string; provider: TunnelProviderName };
 	hosts: Array<{
 		id: number;
 		hostname: string;
+		protocol?: string;
 		forward_scheme: string;
 		forward_host: string;
 		forward_port: number;
 		enabled: boolean | number;
+		edge_endpoint?: unknown;
 		last_deployed_at: string | null;
 		last_error: string | null;
 	}>;
-	yaml: string;
+	yaml?: string;
+	provider_meta?: unknown;
 }
 
 export function useTunnelConfig(id: number | null) {
@@ -84,7 +97,7 @@ export function useRedeployAllHosts() {
 		mutationFn: (id: number) =>
 			api<{ ok: number; failed: number; errors: Array<{ hostname: string; error: string }> }>(
 				`/tunnels/${id}/redeploy-all`,
-				{ method: 'POST' },
+				{ method: 'POST' }
 			),
 		onSuccess: () => {
 			qc.invalidateQueries({ queryKey: ['hosts'] });

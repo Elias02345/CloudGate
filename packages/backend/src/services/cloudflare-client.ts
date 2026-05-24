@@ -110,6 +110,122 @@ export async function listZones(token: string): Promise<CloudflareZoneSummary[]>
 	}
 }
 
+// ---------------------------------------------------------------------------
+// DNS record helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Generic CNAME create/update. Idempotent on the caller side: pass
+ * existingRecordId to update in place, omit to create.
+ *
+ * Returns the record id (created or unchanged) so callers can persist it.
+ */
+export async function upsertCnameRecord(
+	token: string,
+	args: {
+		zone_id: string;
+		hostname: string;
+		target: string;
+		existingRecordId?: string | null;
+		proxied?: boolean;
+		ttl?: number;
+	},
+): Promise<string> {
+	const cf = clientFor(token);
+	const payload = {
+		zone_id: args.zone_id,
+		type: 'CNAME' as const,
+		name: args.hostname,
+		content: args.target,
+		proxied: args.proxied ?? true,
+		ttl: args.ttl ?? 1,
+	};
+	try {
+		if (args.existingRecordId) {
+			// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
+			await (cf.dns.records as any).update(args.existingRecordId, payload);
+			return args.existingRecordId;
+		}
+		// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
+		const created = (await (cf.dns.records as any).create(payload)) as { id: string };
+		return created.id;
+	} catch (err) {
+		throw mapError(err, 'cname record upsert');
+	}
+}
+
+/**
+ * SRV record create/update. SRV records carry `service`, `proto` (with
+ * leading underscore), `name` (the relative host inside the zone),
+ * `priority`, `weight`, `port`, `target`.
+ *
+ * Cloudflare uses TTL=60 by default for SRV — low enough that a port
+ * reassignment by the upstream provider propagates within a minute.
+ */
+export async function upsertSrvRecord(
+	token: string,
+	args: {
+		zone_id: string;
+		/** Full hostname like 'play.example.com' — we split off the zone label-set. */
+		hostname: string;
+		/** e.g. '_minecraft' */
+		service: string;
+		/** '_tcp' | '_udp' */
+		proto: '_tcp' | '_udp';
+		port: number;
+		target: string;
+		existingRecordId?: string | null;
+		priority?: number;
+		weight?: number;
+		ttl?: number;
+	},
+): Promise<string> {
+	const cf = clientFor(token);
+	const payload = {
+		zone_id: args.zone_id,
+		type: 'SRV' as const,
+		// The Cloudflare API accepts either the structured `data` form OR a
+		// flat `name` like `_minecraft._tcp.play.example.com`. We send both
+		// so the SDK and dashboard agree on what we wrote.
+		name: `${args.service}.${args.proto}.${args.hostname}`,
+		data: {
+			service: args.service,
+			proto: args.proto,
+			name: args.hostname,
+			priority: args.priority ?? 0,
+			weight: args.weight ?? 5,
+			port: args.port,
+			target: args.target,
+		},
+		ttl: args.ttl ?? 60,
+	};
+	try {
+		if (args.existingRecordId) {
+			// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
+			await (cf.dns.records as any).update(args.existingRecordId, payload);
+			return args.existingRecordId;
+		}
+		// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
+		const created = (await (cf.dns.records as any).create(payload)) as { id: string };
+		return created.id;
+	} catch (err) {
+		throw mapError(err, 'srv record upsert');
+	}
+}
+
+/** Best-effort DNS record delete — swallows 404, propagates real failures. */
+export async function deleteDnsRecord(token: string, zoneId: string, recordId: string): Promise<void> {
+	const cf = clientFor(token);
+	try {
+		// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
+		await (cf.dns.records as any).delete(recordId, { zone_id: zoneId });
+	} catch (err) {
+		const status = (err as { status?: number }).status;
+		if (status === 404) return; // already gone, fine
+		throw mapError(err, 'dns record delete');
+	}
+}
+
 /**
  * Convert SDK errors into a clean CloudflareApiError that routes can
  * serialise. We dig into the SDK's structured `.errors` array (when present)
