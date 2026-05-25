@@ -146,9 +146,9 @@ hostsRouter.post(
 				.leftJoin('playit_accounts', 'playit_accounts.id', 'tunnels.playit_account_id')
 				.where('tunnels.id', input.tunnel_id)
 				.andWhere((b) => {
-					b.where('cloudflare_accounts.user_id', req.user!.id).orWhere(
+					b.where('cloudflare_accounts.user_id', req.user?.id).orWhere(
 						'playit_accounts.user_id',
-						req.user!.id
+						req.user?.id
 					);
 				})
 				.select('tunnels.id', 'tunnels.provider')
@@ -268,8 +268,8 @@ hostsRouter.get('/', requireAuth, requirePasswordSet, async (req, res) => {
 		.leftJoin('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
 		.leftJoin('playit_accounts', 'playit_accounts.id', 'tunnels.playit_account_id')
 		.where((b) => {
-			b.where('cloudflare_accounts.user_id', req.user!.id)
-				.orWhere('playit_accounts.user_id', req.user!.id)
+			b.where('cloudflare_accounts.user_id', req.user?.id)
+				.orWhere('playit_accounts.user_id', req.user?.id)
 				.orWhere((nested) => {
 					nested.whereNull('cloudflare_accounts.user_id').whereNull('playit_accounts.user_id');
 				});
@@ -297,10 +297,16 @@ hostsRouter.get('/:id', requireAuth, requirePasswordSet, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// PUT /:id — edit forward_scheme / forward_host / forward_port / tls_options
-// Hostname/mode/tunnel/zone are immutable — change those by delete+create.
+// PUT /:id — edit forward target + tunnel/zone reassignment
+//
+// Hostname/mode are still immutable (changing those is a delete+create
+// operation for sanity). tunnel_id and cf_zone_id ARE editable in 0.2.4+
+// so users can recover from orphaned hosts (migration 008) and move a
+// host between tunnels without rebuilding it.
 // ---------------------------------------------------------------------------
 const UpdateHostSchema = z.object({
+	tunnel_id: z.number().int().positive().optional(),
+	cf_zone_id: z.number().int().positive().optional(),
 	forward_scheme: z.enum(['http', 'https']).optional(),
 	forward_host: z.string().min(1).optional(),
 	forward_port: z.number().int().min(1).max(65535).optional(),
@@ -343,7 +349,85 @@ hostsRouter.put(
 		}
 		const input = parsed.data;
 		const knex = getDb();
+
+		// Detect reassignment: tunnel or zone changing means we need to
+		// undeploy the host from the OLD tunnel/zone before persisting,
+		// otherwise stale DNS records + ingress entries leak.
+		const tunnelChanging = input.tunnel_id !== undefined && input.tunnel_id !== row.tunnel_id;
+		const zoneChanging = input.cf_zone_id !== undefined && input.cf_zone_id !== row.cf_zone_id;
+
+		if (tunnelChanging || zoneChanging) {
+			// Validate the new tunnel belongs to the user. Skip when only
+			// the zone changes within the same tunnel.
+			if (tunnelChanging && input.tunnel_id) {
+				const newTunnel = await knex<{ id: number; provider: string }>('tunnels')
+					.leftJoin('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
+					.leftJoin('playit_accounts', 'playit_accounts.id', 'tunnels.playit_account_id')
+					.where('tunnels.id', input.tunnel_id)
+					.andWhere((b) => {
+						b.where('cloudflare_accounts.user_id', req.user?.id).orWhere(
+							'playit_accounts.user_id',
+							req.user?.id
+						);
+					})
+					.select('tunnels.id', 'tunnels.provider')
+					.first();
+				if (!newTunnel) {
+					res.status(400).json({
+						error: 'Target tunnel not found or not yours',
+						code: 'BAD_REQUEST',
+					});
+					return;
+				}
+				const protocol = row.protocol ?? 'http';
+				const supports: Record<string, string[]> = {
+					cloudflared: ['http', 'https'],
+					playit: ['tcp', 'udp'],
+				};
+				if (!supports[newTunnel.provider]?.includes(protocol)) {
+					res.status(400).json({
+						error: `Target tunnel uses provider '${newTunnel.provider}' which does not support this host's protocol '${protocol}'.`,
+						code: 'PROTOCOL_PROVIDER_MISMATCH',
+					});
+					return;
+				}
+			}
+
+			// Validate the new zone exists + the hostname still ends with
+			// the zone's name. Zone-hostname mismatch is the most common
+			// foot-shoot here.
+			if (input.cf_zone_id !== undefined && input.cf_zone_id !== null) {
+				const zone = await knex<{ name: string }>('cf_zones').where({ id: input.cf_zone_id }).first();
+				if (!zone) {
+					res.status(400).json({ error: 'Target zone not found', code: 'BAD_REQUEST' });
+					return;
+				}
+				if (!row.hostname.endsWith(zone.name)) {
+					res.status(400).json({
+						error: `Hostname '${row.hostname}' does not end with zone '${zone.name}'`,
+						code: 'HOSTNAME_ZONE_MISMATCH',
+					});
+					return;
+				}
+			}
+
+			// Tear down the old deployment before mutating the row. This
+			// deletes the old DNS record (using the soon-to-be-stale
+			// cf_zone_id) and removes the host from the old tunnel's
+			// rendered ingress.
+			try {
+				await undeployHost(id);
+			} catch (err) {
+				log.warn(
+					{ err: (err as Error).message, host_id: id },
+					'undeploy-before-reassign failed (continuing — dns record may leak)'
+				);
+			}
+		}
+
 		const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+		if (input.tunnel_id !== undefined) updates.tunnel_id = input.tunnel_id;
+		if (input.cf_zone_id !== undefined) updates.cf_zone_id = input.cf_zone_id;
 		if (input.forward_scheme !== undefined) updates.forward_scheme = input.forward_scheme;
 		if (input.forward_host !== undefined) updates.forward_host = input.forward_host;
 		if (input.forward_port !== undefined) updates.forward_port = input.forward_port;
@@ -355,11 +439,17 @@ hostsRouter.put(
 				updates.advanced_options = JSON.stringify(input.advanced_options);
 			}
 		}
+		// Reset stale dns_record_id when zone changes — old id pointed at
+		// a record we just deleted (or one in a different zone entirely).
+		if (zoneChanging) updates.dns_record_id = null;
+		// Clear any prior orphan-recovery last_error since we're freshly
+		// re-attaching to a known tunnel.
+		if (tunnelChanging) updates.last_error = null;
 
 		await knex('proxy_hosts').where({ id }).update(updates);
 
-		// Re-deploy so the tunnel config picks up the new scheme/port/etc.
-		// and the upstream probe re-runs.
+		// Re-deploy so the tunnel config picks up the change (new scheme /
+		// port / tunnel / zone / etc.) and the upstream probe re-runs.
 		void deployHost(id).catch((err) =>
 			log.warn({ err: (err as Error).message, host_id: id }, 'Re-deploy after edit failed')
 		);

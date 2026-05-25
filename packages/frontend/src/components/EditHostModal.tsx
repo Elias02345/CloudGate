@@ -1,13 +1,13 @@
 /**
  * Edit a host's forwarding settings without delete+recreate.
  *
- * Only mutable fields: forward_scheme, forward_host, forward_port,
- * tls_options.no_tls_verify, path_prefix. The hostname/zone/tunnel are
- * deliberately read-only — changing those would require recreating the
- * DNS record, which is fragile and rare.
+ * Everything except hostname/mode is editable — including the tunnel
+ * and DNS zone, so users can recover from orphaned hosts (migration
+ * 008) and move hosts between tunnels.
  *
- * Mantine modal with a small form. The "Save" button calls PUT
- * /api/hosts/:id which also re-runs deployHost() → upstream probe.
+ * When tunnel/zone change, the backend tears down the old deployment
+ * (deletes the old DNS record, drops the host from the old tunnel's
+ * ingress) before persisting and re-deploying — no orphan DNS records.
  */
 
 import {
@@ -17,6 +17,7 @@ import {
 	Button,
 	Checkbox,
 	Collapse,
+	Divider,
 	Group,
 	Modal,
 	NumberInput,
@@ -28,10 +29,19 @@ import {
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconBulb, IconCheck, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
-import { useEffect } from 'react';
+import {
+	IconAlertCircle,
+	IconBulb,
+	IconCheck,
+	IconChevronDown,
+	IconChevronUp,
+	IconExchange,
+} from '@tabler/icons-react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useZones } from '../api/cloudflare.js';
 import { type HostDto, useUpdateHost } from '../api/hosts.js';
+import { useTunnels } from '../api/tunnels.js';
 
 interface EditHostModalProps {
 	host: HostDto | null;
@@ -42,9 +52,13 @@ interface EditHostModalProps {
 export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 	const { t } = useTranslation();
 	const update = useUpdateHost();
+	const tunnels = useTunnels();
 	const [advancedOpen, advanced] = useDisclosure(false);
+	const [reassignOpen, reassign] = useDisclosure(false);
 	const form = useForm({
 		initialValues: {
+			tunnel_id: '' as string,
+			cf_zone_id: '' as string,
 			forward_scheme: 'http' as 'http' | 'https',
 			forward_host: '',
 			forward_port: 80,
@@ -59,10 +73,13 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 		},
 	});
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: deps are intentional — only re-init when the modal opens for a different host
 	useEffect(() => {
 		if (!host) return;
 		const adv = host.advanced_options ?? {};
 		form.setValues({
+			tunnel_id: host.tunnel_id ? String(host.tunnel_id) : '',
+			cf_zone_id: host.cf_zone_id ? String(host.cf_zone_id) : '',
 			forward_scheme: host.forward_scheme,
 			forward_host: host.forward_host,
 			forward_port: host.forward_port,
@@ -75,15 +92,41 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 			disable_chunked_encoding: Boolean(adv.disable_chunked_encoding),
 			connect_timeout_seconds: adv.connect_timeout_seconds ?? 30,
 		});
+		// Auto-open the reassign panel if the host is currently orphaned —
+		// the user almost certainly opened this modal to fix that.
+		if (!host.tunnel_id) {
+			reassign.open();
+		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [host?.id]);
+
+	// Eligible tunnels for the current host's protocol — playit can't
+	// carry HTTP and vice versa.
+	const eligibleTunnels = useMemo(() => {
+		const protocol = host?.protocol ?? 'http';
+		return (tunnels.data?.tunnels ?? []).filter((tn) =>
+			protocol === 'http' || protocol === 'https' ? tn.provider === 'cloudflared' : tn.provider === 'playit'
+		);
+	}, [tunnels.data, host?.protocol]);
+
+	const selectedTunnelId = form.values.tunnel_id ? Number.parseInt(form.values.tunnel_id, 10) : null;
+	const selectedTunnel = eligibleTunnels.find((tn) => tn.id === selectedTunnelId);
+	const zonesAccountId = selectedTunnel?.cloudflare_account_id ?? null;
+	const zones = useZones(zonesAccountId);
+
+	const tunnelChanged = host && form.values.tunnel_id !== (host.tunnel_id ? String(host.tunnel_id) : '');
+	const zoneChanged = host && form.values.cf_zone_id !== (host.cf_zone_id ? String(host.cf_zone_id) : '');
+	const hostnameMatchesZone = (() => {
+		const zoneId = form.values.cf_zone_id ? Number.parseInt(form.values.cf_zone_id, 10) : null;
+		if (!zoneId) return true;
+		const z = zones.data?.zones.find((zone) => zone.id === zoneId);
+		if (!z || !host) return true;
+		return host.hostname.endsWith(z.name);
+	})();
 
 	const onSubmit = form.onSubmit(async (values) => {
 		if (!host) return;
 		try {
-			// Only persist non-default advanced options. Empty strings → undefined
-			// so the JSON blob stays compact and the cloudflared template doesn't
-			// emit empty originRequest fields.
 			const advanced_options = {
 				...(values.http_host_header ? { http_host_header: values.http_host_header } : {}),
 				...(values.origin_server_name ? { origin_server_name: values.origin_server_name } : {}),
@@ -94,17 +137,21 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 					? { connect_timeout_seconds: values.connect_timeout_seconds }
 					: {}),
 			};
-			await update.mutateAsync({
-				id: host.id,
-				input: {
-					forward_scheme: values.forward_scheme,
-					forward_host: values.forward_host,
-					forward_port: values.forward_port,
-					path_prefix: values.path_prefix,
-					tls_options: { no_tls_verify: values.no_tls_verify },
-					advanced_options,
-				},
-			});
+			const payload: Parameters<typeof update.mutateAsync>[0]['input'] = {
+				forward_scheme: values.forward_scheme,
+				forward_host: values.forward_host,
+				forward_port: values.forward_port,
+				path_prefix: values.path_prefix,
+				tls_options: { no_tls_verify: values.no_tls_verify },
+				advanced_options,
+			};
+			if (tunnelChanged && values.tunnel_id) {
+				payload.tunnel_id = Number.parseInt(values.tunnel_id, 10);
+			}
+			if (zoneChanged && values.cf_zone_id) {
+				payload.cf_zone_id = Number.parseInt(values.cf_zone_id, 10);
+			}
+			await update.mutateAsync({ id: host.id, input: payload });
 			notifications.show({
 				color: 'green',
 				icon: <IconCheck size={18} />,
@@ -135,6 +182,66 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 							{t('hosts.edit_scheme_hint')}
 						</Alert>
 					)}
+					{host && !host.tunnel_id && (
+						<Alert color="orange" icon={<IconAlertCircle size={18} />} title="Host has no tunnel">
+							This host lost its tunnel assignment during a previous upgrade. Use the{' '}
+							<strong>Reassign tunnel/zone</strong> section below to attach it again — DNS and ingress will be
+							re-created on save.
+						</Alert>
+					)}
+
+					<Button
+						variant="subtle"
+						size="xs"
+						leftSection={reassignOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
+						onClick={reassign.toggle}
+						style={{ alignSelf: 'flex-start' }}
+					>
+						<Group gap={6}>
+							<IconExchange size={14} />
+							<Text size="xs" inherit>
+								Reassign tunnel / zone
+							</Text>
+							{(tunnelChanged || zoneChanged) && (
+								<Text size="xs" c="orange" inherit>
+									(changed)
+								</Text>
+							)}
+						</Group>
+					</Button>
+					<Collapse in={reassignOpen}>
+						<Stack gap="sm">
+							<Alert color="blue" variant="light">
+								<Text size="xs">
+									Moving a host between tunnels (or zones) deletes the old DNS record and creates a new one,
+									then redeploys. Expect a few seconds of downtime while DNS converges.
+								</Text>
+							</Alert>
+							<Select
+								label="Tunnel"
+								placeholder="Pick a tunnel"
+								data={eligibleTunnels.map((tn) => ({
+									value: String(tn.id),
+									label: `${tn.name} (${tn.provider})`,
+								}))}
+								{...form.getInputProps('tunnel_id')}
+							/>
+							<Select
+								label="DNS zone"
+								placeholder={zones.isLoading ? 'Loading…' : 'Pick a zone'}
+								disabled={!zonesAccountId}
+								data={zones.data?.zones.map((z) => ({ value: String(z.id), label: z.name })) ?? []}
+								{...form.getInputProps('cf_zone_id')}
+								error={
+									!hostnameMatchesZone && form.values.cf_zone_id
+										? `Hostname '${host?.hostname ?? ''}' does not end with this zone`
+										: undefined
+								}
+							/>
+						</Stack>
+					</Collapse>
+					<Divider />
+
 					{host && (
 						<Text size="sm" c="dimmed">
 							{t('hosts.edit_immutable_note', { hostname: host.hostname })}
@@ -242,7 +349,11 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 					</Collapse>
 
 					<Box>
-						<Button type="submit" loading={update.isPending}>
+						<Button
+							type="submit"
+							loading={update.isPending}
+							disabled={!hostnameMatchesZone && Boolean(form.values.cf_zone_id)}
+						>
 							{t('common.save')}
 						</Button>
 					</Box>
