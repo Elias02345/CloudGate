@@ -63,6 +63,24 @@ export function useRecreateTunnel() {
 	});
 }
 
+export interface ForceSyncResult {
+	ok: true;
+	hosts_total: number;
+	hosts_redeployed: number;
+	host_errors: Array<{ hostname: string; error: string }>;
+}
+
+export function useForceSyncTunnel() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (id: number) => api<ForceSyncResult>(`/tunnels/${id}/force-sync`, { method: 'POST' }),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: ['tunnels'] });
+			qc.invalidateQueries({ queryKey: ['hosts'] });
+		},
+	});
+}
+
 export function useDeleteTunnel() {
 	const qc = useQueryClient();
 	return useMutation({

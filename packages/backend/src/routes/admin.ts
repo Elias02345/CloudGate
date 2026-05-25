@@ -11,6 +11,7 @@
  */
 
 import { existsSync, statSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { Router, type Router as RouterType } from 'express';
 import { VERSION, dataPath } from '../config.js';
 import { getDb } from '../db/db.js';
@@ -156,6 +157,81 @@ adminRouter.get('/diagnostics', requireAuth, requirePasswordSet, requireAdmin, a
 		}
 	}
 
+	// Rendered cloudflared config.yml — the most direct signal for "is the
+	// hostname I expect actually in the ingress?". No secrets in it.
+	let configYml: string;
+	try {
+		configYml = await readFile(dataPath('cloudflared', 'config.yml'), 'utf8');
+	} catch (err) {
+		configYml = `# (no config.yml on disk) error: ${(err as Error).message}`;
+	}
+
+	// Per-tunnel attached-host audit: for each cloudflared tunnel, what
+	// proxy_hosts rows are attached, and would they make it into ingress?
+	// (Mirrors the buildContext filter without spawning anything.)
+	const tunnelHostAudit: Array<{
+		tunnel_id: number;
+		name: string;
+		included: Array<{ id: number; hostname: string; protocol: string }>;
+		excluded: Array<{ id: number; hostname: string; reason: string }>;
+	}> = [];
+	try {
+		const cfTunnels = await knex<{ id: number; name: string }>('tunnels')
+			.where('provider', 'cloudflared')
+			.select('id', 'name');
+		for (const tn of cfTunnels) {
+			interface AuditHost {
+				id: number;
+				hostname: string;
+				mode: string;
+				enabled: number;
+				protocol: string | null;
+				forward_host: string;
+				forward_port: number;
+			}
+			const cols: Array<keyof AuditHost> = [
+				'id',
+				'hostname',
+				'mode',
+				'enabled',
+				'forward_host',
+				'forward_port',
+			];
+			if (await knex.schema.hasColumn('proxy_hosts', 'protocol')) cols.push('protocol');
+			const hosts = await knex<AuditHost>('proxy_hosts')
+				.where({ tunnel_id: tn.id })
+				.select(...cols);
+			const included: Array<{ id: number; hostname: string; protocol: string }> = [];
+			const excluded: Array<{ id: number; hostname: string; reason: string }> = [];
+			for (const h of hosts) {
+				const protocol = h.protocol ?? 'http';
+				if (h.mode !== 'cloudflare_tunnel') {
+					excluded.push({ id: h.id, hostname: h.hostname, reason: `mode='${h.mode}'` });
+				} else if (Number(h.enabled) !== 1) {
+					excluded.push({ id: h.id, hostname: h.hostname, reason: 'disabled' });
+				} else if (protocol !== 'http' && protocol !== 'https') {
+					excluded.push({ id: h.id, hostname: h.hostname, reason: `protocol='${protocol}'` });
+				} else if (
+					!h.forward_host ||
+					!Number.isFinite(h.forward_port) ||
+					h.forward_port < 1 ||
+					h.forward_port > 65535
+				) {
+					excluded.push({
+						id: h.id,
+						hostname: h.hostname,
+						reason: `invalid forward target ${h.forward_host}:${h.forward_port}`,
+					});
+				} else {
+					included.push({ id: h.id, hostname: h.hostname, protocol });
+				}
+			}
+			tunnelHostAudit.push({ tunnel_id: tn.id, name: tn.name, included, excluded });
+		}
+	} catch (err) {
+		log.warn({ err: (err as Error).message }, 'diagnostics: per-tunnel host audit failed');
+	}
+
 	res.json({
 		version: VERSION,
 		generated_at: now,
@@ -163,6 +239,8 @@ adminRouter.get('/diagnostics', requireAuth, requirePasswordSet, requireAdmin, a
 		migrations,
 		tables,
 		tunnels,
+		tunnel_host_audit: tunnelHostAudit,
+		cloudflared_config_yml: configYml,
 		data_paths: dataPaths,
 		bootstrap_complete: existsSync(dataPath('.bootstrap-complete')),
 	});

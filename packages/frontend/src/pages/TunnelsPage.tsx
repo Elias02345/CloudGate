@@ -26,6 +26,7 @@ import {
 	IconLifebuoy,
 	IconRefresh,
 	IconRefreshDot,
+	IconReload,
 	IconTerminal2,
 	IconTrash,
 } from '@tabler/icons-react';
@@ -38,6 +39,7 @@ import {
 	type TunnelDto,
 	useCreateTunnel,
 	useDeleteTunnel,
+	useForceSyncTunnel,
 	useRecreateTunnel,
 	useRedeployAllHosts,
 	useRestartTunnel,
@@ -70,13 +72,30 @@ export function TunnelsPage() {
 	const deleteMutation = useDeleteTunnel();
 	const restartMutation = useRestartTunnel();
 	const recreateMutation = useRecreateTunnel();
+	const forceSyncMutation = useForceSyncTunnel();
+
+	const onForceSync = async (row: TunnelDto): Promise<void> => {
+		const ok = confirm(
+			`Force-sync tunnel "${row.name}"?\n\nTears down the cloudflared process completely, re-renders the config from the current DB state, restarts fresh, then re-deploys every host so DNS records refresh. Use this when the daemon shows "running" but your hostnames return "page not found".\n\nIdempotent — safe to retry.`
+		);
+		if (!ok) return;
+		try {
+			const r = await forceSyncMutation.mutateAsync(row.id);
+			notifications.show({
+				color: r.host_errors.length > 0 ? 'orange' : 'green',
+				icon: <IconCheck size={18} />,
+				title: 'Tunnel force-synced',
+				message: `${r.hosts_redeployed}/${r.hosts_total} hosts re-deployed${r.host_errors.length ? ` — ${r.host_errors.length} failed` : ''}.`,
+				autoClose: 8000,
+			});
+		} catch (err) {
+			notifications.show({ color: 'red', message: (err as Error).message, autoClose: 10000 });
+		}
+	};
 
 	const onRecreate = async (row: TunnelDto): Promise<void> => {
 		const ok = confirm(
-			`Re-create CF tunnel "${row.name}"?\n\n` +
-				'This deletes the broken tunnel from Cloudflare and creates a fresh one ' +
-				'under the same account. Your hosts stay attached and DNS records will be ' +
-				'updated to the new tunnel UUID on the next deploy.'
+			`Re-create CF tunnel "${row.name}"?\n\nThis deletes the broken tunnel from Cloudflare and creates a fresh one under the same account. Your hosts stay attached and DNS records will be updated to the new tunnel UUID on the next deploy.`
 		);
 		if (!ok) return;
 		try {
@@ -243,6 +262,17 @@ export function TunnelsPage() {
 														title="Re-create broken tunnel under same CF account"
 													>
 														<IconLifebuoy size={16} />
+													</ActionIcon>
+												)}
+												{row.provider === 'cloudflared' && !row.recovery_needed && (
+													<ActionIcon
+														variant="subtle"
+														color="orange"
+														onClick={() => void onForceSync(row)}
+														loading={forceSyncMutation.isPending}
+														title="Force-sync: tear down + restart + re-deploy hosts (recovery for 'running but 404')"
+													>
+														<IconReload size={16} />
 													</ActionIcon>
 												)}
 												<ActionIcon

@@ -129,7 +129,7 @@ export async function upsertCnameRecord(
 		existingRecordId?: string | null;
 		proxied?: boolean;
 		ttl?: number;
-	},
+	}
 ): Promise<string> {
 	const cf = clientFor(token);
 	const payload = {
@@ -142,9 +142,21 @@ export async function upsertCnameRecord(
 	};
 	try {
 		if (args.existingRecordId) {
-			// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
-			await (cf.dns.records as any).update(args.existingRecordId, payload);
-			return args.existingRecordId;
+			try {
+				// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
+				await (cf.dns.records as any).update(args.existingRecordId, payload);
+				return args.existingRecordId;
+			} catch (err) {
+				// 404 = the record we thought existed is gone (user deleted it
+				// in the CF dashboard, or CF auto-cleaned it after a tunnel
+				// delete). Fall through to create a fresh one.
+				const status = (err as { status?: number }).status;
+				if (status !== 404) throw err;
+				log.warn(
+					{ recordId: args.existingRecordId, hostname: args.hostname },
+					'stale dns_record_id (404) — creating fresh CNAME'
+				);
+			}
 		}
 		// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
 		const created = (await (cf.dns.records as any).create(payload)) as { id: string };
@@ -178,7 +190,7 @@ export async function upsertSrvRecord(
 		priority?: number;
 		weight?: number;
 		ttl?: number;
-	},
+	}
 ): Promise<string> {
 	const cf = clientFor(token);
 	const payload = {
@@ -201,9 +213,18 @@ export async function upsertSrvRecord(
 	};
 	try {
 		if (args.existingRecordId) {
-			// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
-			await (cf.dns.records as any).update(args.existingRecordId, payload);
-			return args.existingRecordId;
+			try {
+				// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
+				await (cf.dns.records as any).update(args.existingRecordId, payload);
+				return args.existingRecordId;
+			} catch (err) {
+				const status = (err as { status?: number }).status;
+				if (status !== 404) throw err;
+				log.warn(
+					{ recordId: args.existingRecordId, hostname: args.hostname },
+					'stale dns_record_id (404) — creating fresh SRV'
+				);
+			}
 		}
 		// biome-ignore lint/suspicious/noExplicitAny: CF SDK types are loose
 		const created = (await (cf.dns.records as any).create(payload)) as { id: string };
