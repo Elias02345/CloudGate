@@ -130,11 +130,15 @@ async function createCloudflaredTunnel(
 	res: import('express').Response,
 	input: { cloudflare_account_id?: number; name: string }
 ): Promise<void> {
+	if (!req.user) {
+		res.status(401).json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' });
+		return;
+	}
 	if (!input.cloudflare_account_id) {
 		res.status(400).json({ error: 'cloudflared tunnels require cloudflare_account_id', code: 'BAD_REQUEST' });
 		return;
 	}
-	const account = await getAccountById(input.cloudflare_account_id, req.user!.id);
+	const account = await getAccountById(input.cloudflare_account_id, req.user.id);
 	if (!account) {
 		res.status(404).json({ error: 'Cloudflare account not found', code: 'NOT_FOUND' });
 		return;
@@ -198,11 +202,15 @@ async function createPlayitTunnel(
 	res: import('express').Response,
 	input: { playit_account_id?: number; name: string }
 ): Promise<void> {
+	if (!req.user) {
+		res.status(401).json({ error: 'Unauthenticated', code: 'UNAUTHENTICATED' });
+		return;
+	}
 	if (!input.playit_account_id) {
 		res.status(400).json({ error: 'playit tunnels require playit_account_id', code: 'BAD_REQUEST' });
 		return;
 	}
-	const account = await getPlayitAccountById(input.playit_account_id, req.user!.id);
+	const account = await getPlayitAccountById(input.playit_account_id, req.user.id);
 	if (!account) {
 		res.status(404).json({ error: 'Playit account not found', code: 'NOT_FOUND' });
 		return;
@@ -255,7 +263,7 @@ tunnelsRouter.get('/', requireAuth, requirePasswordSet, async (req, res) => {
 		.leftJoin('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
 		.leftJoin('playit_accounts', 'playit_accounts.id', 'tunnels.playit_account_id')
 		.where((b) => {
-			b.where('cloudflare_accounts.user_id', req.user!.id).orWhere('playit_accounts.user_id', req.user!.id);
+			b.where('cloudflare_accounts.user_id', req.user?.id).orWhere('playit_accounts.user_id', req.user?.id);
 		})
 		.select(
 			'tunnels.id',
@@ -373,6 +381,76 @@ tunnelsRouter.post('/:id/restart', requireAuth, requirePasswordSet, async (req, 
 	await startTunnel(id);
 	res.json({ ok: true });
 });
+
+// ---------------------------------------------------------------------------
+// POST /:id/force-sync
+//
+// "Everything looks right in the UI but my hostnames return 404" recovery.
+// Tears the daemon down completely (drops cached process state so a stale
+// tunnelUuid from a prior Recreate can't survive), re-renders config from
+// the current DB, spawns fresh, then re-deploys every host so DNS records
+// re-converge on the current tunnel UUID.
+//
+// Idempotent and safe to spam.
+// ---------------------------------------------------------------------------
+tunnelsRouter.post(
+	'/:id/force-sync',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'tunnel.force_sync',
+		entityType: 'tunnel',
+		entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+			return;
+		}
+		const id = Number.parseInt(String(req.params.id ?? ''), 10);
+		const row = await findOwnedTunnel(req.user.id, id);
+		if (!row) {
+			res.status(404).json({ error: 'Tunnel not found', code: 'NOT_FOUND' });
+			return;
+		}
+
+		// Full teardown — stop() drops the proc from the provider's cache
+		// (fix in CloudflaredProvider.stop). The next start() builds a
+		// fresh CloudflaredProcess with the current DB state, including
+		// the current tunnel UUID.
+		try {
+			await stopTunnel(id);
+		} catch (err) {
+			log.warn({ err: (err as Error).message }, 'force-sync stop failed (continuing)');
+		}
+		try {
+			await startTunnel(id);
+		} catch (err) {
+			log.warn({ err: (err as Error).message }, 'force-sync start failed (continuing)');
+		}
+
+		// Re-deploy every host so DNS records refresh to the (possibly
+		// new) tunnel UUID. Mirrors the redeploy-all behaviour but the
+		// caller doesn't need to chain two requests.
+		const knex = getDb();
+		const hosts = await knex('proxy_hosts')
+			.where({ tunnel_id: id, mode: 'cloudflare_tunnel' })
+			.select('id', 'hostname');
+		let ok = 0;
+		let failed = 0;
+		const errors: Array<{ hostname: string; error: string }> = [];
+		for (const host of hosts) {
+			try {
+				await deployHost(host.id);
+				ok++;
+			} catch (err) {
+				failed++;
+				errors.push({ hostname: host.hostname, error: (err as Error).message });
+			}
+		}
+		res.json({ ok: true, hosts_total: hosts.length, hosts_redeployed: ok, host_errors: errors });
+	}
+);
 
 // ---------------------------------------------------------------------------
 // GET /:id/logs

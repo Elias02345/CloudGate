@@ -136,39 +136,80 @@ export async function buildContext(tunnelRow: {
 }): Promise<RenderContext> {
 	const knex = getDb();
 	type HostRow = {
+		id: number;
 		hostname: string;
+		enabled: number;
+		mode: string;
 		path_prefix: string;
 		forward_scheme: string;
 		forward_host: string;
 		forward_port: number;
 		tls_options: string;
 		advanced_options: string | null;
-		protocol: string;
+		protocol: string | null;
 	};
-	// SQLite stores booleans as integers. We write `enabled: 1` everywhere
-	// (routes/hosts.ts) so we query with `1` here too.
-	//
+
 	// advanced_options column was added in migration 006 and may not exist
-	// yet on installs that paused mid-migration — selectOptional() protects
-	// the cloudflared config render from booting into a blank state.
+	// yet on installs that paused mid-migration.
 	const hasAdvanced = await knex.schema.hasColumn('proxy_hosts', 'advanced_options');
-	const baseQuery = knex<HostRow>('proxy_hosts')
-		.where({ tunnel_id: tunnelRow.id, mode: 'cloudflare_tunnel' })
-		.where('enabled', 1)
-		.whereIn('protocol', ['http', 'https']);
+	const hasProtocol = await knex.schema.hasColumn('proxy_hosts', 'protocol');
 	const cols: Array<keyof HostRow> = [
+		'id',
 		'hostname',
+		'enabled',
+		'mode',
 		'path_prefix',
 		'forward_scheme',
 		'forward_host',
 		'forward_port',
 		'tls_options',
-		'protocol',
 	];
+	if (hasProtocol) cols.push('protocol');
 	if (hasAdvanced) cols.push('advanced_options');
-	const rows = await baseQuery.select(...cols);
 
-	log.info({ tunnel_id: tunnelRow.id, rows: rows.length }, 'buildContext: hosts found for tunnel');
+	// We fetch ALL rows attached to the tunnel, then filter in JS so we can
+	// log WHY each one was excluded. "Live and running but page not found"
+	// is overwhelmingly caused by silently-dropped ingress entries; the
+	// per-row reason makes the diagnostic obvious.
+	const allRows = await knex<HostRow>('proxy_hosts')
+		.where({ tunnel_id: tunnelRow.id })
+		.select(...cols);
+
+	const included: HostRow[] = [];
+	const excluded: Array<{ id: number; hostname: string; reason: string }> = [];
+	for (const r of allRows) {
+		if (r.mode !== 'cloudflare_tunnel') {
+			excluded.push({ id: r.id, hostname: r.hostname, reason: `mode='${r.mode}' (not cloudflare_tunnel)` });
+			continue;
+		}
+		if (Number(r.enabled) !== 1) {
+			excluded.push({ id: r.id, hostname: r.hostname, reason: 'disabled' });
+			continue;
+		}
+		// Treat NULL protocol as 'http' — defensive against partial migrations.
+		const effectiveProtocol = r.protocol ?? 'http';
+		if (effectiveProtocol !== 'http' && effectiveProtocol !== 'https') {
+			excluded.push({
+				id: r.id,
+				hostname: r.hostname,
+				reason: `protocol='${effectiveProtocol}' (not http/https — routed via different provider)`,
+			});
+			continue;
+		}
+		included.push(r);
+	}
+
+	if (excluded.length > 0) {
+		log.warn(
+			{ tunnel_id: tunnelRow.id, excluded, included_count: included.length },
+			'buildContext: some hosts excluded from ingress'
+		);
+	}
+	log.info(
+		{ tunnel_id: tunnelRow.id, included: included.length, excluded: excluded.length },
+		'buildContext: hosts evaluated for tunnel'
+	);
+	const rows = included;
 
 	const hosts: RenderHost[] = [];
 	for (const r of rows) {

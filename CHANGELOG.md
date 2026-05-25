@@ -9,6 +9,70 @@ _Nothing yet._
 
 ---
 
+## [0.2.3] — 2026-05-25
+
+### Fixed — "live and running but page not found"
+
+After the 0.2.2 metrics-port fix, the cloudflared daemon stayed up and
+`/ready` returned 200 — so the UI happily reported `running` — but every
+hostname still served Cloudflare's "page not found" page. Two
+independent causes, both fixed here:
+
+**1. Stale `tunnelUuid` after Recreate.**
+`CloudflaredProvider.stop()` killed the daemon but **left the
+`CloudflaredProcess` instance in its in-memory cache**. The next
+`start()` reused the cached instance — including the `tunnelUuid`
+baked into its constructor at boot time. After a Recreate (the DB
+row's `tunnel_id` changes to the new UUID), cloudflared therefore
+spawned with the OLD UUID positional arg even though `config.yml`
+pointed at the NEW one. Result: the daemon connected to Cloudflare as
+the wrong tunnel (or failed auth and respawned silently), the DNS
+CNAME pointed to the NEW UUID's `cfargotunnel.com` target, and CF had
+no daemon answering for the right UUID.
+
+Fix: `stop()` now deletes the entry from the cache. The next `start()`
+constructs a fresh `CloudflaredProcess` with the current DB state.
+
+**2. Hosts silently dropped from `config.yml` ingress when `protocol IS NULL`.**
+`buildContext` used `whereIn('protocol', ['http','https'])` which
+doesn't match `NULL`. If migration 004's backfill didn't take on some
+rows (we've seen this on installs that paused mid-upgrade), those
+hosts disappeared from the rendered config. cloudflared then served
+its `http_status:404` catch-all for them — the "page not found" UI
+behaviour. Now `buildContext` treats `NULL` as `http` and migration
+007 backfills any straggling rows.
+
+### Added — recovery + diagnosis
+
+- **`POST /api/tunnels/:id/force-sync`** + 🔄 sidebar button (orange,
+  next to logs). One-click recovery: drops the cached process,
+  re-renders config from current DB, restarts fresh, re-deploys every
+  host so DNS records re-converge. Idempotent.
+- **`/api/admin/diagnostics`** now includes:
+  - the full rendered `cloudflared/config.yml` so the user can verify
+    what cloudflared actually sees,
+  - per-tunnel attached-host audit listing which rows would land in
+    ingress and which would be silently excluded (and why).
+- **Stale cred file cleanup**: `CloudflaredProvider.ensureCredentialsFile`
+  now sweeps `/data/cloudflared/*.json` for UUIDs no DB row owns — kills
+  the ambiguous-credentials-on-disk failure mode after Recreate.
+- **`upsertCnameRecord` / `upsertSrvRecord` fall back to `create()`
+  on 404** when the persisted `dns_record_id` no longer exists at
+  Cloudflare (manual dashboard deletion, side effect of tunnel delete,
+  etc.). Previously every deploy threw and the host never recovered.
+
+### Migration 007
+
+Backfills `proxy_hosts.protocol = 'http'` for any row left with
+`NULL` by migration 004. Purely additive, idempotent, no-op `down()`.
+
+### Tests
+
+- `cloudflared-stop-clears-cache.test.ts` — direct regression for the
+  cache-invalidation contract that the stale-UUID fix relies on.
+
+---
+
 ## [0.2.2] — 2026-05-25
 
 ### Fixed — cloudflared "address already in use" respawn loop
