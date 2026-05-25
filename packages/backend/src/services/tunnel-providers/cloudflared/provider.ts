@@ -17,7 +17,7 @@ import { childLogger } from '../../../logger.js';
 import { decryptJson } from '../../crypto.js';
 import type { HostBinding, ProviderStatus, TunnelProvider } from '../types.js';
 import { buildContext, writeConfig } from './config-writer.js';
-import { CloudflaredProcess } from './process.js';
+import { CloudflaredProcess, metricsAddrFor } from './process.js';
 
 const log = childLogger('cloudflared-provider');
 
@@ -88,6 +88,9 @@ export class CloudflaredProvider implements TunnelProvider {
 				id: row.tunnel_id,
 				tunnelUuid: row.tunnel_id,
 				configPath: dataPath('cloudflared', 'config.yml'),
+				// Each tunnel binds its own metrics port so multi-tunnel
+				// installs don't collide on 127.0.0.1:36500.
+				metricsAddr: metricsAddrFor(tunnelDbId),
 				onStatusChange: (s, err) => void this.persistStatus(tunnelDbId, s, err),
 			});
 			this.processes.set(tunnelDbId, proc);
