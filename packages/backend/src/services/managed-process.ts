@@ -57,6 +57,14 @@ export abstract class ManagedProcess {
 	private opts: ManagedProcessOptions;
 	private intentionallyStopped = false;
 	private healthTimer: NodeJS.Timeout | null = null;
+	/**
+	 * Pending backoff respawn — tracked so a manual start() / stop() can
+	 * cancel it. Without this, calling start() while a backoff was queued
+	 * would race: the queued spawnOnce fires AFTER our manual spawnOnce
+	 * and overwrites `this.child` without killing the previous one,
+	 * leaking a child that holds whatever port it bound to.
+	 */
+	private pendingRespawnTimer: NodeJS.Timeout | null = null;
 	private backoffMs = 1_000;
 	private lastStartMs = 0;
 	private logBuffer: string[] = [];
@@ -84,6 +92,11 @@ export abstract class ManagedProcess {
 	start(): void {
 		if (this.child) return;
 		this.intentionallyStopped = false;
+		// Cancel any backoff respawn that was queued while the daemon was
+		// down; we're about to spawn directly. Without this, the backoff
+		// timer can fire ~ms after our spawnOnce and overwrite this.child
+		// with a second instance, leaking the first.
+		this.cancelPendingRespawn();
 		this.spawnOnce();
 	}
 
@@ -91,6 +104,7 @@ export abstract class ManagedProcess {
 		return new Promise((resolve) => {
 			this.intentionallyStopped = true;
 			this.stopHealthTimer();
+			this.cancelPendingRespawn();
 			if (!this.child) {
 				this.setStatus('stopped');
 				resolve();
@@ -106,6 +120,13 @@ export abstract class ManagedProcess {
 				if (this.child === child) child.kill('SIGKILL');
 			}, KILL_FORCE_TIMEOUT_MS).unref();
 		});
+	}
+
+	private cancelPendingRespawn(): void {
+		if (this.pendingRespawnTimer) {
+			clearTimeout(this.pendingRespawnTimer);
+			this.pendingRespawnTimer = null;
+		}
 	}
 
 	/**
@@ -152,6 +173,25 @@ export abstract class ManagedProcess {
 	// -----------------------------------------------------------------------
 
 	private spawnOnce(): void {
+		// Defensive: if there's already a live child (e.g. race between
+		// a queued backoff respawn and a manual start()), kill it before
+		// overwriting the reference. Otherwise the previous child becomes
+		// orphaned and keeps holding any port it bound to — the symptom
+		// users see is "address already in use" on every restart.
+		if (this.child) {
+			const orphan = this.child;
+			this.log.warn(
+				{ pid: orphan.pid, id: this.id },
+				'spawnOnce called with live child — killing orphan first'
+			);
+			try {
+				orphan.kill('SIGKILL');
+			} catch {
+				/* already gone */
+			}
+			this.child = null;
+		}
+
 		this.lastStartMs = Date.now();
 		this.setStatus('starting');
 		const args = this.buildArgs();
@@ -168,7 +208,11 @@ export abstract class ManagedProcess {
 		});
 
 		proc.on('exit', (code, signal) => {
-			this.child = null;
+			// Only clear this.child if it still points at the exited process —
+			// if a fresh spawnOnce already replaced it, the new child is the
+			// authoritative one. (Belt-and-braces; the kill-before-spawn
+			// guard above should prevent the overlap in the first place.)
+			if (this.child === proc) this.child = null;
 			this.stopHealthTimer();
 			this.log.warn({ code, signal, id: this.id }, 'Process exited');
 			if (this.intentionallyStopped) {
@@ -181,9 +225,12 @@ export abstract class ManagedProcess {
 			const wait = Math.min(this.backoffMs, MAX_BACKOFF_MS);
 			this.backoffMs = Math.min(this.backoffMs * 2, MAX_BACKOFF_MS);
 			this.log.info({ wait_ms: wait, id: this.id }, 'Restarting after backoff');
-			setTimeout(() => {
+			this.cancelPendingRespawn();
+			this.pendingRespawnTimer = setTimeout(() => {
+				this.pendingRespawnTimer = null;
 				if (!this.intentionallyStopped) this.spawnOnce();
-			}, wait).unref();
+			}, wait);
+			this.pendingRespawnTimer.unref();
 		});
 
 		setTimeout(() => this.startHealthTimer(), HEALTH_GRACE_MS).unref();

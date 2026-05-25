@@ -9,6 +9,57 @@ _Nothing yet._
 
 ---
 
+## [0.2.2] — 2026-05-25
+
+### Fixed — cloudflared "address already in use" respawn loop
+
+The 0.2.1 install kept logging:
+
+```
+Error opening metrics server listener: failed to bind to address (127.0.0.1:36500): listen tcp 127.0.0.1:36500: bind: address already in use
+```
+
+…every 1 / 2 / 4 / 8 / 16 / 32 / 60 seconds, forever. Root cause was a
+race in `ManagedProcess`: when a manual `start()` came in while the exit
+handler had already queued a backoff respawn (`setTimeout`), the queued
+spawn fired ~ms after our manual spawn and overwrote `this.child` with
+a second instance. The first child kept the metrics-port listener, the
+second couldn't bind, exited, queued another backoff, repeat.
+
+- **Supervisor tracks the pending backoff timer** and cancels it on
+  `start()` / `stop()`. No more racing respawns against a queued one.
+- **`spawnOnce()` kills any live `this.child` before spawning**
+  (belt-and-braces — the cancellation above should mean we never enter
+  with a live child, but the kill catches anything we missed).
+- **`exit` handler only nulls `this.child`** when it still points at
+  the exited process (avoids clobbering a freshly-spawned successor).
+
+### Fixed — multi-tunnel installs collided on the metrics port
+
+The cloudflared metrics listener was hardcoded to `127.0.0.1:36500`, so
+once you had two CF tunnels the second one always failed to bind. Each
+`CloudflaredProcess` now gets `127.0.0.1:36500 + tunnelDbId` derived
+from its DB row. Single-tunnel installs that have just `id=1` now bind
+36501 — picked deliberately so cached "what was that port again" muscle
+memory doesn't conflict if you happened to know about 36500.
+
+### Added — orphan-cloudflared sweep on Linux
+
+Before spawning, `CloudflaredProcess.start()` walks `/proc/*/cmdline`
+and `SIGKILL`s any other `cloudflared` process whose command line
+mentions our tunnel UUID. Belt-and-braces safety net for cases where
+the supervisor genuinely lost track of a child (across an upgrade, a
+crash + restart, or someone exec'd cloudflared manually in the
+container). No-op on non-Linux.
+
+### Tests
+
+- `managed-process-race.test.ts` — repro for the supervisor race:
+  start during a queued backoff must result in exactly one extra
+  spawn, not two. Stop during a queued backoff must result in zero.
+
+---
+
 ## [0.2.1] — 2026-05-25
 
 ### Fixed — broken tunnels after 0.2.0 upgrade
