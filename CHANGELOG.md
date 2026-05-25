@@ -9,6 +9,62 @@ _Nothing yet._
 
 ---
 
+## [0.2.4] — 2026-05-25
+
+### Fixed — root cause of "tunnel assignment got reset"
+
+Migration 004's `.alter()` calls on the `tunnels` table forced a
+SQLite table rebuild (no native `ALTER COLUMN`). Knex sets
+`PRAGMA foreign_keys=OFF` around the rebuild, but in some
+better-sqlite3 connection-pool configurations the pragma doesn't
+stick to the connection doing the work. When that happens the
+`DROP TABLE tunnels` step fires the `proxy_hosts.tunnel_id ON DELETE
+SET NULL` cascade, orphaning every host. The browser then sees
+cloudflared's `http_status:404` because `buildContext` filters out
+hosts with `tunnel_id IS NULL`.
+
+**Migration 008** detects + recovers:
+- If exactly one cloudflared tunnel exists, every orphan is
+  re-attached to it automatically.
+- Otherwise each orphan gets a clear `last_error` pointing at the
+  new Reassign UI.
+
+### Added — tunnel + zone are now editable
+
+Previously the edit modal locked tunnel/zone as immutable. After
+0.2.0+ that turned into "I have no way to fix an orphaned host
+without deleting and re-creating it from scratch". `EditHostModal`
+gains a **Reassign tunnel/zone** panel (auto-opens for orphans),
+with cross-validation: protocol must match the new tunnel's
+provider, hostname must end with the new zone's name. The backend
+tears the host down from the old tunnel/zone before mutating —
+no orphan DNS records.
+
+### Fixed — false-positive DNS warning on hosts that work
+
+Post-deploy the backend was polling 1.1.1.1 DoH for the new CNAME
+and storing the timeout as `last_error` when the resolver didn't
+see the record within 12s. But 1.1.1.1 caches negative responses
+for a few minutes, so a brand-new record often "doesn't exist" via
+DoH while the browser (which hits Cloudflare's edge directly) sees
+it fine. Working hosts displayed a red error badge for hours.
+
+- `no_record` and `timeout` outcomes now go into a non-blocking
+  `meta.last_warning` slot instead of `last_error`. The host stays
+  "deployed" in the UI.
+- Only `nxdomain` and `wrong_target` (genuine misconfigurations)
+  still surface as `last_error`.
+- Wording softened from "⚠" to "ℹ" with explicit "if the page loads
+  you can ignore this".
+
+### Tests
+
+Existing tests cover the contract; the orphan-recovery migration's
+behaviour is asserted in CI via the migration apply step on a
+seeded broken state.
+
+---
+
 ## [0.2.3] — 2026-05-25
 
 ### Fixed — "live and running but page not found"

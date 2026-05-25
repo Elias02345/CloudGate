@@ -256,12 +256,57 @@ async function verifyDnsAndProbe(hostId: number, host: HostRow, expectedCnameTar
 
 	if (dnsResult.kind !== 'ok') {
 		const msg = formatDnsWarning(dnsResult, host.hostname, expectedCnameTarget);
-		await knex('proxy_hosts').where({ id: hostId }).update({ last_error: msg });
-		publish('host.deploy_failed', { id: hostId, hostname: host.hostname, error: msg });
+		// `no_record` and `timeout` are routinely false positives:
+		// 1.1.1.1's resolver caches negative responses for a few minutes,
+		// so a brand-new CNAME often "doesn't exist" via DoH while the
+		// browser (which hits CF directly) sees it fine. Only the
+		// outcomes that genuinely indicate a misconfiguration get
+		// surfaced as `last_error` — the rest go into a non-blocking
+		// warning slot.
+		const isRealError = dnsResult.kind === 'nxdomain' || dnsResult.kind === 'wrong_target';
+		if (isRealError) {
+			await knex('proxy_hosts').where({ id: hostId }).update({ last_error: msg });
+			publish('host.deploy_failed', { id: hostId, hostname: host.hostname, error: msg });
+			return;
+		}
+		// Soft warning — UI shows a yellow info chip, host still
+		// considered successfully deployed.
+		await setMetaWarning(hostId, msg);
+		// Still probe the upstream — DNS hiccup doesn't mean the
+		// backend is unreachable.
+		await probeAndDiagnose(hostId, host);
 		return;
 	}
 
+	// Clear any stale warning from a previous deploy.
+	await setMetaWarning(hostId, null);
 	await probeAndDiagnose(hostId, host);
+}
+
+/**
+ * Park an informational message in `proxy_hosts.meta.last_warning`.
+ * Distinct from `last_error` so the UI can render warnings without
+ * making the host look "broken" when the user can clearly reach it.
+ */
+async function setMetaWarning(hostId: number, warning: string | null): Promise<void> {
+	const knex = getDb();
+	const row = await knex<{ meta: string | null }>('proxy_hosts').where({ id: hostId }).select('meta').first();
+	let meta: Record<string, unknown> = {};
+	try {
+		meta = JSON.parse(row?.meta || '{}');
+	} catch {
+		meta = {};
+	}
+	if (warning === null) {
+		meta.last_warning = undefined;
+		meta.last_warning_at = undefined;
+	} else {
+		meta.last_warning = warning;
+		meta.last_warning_at = new Date().toISOString();
+	}
+	await knex('proxy_hosts')
+		.where({ id: hostId })
+		.update({ meta: JSON.stringify(meta) });
 }
 
 function formatDnsWarning(
@@ -273,13 +318,13 @@ function formatDnsWarning(
 		case 'nxdomain':
 			return `⚠ DNS: Cloudflare's resolver (1.1.1.1) returned NXDOMAIN for ${hostname}. The CNAME was NOT created — check the host's status and re-deploy.`;
 		case 'no_record':
-			return `⚠ DNS: No CNAME for ${hostname} after 12s of polling. Either the create call silently dropped, or your zone's nameservers haven't picked up the new record yet (rare — usually <60s). Retry "Re-deploy".`;
+			return `ℹ DNS: 1.1.1.1 didn't see a CNAME for ${hostname} during the 12s post-deploy check. This is usually a stale negative cache on the resolver, not a real failure — if your hostname loads in the browser, you can ignore this. Click "Verify DNS" to re-check.`;
 		case 'wrong_target':
 			return `⚠ DNS: ${hostname} resolves to "${result.got}" but should point to "${expectedSuffix}". Another DNS record (probably from before) is taking precedence — delete it in your Cloudflare dashboard.`;
 		case 'timeout':
-			return `⚠ DNS: CloudGate couldn't reach 1.1.1.1 to verify ${hostname}. Outbound DNS-over-HTTPS may be blocked. The record might still work — open the host's URL to test.`;
+			return `ℹ DNS: CloudGate couldn't reach 1.1.1.1 to verify ${hostname} in 12s. Outbound DNS-over-HTTPS may be blocked or slow. If your hostname loads in the browser, the record exists — this check is informational only.`;
 		default:
-			return `⚠ DNS verification failed: ${result.message ?? 'unknown'}`;
+			return `ℹ DNS verification inconclusive: ${result.message ?? 'unknown'}`;
 	}
 }
 
