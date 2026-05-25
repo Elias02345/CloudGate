@@ -85,6 +85,8 @@ export function useRedeployHost() {
 }
 
 export interface UpdateHostInput {
+	tunnel_id?: number;
+	cf_zone_id?: number;
 	forward_scheme?: 'http' | 'https';
 	forward_host?: string;
 	forward_port?: number;
