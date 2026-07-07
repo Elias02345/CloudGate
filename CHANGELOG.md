@@ -9,6 +9,52 @@ _Nothing yet._
 
 ---
 
+## [0.2.5] — 2026-07-06
+
+### Fixed — hosts orphaned again on every Cloudflare zone re-sync
+
+0.2.4 recovered hosts orphaned by migration 004's one-time table
+rebuild, but a second, recurring source of the same symptom
+survived: **zone sync**. `doZoneSync` refreshed the cached zone list
+by `DELETE`-ing every `cf_zones` row for the account and re-`INSERT`ing
+them — which handed each zone a brand-new auto-increment `id`. Because
+`proxy_hosts.cf_zone_id` references `cf_zones.id` with
+`ON DELETE SET NULL`, every host attached to a zone had its
+`cf_zone_id` NULLed on **every** sync (the "Sync" button, and the
+automatic sync when adding an account). The host then failed to
+publish its DNS record ("host has no cf_zone_id …") and the browser
+saw a 404.
+
+- Zone persistence now **upserts** on the `(cloudflare_account_id,
+  zone_id)` unique key, so existing zone rows keep their primary-key
+  `id` and attached hosts stay bound. Zones Cloudflare no longer
+  returns are pruned (SET NULL on their hosts is correct there — the
+  zone is genuinely gone).
+- New regression test `tests/zone-sync.test.ts` asserts a re-sync
+  preserves `cf_zone_id` and that stale zones are pruned.
+
+### Fixed — dashboard falsely reported cloudflared "down"
+
+The deep health check (`GET /api/health/deep`) probed a hardcoded
+`127.0.0.1:36500`, but since 0.2.2 each tunnel binds its own metrics
+port (`36500 + tunnel id`) to avoid multi-tunnel collisions. The
+check therefore always missed the real port and reported cloudflared
+unreachable even on healthy systems. It now enumerates the
+cloudflared tunnels and probes each tunnel's actual metrics port.
+
+### Fixed — migrations + tests broken on Windows dev machines
+
+- `db.ts` derived the migrations directory via `new URL(...).pathname`,
+  which yields `/C:/…` on Windows and made Knex miss the migrations
+  folder. Now uses `fileURLToPath()` (the same idiom already used in
+  `knexfile.ts` / `run-migrations.ts`).
+- Vitest now loads migration `.ts` files through the `tsx` loader and
+  allows a longer bootstrap hook/test timeout, so the required
+  bootstrap/persistence/updater suites run on Windows too (they were
+  already green on the Linux CI).
+
+---
+
 ## [0.2.4] — 2026-05-25
 
 ### Fixed — root cause of "tunnel assignment got reset"

@@ -21,6 +21,7 @@ import {
 	getAccountById,
 	listAccountsForUser,
 	publicAccount,
+	syncZonesForAccount,
 	touchValidated,
 } from '../services/cf-account.js';
 import {
@@ -196,23 +197,8 @@ async function doZoneSync(account: DbCfAccount): Promise<number> {
 		throw new CloudflareApiError(400, 'CF_UNSUPPORTED_AUTH', 'OAuth zone sync not supported in M1');
 	}
 	const zones = await cfListZones(creds.token);
-	const knex = getDb();
-	const now = new Date().toISOString();
-	await knex.transaction(async (trx) => {
-		await trx('cf_zones').where({ cloudflare_account_id: account.id }).delete();
-		if (zones.length > 0) {
-			await trx('cf_zones').insert(
-				zones.map((z) => ({
-					cloudflare_account_id: account.id,
-					zone_id: z.id,
-					name: z.name,
-					status: z.status,
-					last_synced_at: now,
-				}))
-			);
-		}
-	});
+	const count = await syncZonesForAccount(account.id, zones);
 	await touchValidated(account.id);
-	log.info({ account_id: account.id, count: zones.length }, 'Synced zones');
-	return zones.length;
+	log.info({ account_id: account.id, count }, 'Synced zones');
+	return count;
 }

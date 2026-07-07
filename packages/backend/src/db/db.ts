@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import knex, { type Knex } from 'knex';
 import { dataPath } from '../config.js';
 
@@ -25,7 +26,8 @@ export function getDb(): Knex {
 			},
 		},
 		migrations: {
-			directory: new URL('./migrations/', import.meta.url).pathname,
+			// fileURLToPath, not .pathname — .pathname yields "/C:/..." on Windows.
+			directory: fileURLToPath(new URL('./migrations/', import.meta.url)),
 			extension: 'ts',
 			// In production we run compiled JS — load .js only.
 			// In dev (tsx) we run TS directly — load .ts only.
