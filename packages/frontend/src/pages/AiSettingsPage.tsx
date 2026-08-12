@@ -70,6 +70,10 @@ export function AiSettingsPage() {
 		},
 	});
 
+	// Seeds the form once the saved settings arrive. Mantine hands back a fresh `form`
+	// object every render, so depending on `form.setValues` would re-seed on every pass
+	// and discard whatever the user had typed.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: form identity changes each render
 	useEffect(() => {
 		if (!settings.data) return;
 		form.setValues({
@@ -80,7 +84,6 @@ export function AiSettingsPage() {
 			autonomy: settings.data.autonomy,
 			system_prompt_override: settings.data.system_prompt_override ?? '',
 		});
-		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [settings.data]);
 
 	const onSave = form.onSubmit(async (values) => {

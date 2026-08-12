@@ -49,10 +49,7 @@ export interface RestoreOptions {
  * Check whether /data already contains a CloudGate install.
  */
 export function dataDirHasInstall(): boolean {
-	return (
-		existsSync(dataPath('db', 'db.sqlite')) &&
-		existsSync(dataPath('secrets', 'encryption.key'))
-	);
+	return existsSync(dataPath('db', 'db.sqlite')) && existsSync(dataPath('secrets', 'encryption.key'));
 }
 
 /**
@@ -138,7 +135,11 @@ export async function restoreFromBuffer(
  * Convenience wrapper — also writes the .bootstrap-complete marker so the
  * backend will treat the restored data as a finished install.
  */
-export async function restoreAndMark(buffer: Buffer, passphrase: string, opts: RestoreOptions = {}): Promise<{ files: number; bytes: number }> {
+export async function restoreAndMark(
+	buffer: Buffer,
+	passphrase: string,
+	opts: RestoreOptions = {}
+): Promise<{ files: number; bytes: number }> {
 	const result = await restoreFromBuffer(buffer, passphrase, opts);
 	const markerPath = dataPath('.bootstrap-complete');
 	const fs = await import('node:fs/promises');

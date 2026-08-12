@@ -12,7 +12,7 @@
 
 import { readFileSync } from 'node:fs';
 import argon2 from 'argon2';
-import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
+import { type JWTPayload, SignJWT, jwtVerify } from 'jose';
 import { dataPath } from '../config.js';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
@@ -68,7 +68,9 @@ export interface JwtClaims extends JWTPayload {
 	is_admin: boolean;
 }
 
-export async function issueAccessToken(claims: Omit<JwtClaims, 'iat' | 'exp' | 'iss' | 'aud'>): Promise<string> {
+export async function issueAccessToken(
+	claims: Omit<JwtClaims, 'iat' | 'exp' | 'iss' | 'aud'>
+): Promise<string> {
 	const key = loadJwtKey();
 	return new SignJWT(claims)
 		.setProtectedHeader({ alg: 'HS256' })
@@ -128,13 +130,11 @@ export async function recordLogin(userId: number): Promise<void> {
 export async function changePassword(userId: number, newPlaintext: string): Promise<void> {
 	const knex = getDb();
 	const hash = await hashPassword(newPlaintext);
-	await knex('users')
-		.where({ id: userId })
-		.update({
-			password_hash: hash,
-			must_change_password: 0,
-			updated_at: new Date().toISOString(),
-		});
+	await knex('users').where({ id: userId }).update({
+		password_hash: hash,
+		must_change_password: 0,
+		updated_at: new Date().toISOString(),
+	});
 }
 
 /**

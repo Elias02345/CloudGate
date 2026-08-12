@@ -14,8 +14,8 @@
  * was the root cause of "migrations failed" rollbacks since v0.1.0.
  */
 
-import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Knex } from 'knex';
 import { dataPath } from '../config.js';
 

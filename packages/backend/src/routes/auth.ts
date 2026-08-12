@@ -165,13 +165,11 @@ authRouter.post('/password', requireAuth, async (req, res) => {
 	}
 	const parsed = ChangePasswordRequestSchema.safeParse(req.body);
 	if (!parsed.success) {
-		res
-			.status(400)
-			.json({
-				error: 'Invalid password change payload',
-				code: 'BAD_REQUEST',
-				details: parsed.error.flatten(),
-			});
+		res.status(400).json({
+			error: 'Invalid password change payload',
+			code: 'BAD_REQUEST',
+			details: parsed.error.flatten(),
+		});
 		return;
 	}
 	const { current_password, new_password, email, name } = parsed.data;

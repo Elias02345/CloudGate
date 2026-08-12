@@ -99,7 +99,9 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 	const [pendingMessage, setPendingMessage] = useState('');
 	const scrollRef = useRef<HTMLDivElement>(null);
 
-	// Auto-scroll on new messages
+	// Auto-scroll on new messages. The message count is a trigger, not a value the body
+	// reads: dropping it (as the rule suggests) would scroll once on mount and never again.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: message count is a re-run trigger
 	useEffect(() => {
 		if (scrollRef.current) {
 			scrollRef.current.scrollTop = scrollRef.current.scrollHeight;

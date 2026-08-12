@@ -119,7 +119,7 @@ async function main(): Promise<void> {
 	// will be hit by curl / AI agents.
 	app.use((req, res, next) => {
 		const auth = req.header('authorization');
-		if (auth && auth.toLowerCase().startsWith('bearer cgk_')) {
+		if (auth?.toLowerCase().startsWith('bearer cgk_')) {
 			res.header('Access-Control-Allow-Origin', '*');
 			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 		}

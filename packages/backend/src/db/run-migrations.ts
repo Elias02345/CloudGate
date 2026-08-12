@@ -45,8 +45,7 @@ async function main(): Promise<void> {
 
 	if (!existsSync(MIGRATIONS_DIR)) {
 		throw new Error(
-			`Migrations directory not found at ${MIGRATIONS_DIR}. ` +
-				`The release tarball is incomplete — expected backend/dist/db/migrations/ to exist.`,
+			`Migrations directory not found at ${MIGRATIONS_DIR}. The release tarball is incomplete — expected backend/dist/db/migrations/ to exist.`
 		);
 	}
 
@@ -93,5 +92,5 @@ main().then(
 		console.error('[run-migrations] FAILED');
 		console.error(err.stack ?? err.message);
 		process.exit(1);
-	},
+	}
 );

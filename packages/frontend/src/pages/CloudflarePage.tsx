@@ -17,15 +17,10 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import {
-	IconAlertCircle,
-	IconCheck,
-	IconCloudPlus,
-	IconRefresh,
-	IconTrash,
-} from '@tabler/icons-react';
+import { IconAlertCircle, IconCheck, IconCloudPlus, IconRefresh, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { ApiError } from '../api/client.js';
 import {
 	useAddCloudflareAccount,
 	useCloudflareAccounts,
@@ -33,7 +28,6 @@ import {
 	useSyncZones,
 	useZones,
 } from '../api/cloudflare.js';
-import { ApiError } from '../api/client.js';
 
 export function CloudflarePage() {
 	const { t } = useTranslation();
@@ -85,7 +79,10 @@ export function CloudflarePage() {
 				<Stack>
 					<Text size="sm" c="dimmed">
 						{t('cloudflare.hint')}{' '}
-						<Anchor href="https://github.com/Elias02345/CloudGate/blob/dev/docs/CLOUDFLARE_SETUP.md" target="_blank">
+						<Anchor
+							href="https://github.com/Elias02345/CloudGate/blob/dev/docs/CLOUDFLARE_SETUP.md"
+							target="_blank"
+						>
 							{t('cloudflare.docs_link')}
 						</Anchor>
 					</Text>
@@ -112,7 +109,10 @@ export function CloudflarePage() {
 								{accounts.data.accounts.map((a) => (
 									<Table.Tr
 										key={a.id}
-										style={{ cursor: 'pointer', background: selectedId === a.id ? 'var(--mantine-color-dark-6)' : undefined }}
+										style={{
+											cursor: 'pointer',
+											background: selectedId === a.id ? 'var(--mantine-color-dark-6)' : undefined,
+										}}
 										onClick={() => setSelectedId(a.id)}
 									>
 										<Table.Td>
@@ -169,9 +169,7 @@ export function CloudflarePage() {
 								{t('cloudflare.sync')}
 							</Button>
 						</Group>
-						{zones.data?.zones.length === 0 && (
-							<Text c="dimmed">{t('cloudflare.no_zones')}</Text>
-						)}
+						{zones.data?.zones.length === 0 && <Text c="dimmed">{t('cloudflare.no_zones')}</Text>}
 						{zones.data && zones.data.zones.length > 0 && (
 							<Table>
 								<Table.Thead>
@@ -206,7 +204,10 @@ export function CloudflarePage() {
 				<Stack>
 					<Text size="sm" c="dimmed">
 						{t('cloudflare.add_hint')}{' '}
-						<Anchor href="https://github.com/Elias02345/CloudGate/blob/dev/docs/CLOUDFLARE_SETUP.md" target="_blank">
+						<Anchor
+							href="https://github.com/Elias02345/CloudGate/blob/dev/docs/CLOUDFLARE_SETUP.md"
+							target="_blank"
+						>
 							{t('cloudflare.add_hint_link')}
 						</Anchor>
 					</Text>
