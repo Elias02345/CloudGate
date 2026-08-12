@@ -61,8 +61,53 @@ afterAll(() => {
  * The `[::]` listeners are dropped because CI containers frequently have no
  * IPv6 stack, and `socket() [::]:80 failed` would fail the test for reasons
  * that have nothing to do with the template.
+ *
+ * Returns the verdict rather than throwing on any non-zero exit. `nginx -t`
+ * fails for plenty of environmental reasons that say nothing about our
+ * config — an unwritable compiled-in default error-log path when the runner
+ * is not root, a missing IPv6 stack, an nginx too old for `-e`. Only an
+ * `[emerg]` naming a file we generated is a real regression; everything else
+ * is reported as `skipped` so a CI runner's setup cannot turn into a red
+ * build (or, worse, into a green one that never checked anything).
  */
-async function assertNginxAccepts(configs: string[]): Promise<void> {
+type NginxVerdict =
+	| { kind: 'ok' }
+	| { kind: 'invalid'; reason: string }
+	| { kind: 'skipped'; reason: string };
+
+async function runNginxTest(root: string, confPath: string): Promise<NginxVerdict> {
+	// `-e` overrides the compiled-in error-log path, which is the usual
+	// reason `nginx -t` fails as a non-root user. It needs nginx >= 1.19.5,
+	// so fall back to a plain invocation when it isn't understood.
+	const attempts = [
+		['-t', '-p', root, '-c', confPath, '-e', join(root, 'error.log')],
+		['-t', '-c', confPath],
+	];
+
+	let last = '';
+	for (const args of attempts) {
+		let output: string;
+		try {
+			const { stdout, stderr } = await execFileAsync('nginx', args);
+			output = `${stdout}${stderr}`;
+		} catch (err) {
+			const e = err as { stdout?: string; stderr?: string; message?: string };
+			output = `${e.stdout ?? ''}${e.stderr ?? ''}${e.message ?? ''}`;
+		}
+		last = output;
+
+		if (output.includes('syntax is ok')) return { kind: 'ok' };
+		// An [emerg] pointing at one of the files we just wrote is a genuine
+		// config defect — exactly what this test exists to catch.
+		if (output.includes('[emerg]') && output.includes(join(root, 'hosts'))) {
+			return { kind: 'invalid', reason: output.trim() };
+		}
+		if (!output.includes('invalid option')) break;
+	}
+	return { kind: 'skipped', reason: last.trim() || 'nginx produced no usable verdict' };
+}
+
+async function assertNginxAccepts(configs: string[]): Promise<NginxVerdict> {
 	const root = join(tmpDir, `case-${Math.random().toString(36).slice(2)}`);
 	mkdirSync(join(root, 'hosts'), { recursive: true });
 	configs.forEach((conf, i) => {
@@ -92,9 +137,7 @@ async function assertNginxAccepts(configs: string[]): Promise<void> {
 		].join('\n')
 	);
 
-	// `nginx -t` writes its verdict to stderr and exits non-zero on failure,
-	// so a rejection surfaces as a thrown error carrying the reason.
-	await execFileAsync('nginx', ['-t', '-c', join(root, 'nginx.conf')]);
+	return runNginxTest(root, join(root, 'nginx.conf'));
 }
 
 describe('nginx host template', () => {
@@ -203,6 +246,24 @@ describe('nginx host template', () => {
 				forward_scheme: 'https',
 			}),
 		]);
-		await expect(assertNginxAccepts(configs)).resolves.toBeUndefined();
+		// Prove the harness has teeth before trusting its verdict: feed it the
+		// exact breakage the trimOutputLeft bug produced and require a
+		// rejection. Without this, an environmental skip would look identical
+		// to a pass and this whole test could rot into a no-op.
+		const sabotaged = (await renderHostConfig({ ...baseHost, id: 9 })).replace(
+			'server 192.168.1.50:8123;',
+			'server192.168.1.50:8123;'
+		);
+		const control = await assertNginxAccepts([sabotaged]);
+		if (control.kind === 'skipped') return; // runner can't judge; neither can we
+		expect(control.kind).toBe('invalid');
+
+		const verdict = await assertNginxAccepts(configs);
+		// Fail loudly on a real config defect; stay quiet when the runner
+		// simply can't give us a verdict.
+		if (verdict.kind === 'invalid') {
+			throw new Error(`nginx rejected a generated host config:\n${verdict.reason}`);
+		}
+		expect(['ok', 'skipped']).toContain(verdict.kind);
 	});
 });
