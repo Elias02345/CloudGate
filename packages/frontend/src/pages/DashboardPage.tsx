@@ -11,10 +11,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
+import { api } from '../api/client.js';
 import { useCloudflareAccounts } from '../api/cloudflare.js';
 import { useHosts } from '../api/hosts.js';
 import { useTunnels } from '../api/tunnels.js';
-import { api } from '../api/client.js';
 import { wasOnboardingDismissed } from './OnboardingPage.js';
 
 interface HealthResponse {
@@ -47,7 +47,13 @@ function StatCard({
 					<Text size="sm" c="dimmed">
 						{label}
 					</Text>
-					{loading ? <Skeleton h={22} w={50} mt={4} /> : <Text fw={700} size="lg">{value}</Text>}
+					{loading ? (
+						<Skeleton h={22} w={50} mt={4} />
+					) : (
+						<Text fw={700} size="lg">
+							{value}
+						</Text>
+					)}
 				</Stack>
 			</Group>
 		</Card>
@@ -92,7 +98,8 @@ export function DashboardPage() {
 
 	const tunnelsRunning = tunnels.data?.tunnels.filter((t) => t.live_status === 'running').length ?? 0;
 	const hostsCount = hosts.data?.hosts.length ?? 0;
-	const hostsLive = hosts.data?.hosts.filter((h) => h.enabled && h.last_deployed_at && !h.last_error).length ?? 0;
+	const hostsLive =
+		hosts.data?.hosts.filter((h) => h.enabled && h.last_deployed_at && !h.last_error).length ?? 0;
 	const hostsError = hosts.data?.hosts.filter((h) => h.last_error).length ?? 0;
 
 	const backendHealthy = health.data?.status === 'ok';
@@ -156,17 +163,20 @@ export function DashboardPage() {
 					<Stack gap="xs">
 						<Text size="sm">{t('dashboard.first_steps_intro')}</Text>
 						<Text size="sm">
-							1. <Anchor component={Link} to="/cloudflare">
+							1.{' '}
+							<Anchor component={Link} to="/cloudflare">
 								{t('dashboard.first_steps_1')}
 							</Anchor>
 						</Text>
 						<Text size="sm">
-							2. <Anchor component={Link} to="/tunnels">
+							2.{' '}
+							<Anchor component={Link} to="/tunnels">
 								{t('dashboard.first_steps_2')}
 							</Anchor>
 						</Text>
 						<Text size="sm">
-							3. <Anchor component={Link} to="/hosts">
+							3.{' '}
+							<Anchor component={Link} to="/hosts">
 								{t('dashboard.first_steps_3')}
 							</Anchor>
 						</Text>

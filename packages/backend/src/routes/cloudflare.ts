@@ -10,6 +10,7 @@
 
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
+import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { audit } from '../middleware/audit.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
@@ -30,7 +31,6 @@ import {
 	listZones as cfListZones,
 	verifyToken,
 } from '../services/cloudflare-client.js';
-import { getDb } from '../db/db.js';
 
 const log = childLogger('routes:cloudflare');
 export const cloudflareRouter: RouterType = Router();
@@ -43,65 +43,75 @@ const CreateAccountSchema = z.object({
 // ---------------------------------------------------------------------------
 // POST /accounts
 // ---------------------------------------------------------------------------
-cloudflareRouter.post('/accounts', requireAuth, requirePasswordSet, audit({
-	action: 'cf_account.added',
-	entityType: 'cf_account',
-	meta: (req) => ({ label: req.body?.label }),
-}), async (req, res) => {
-	if (!req.user) {
-		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
-		return;
-	}
-	const parsed = CreateAccountSchema.safeParse(req.body);
-	if (!parsed.success) {
-		res.status(400).json({ error: 'Invalid payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
-		return;
-	}
-	const { label, api_token } = parsed.data;
+cloudflareRouter.post(
+	'/accounts',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'cf_account.added',
+		entityType: 'cf_account',
+		meta: (req) => ({ label: req.body?.label }),
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+			return;
+		}
+		const parsed = CreateAccountSchema.safeParse(req.body);
+		if (!parsed.success) {
+			res
+				.status(400)
+				.json({ error: 'Invalid payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
+			return;
+		}
+		const { label, api_token } = parsed.data;
 
-	try {
-		const tokenInfo = await verifyToken(api_token);
-		if (tokenInfo.status !== 'active') {
-			res.status(400).json({
-				error: `Token is not active (status: ${tokenInfo.status})`,
-				code: 'CF_TOKEN_INACTIVE',
+		try {
+			const tokenInfo = await verifyToken(api_token);
+			if (tokenInfo.status !== 'active') {
+				res.status(400).json({
+					error: `Token is not active (status: ${tokenInfo.status})`,
+					code: 'CF_TOKEN_INACTIVE',
+				});
+				return;
+			}
+			const accounts = await cfListAccounts(api_token);
+			// For M1 we take the first account. Multi-account support comes in vNext.
+			// Narrowing on the element rather than on `length` keeps the empty case
+			// and the "TS says this may be undefined" case as one guard.
+			const first = accounts[0];
+			if (!first) {
+				res.status(400).json({
+					error: 'Token has no account access. Re-create with Account.Tunnels:Edit scope.',
+					code: 'CF_NO_ACCOUNTS',
+				});
+				return;
+			}
+			const row = await createAccount({
+				user_id: req.user.id,
+				label,
+				auth_type: 'api_token',
+				credentials: { type: 'api_token', token: api_token },
+				account_tag: first.id,
+				email: null,
 			});
-			return;
+			// Async zone sync — doesn't block the response
+			void doZoneSync(row).catch((err) =>
+				log.warn({ err: (err as Error).message, account_id: row.id }, 'Initial zone sync failed')
+			);
+			res.status(201).json({ account: publicAccount(row) });
+		} catch (err) {
+			if (err instanceof CloudflareApiError) {
+				res.status(err.status === 401 || err.status === 403 ? 400 : 502).json({
+					error: err.message,
+					code: err.code,
+				});
+				return;
+			}
+			throw err;
 		}
-		const accounts = await cfListAccounts(api_token);
-		if (accounts.length === 0) {
-			res.status(400).json({
-				error: 'Token has no account access. Re-create with Account.Tunnels:Edit scope.',
-				code: 'CF_NO_ACCOUNTS',
-			});
-			return;
-		}
-		// For M1 we take the first account. Multi-account support comes in vNext.
-		const first = accounts[0]!;
-		const row = await createAccount({
-			user_id: req.user.id,
-			label,
-			auth_type: 'api_token',
-			credentials: { type: 'api_token', token: api_token },
-			account_tag: first.id,
-			email: null,
-		});
-		// Async zone sync — doesn't block the response
-		void doZoneSync(row).catch((err) =>
-			log.warn({ err: (err as Error).message, account_id: row.id }, 'Initial zone sync failed')
-		);
-		res.status(201).json({ account: publicAccount(row) });
-	} catch (err) {
-		if (err instanceof CloudflareApiError) {
-			res.status(err.status === 401 || err.status === 403 ? 400 : 502).json({
-				error: err.message,
-				code: err.code,
-			});
-			return;
-		}
-		throw err;
 	}
-});
+);
 
 // ---------------------------------------------------------------------------
 // GET /accounts
@@ -118,27 +128,33 @@ cloudflareRouter.get('/accounts', requireAuth, requirePasswordSet, async (req, r
 // ---------------------------------------------------------------------------
 // DELETE /accounts/:id
 // ---------------------------------------------------------------------------
-cloudflareRouter.delete('/accounts/:id', requireAuth, requirePasswordSet, audit({
-	action: 'cf_account.deleted',
-	entityType: 'cf_account',
-	entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
-}), async (req, res) => {
-	if (!req.user) {
-		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
-		return;
+cloudflareRouter.delete(
+	'/accounts/:id',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'cf_account.deleted',
+		entityType: 'cf_account',
+		entityId: (req) => Number.parseInt(String(req.params.id ?? ''), 10) || null,
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+			return;
+		}
+		const id = Number.parseInt(String(req.params.id ?? ''), 10);
+		if (!Number.isFinite(id)) {
+			res.status(400).json({ error: 'Invalid id', code: 'BAD_REQUEST' });
+			return;
+		}
+		const ok = await deleteAccount(id, req.user.id);
+		if (!ok) {
+			res.status(404).json({ error: 'Account not found', code: 'NOT_FOUND' });
+			return;
+		}
+		res.status(204).end();
 	}
-	const id = Number.parseInt(String(req.params.id ?? ''), 10);
-	if (!Number.isFinite(id)) {
-		res.status(400).json({ error: 'Invalid id', code: 'BAD_REQUEST' });
-		return;
-	}
-	const ok = await deleteAccount(id, req.user.id);
-	if (!ok) {
-		res.status(404).json({ error: 'Account not found', code: 'NOT_FOUND' });
-		return;
-	}
-	res.status(204).end();
-});
+);
 
 // ---------------------------------------------------------------------------
 // POST /accounts/:id/sync — refresh zones from CF

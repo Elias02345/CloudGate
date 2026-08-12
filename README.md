@@ -128,6 +128,7 @@ That's it. CloudGate manages keys, secrets, and updates automatically.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system design overview
 - [`docs/UPDATE_RULES.md`](docs/UPDATE_RULES.md) — detailed update-safety rules
 - [`docs/CLOUDFLARE_SETUP.md`](docs/CLOUDFLARE_SETUP.md) — how to create the Cloudflare API token
+- [`docs/HOME-ASSISTANT.md`](docs/HOME-ASSISTANT.md) — fixing Home Assistant's "400: Bad Request" behind a tunnel
 
 ---
 

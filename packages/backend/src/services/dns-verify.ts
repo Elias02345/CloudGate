@@ -89,7 +89,7 @@ async function dohQuery(hostname: string, timeoutMs = 4000): Promise<DohResponse
 export async function verifyDns(
 	hostname: string,
 	expectedCnameSuffix: string,
-	options: { attempts?: number; intervalMs?: number } = {},
+	options: { attempts?: number; intervalMs?: number } = {}
 ): Promise<DnsVerifyOutcome> {
 	const attempts = options.attempts ?? 6;
 	const intervalMs = options.intervalMs ?? 2000;

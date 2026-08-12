@@ -9,6 +9,112 @@ _Nothing yet._
 
 ---
 
+## [0.2.6] — 2026-08-12
+
+### Fixed — Home Assistant answered "400: Bad Request" through every tunnel
+
+Home Assistant behind a CloudGate tunnel returned a bare **400 Bad
+Request** to every browser and to the companion app, while the LAN
+address kept working and push notifications kept arriving. Other
+services on the same tunnel were unaffected, which made it look like a
+CloudGate routing bug. It is not.
+
+HA's `forwarded_middleware`
+(`homeassistant/components/http/forwarded.py`) raises `HTTPBadRequest`
+whenever a request carries `X-Forwarded-For` and either
+`use_x_forwarded_for` is off (HA's **default**) or the connecting peer
+is absent from `trusted_proxies`. Cloudflare's edge adds
+`X-Forwarded-For` to *every* proxied request, and cloudflared has no
+option to strip or rewrite it — so an unconfigured HA rejects 100% of
+tunnel traffic. LAN requests carry no such header, and push
+notifications leave HA outbound via HA Cloud, which is why both kept
+working and hid the cause.
+
+The fix has to be applied in Home Assistant. CloudGate now finds it for
+you instead of leaving a bare 400:
+
+- **New forwarded-header probe.** After a deploy — and on demand via the
+  new read-only `GET /api/hosts/:id/diagnose` — CloudGate requests the
+  origin twice, once plain and once with `X-Forwarded-For`. A clean
+  "works, then 400s" transition is reported as the cause rather than as
+  a generic "upstream returned 400".
+- **The diagnosis carries the remedy.** CloudGate detects Home Assistant
+  and emits a ready-to-paste `configuration.yaml` block containing the
+  address it actually reaches the origin from. It recommends the `/24`
+  rather than the pinned container IP, because Docker hands the
+  container a new address on every re-create — the most common way this
+  fix silently breaks again a week later.
+- **Corrected misleading advice.** 0.2.1 suggested `http_host_header`
+  and `trusted_proxies: [127.0.0.1]` for this symptom. Neither works:
+  the check never looks at the `Host` header, and CloudGate connects
+  from a Docker bridge address, not localhost. The hint and the field
+  help text have been rewritten.
+- New `docs/HOME-ASSISTANT.md` covers the root cause, the fix, the usual
+  mistakes, and why the companion app can still fail afterwards when
+  Cloudflare Access is enabled on the hostname.
+
+### Fixed — local_nginx hosts could never deploy
+
+The nginx host template was rendered by a Liquid engine configured with
+`trimOutputLeft: true`, which strips the whitespace to the left of every
+`{{ … }}`. `server {{ forward_host }}:{{ forward_port }};` therefore
+rendered as `server192.168.1.50:8123;`, and `server_name {{ hostname }};`
+as `server_nameha.example.com;`. Both are unknown directives, so
+`nginx -t` rejected the file and `writeHostConfig()` rolled back — every
+`local_nginx` deploy failed. The TLS branch had a matching defect that
+ran `listen 443 ssl http2;` onto the end of the `server_name` line.
+
+Whitespace control is now explicit (`{%-` / `-%}`), and the new
+`tests/nginx-host-template.test.ts` renders each variant and runs it
+through a real `nginx -t` so a string-level regression cannot slip
+through again.
+
+### Fixed — `Connection: upgrade` was sent on every request
+
+The nginx template hard-coded `proxy_set_header Connection "upgrade";`,
+announcing a protocol upgrade even for ordinary requests that never
+asked for one. This defeats keep-alive and upsets strict origins. Each
+host config now declares its own `map $http_upgrade $cg_conn_upgrade_<id>`
+so `Connection` is `upgrade` only for real WebSocket handshakes and
+`close` otherwise.
+
+The map is deliberately per-host and id-suffixed: the self-updater
+replaces `/app` but never `/etc/nginx-cloudgate/`, so a generated host
+file may not depend on anything declared in the image-level config.
+
+### Added — forwarded-header control for `local_nginx` hosts
+
+New per-host advanced option `forwarded_headers`:
+
+| Value | Behaviour |
+|---|---|
+| `standard` (default) | Appends CloudGate's hop, preserving the client IP. Unchanged behaviour. |
+| `client_ip_only` | Sends exactly one `X-Forwarded-For` entry, for origins that choke on multi-hop chains. |
+| `strip` | Sends no `X-Forwarded-*` at all — makes Home Assistant work with no HA-side configuration. |
+
+`strip` is a documented trade-off, not a recommendation: the origin then
+sees every visitor as CloudGate, so its per-client brute-force banning
+can no longer tell clients apart and one attacker can get everyone
+banned. `trusted_proxies` remains the recommended fix.
+
+The setting has **no effect** in `cloudflare_tunnel` mode, and the UI
+says so — Cloudflare attaches the header at its edge, upstream of
+anything CloudGate controls.
+
+### Changed — nginx hosts no longer cap request bodies at 1 MB
+
+`client_max_body_size 0` defers the limit to the origin, which is the
+side that knows. nginx's 1 MB default silently broke uploads, backup
+restores and media sync. `large_client_header_buffers 4 32k` was raised
+for the same reason: Cloudflare's cookies overflow the 8 KB default and
+nginx rejected those requests with a 400 of its own before the origin
+ever saw them.
+
+No migration is required for this release — `forwarded_headers` lives in
+the existing `proxy_hosts.advanced_options` JSON column added in 0.2.1.
+
+---
+
 ## [0.2.5] — 2026-07-06
 
 ### Fixed — hosts orphaned again on every Cloudflare zone re-sync

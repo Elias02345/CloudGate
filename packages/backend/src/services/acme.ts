@@ -135,7 +135,9 @@ export async function acquireCert(
 
 	const accountKey = await loadOrCreateAccountKey();
 	const client = new acme.Client({
-		directoryUrl: options.staging ? acme.directory.letsencrypt.staging : acme.directory.letsencrypt.production,
+		directoryUrl: options.staging
+			? acme.directory.letsencrypt.staging
+			: acme.directory.letsencrypt.production,
 		accountKey,
 	});
 
@@ -173,7 +175,8 @@ export async function acquireCert(
 	await writeFile(keyPath, certKey, { encoding: 'utf8', mode: 0o600 });
 
 	// Parse expiry from cert PEM
-	const expiresAt = parseCertExpiry(cert.toString()) ?? new Date(Date.now() + 90 * 86400 * 1000).toISOString();
+	const expiresAt =
+		parseCertExpiry(cert.toString()) ?? new Date(Date.now() + 90 * 86400 * 1000).toISOString();
 
 	log.info({ hostname, certPath, expiresAt }, 'Cert acquired');
 	return { cert_path: certPath, key_path: keyPath, expires_at: expiresAt };
@@ -222,10 +225,12 @@ async function checkAllCerts(): Promise<void> {
 			meta.cert_path = result.cert_path;
 			meta.cert_key_path = result.key_path;
 			meta.cert_expires_at = result.expires_at;
-			await knex('proxy_hosts').where({ id: host.id }).update({
-				meta: JSON.stringify(meta),
-				updated_at: new Date().toISOString(),
-			});
+			await knex('proxy_hosts')
+				.where({ id: host.id })
+				.update({
+					meta: JSON.stringify(meta),
+					updated_at: new Date().toISOString(),
+				});
 		} catch (err) {
 			log.warn({ hostname: host.hostname, err: (err as Error).message }, 'Renewal failed');
 		}

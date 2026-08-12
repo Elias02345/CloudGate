@@ -2,7 +2,7 @@
  * CloudGate Mantine theme — brand colors + small UX defaults.
  */
 
-import { createTheme, type MantineColorsTuple } from '@mantine/core';
+import { type MantineColorsTuple, createTheme } from '@mantine/core';
 
 // CloudGate orange — accents on logo, primary buttons, badges
 const cgOrange: MantineColorsTuple = [
@@ -24,8 +24,7 @@ export const theme = createTheme({
 	colors: {
 		'cg-orange': cgOrange,
 	},
-	fontFamily:
-		'-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif',
+	fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif',
 	defaultRadius: 'md',
 	components: {
 		Card: {

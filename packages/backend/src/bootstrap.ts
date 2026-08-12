@@ -17,7 +17,7 @@ import { dirname } from 'node:path';
 import type { BootstrapStatus, BootstrapStep, BootstrapStepName } from '@cloudgate/shared';
 import { BOOTSTRAP_STEPS } from '@cloudgate/shared';
 import argon2 from 'argon2';
-import { dataPath, getConfig, VERSION } from './config.js';
+import { VERSION, dataPath, getConfig } from './config.js';
 import { childLogger } from './logger.js';
 
 const log = childLogger('bootstrap');
@@ -202,7 +202,7 @@ async function ensurePlayitBinaryStep(): Promise<void> {
 		// with a clear error when actually started.
 		log.warn(
 			{ err: (err as Error).message },
-			'Playit binary not available — playit-backed tunnels will fail until resolved',
+			'Playit binary not available — playit-backed tunnels will fail until resolved'
 		);
 	}
 }
@@ -347,4 +347,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 			process.exit(1);
 		});
 }
-

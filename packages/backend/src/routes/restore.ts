@@ -20,7 +20,7 @@ import { Router, type Router as RouterType } from 'express';
 import { dataPath } from '../config.js';
 import { childLogger } from '../logger.js';
 import { requireAdmin, requireAuth, requirePasswordSet } from '../middleware/auth.js';
-import { dataDirHasInstall, RestoreError, restoreAndMark } from '../services/restore.js';
+import { RestoreError, dataDirHasInstall, restoreAndMark } from '../services/restore.js';
 
 const log = childLogger('routes:restore');
 export const restoreRouter: RouterType = Router();
@@ -61,10 +61,16 @@ restoreRouter.post('/', requireAuth, requirePasswordSet, requireAdmin, async (re
 	await handleRestore(req, res, { allowForce: true });
 });
 
-async function handleRestore(req: import('express').Request, res: import('express').Response, opts: { allowForce: boolean }): Promise<void> {
+async function handleRestore(
+	req: import('express').Request,
+	res: import('express').Response,
+	opts: { allowForce: boolean }
+): Promise<void> {
 	const passphrase = (req.headers['x-cloudgate-passphrase'] as string) ?? '';
 	if (passphrase.length < 8) {
-		res.status(400).json({ error: 'Missing X-Cloudgate-Passphrase header (min 8 chars)', code: 'BAD_REQUEST' });
+		res
+			.status(400)
+			.json({ error: 'Missing X-Cloudgate-Passphrase header (min 8 chars)', code: 'BAD_REQUEST' });
 		return;
 	}
 
@@ -91,7 +97,9 @@ async function handleRestore(req: import('express').Request, res: import('expres
 	}
 
 	if (size === 0) {
-		res.status(400).json({ error: 'Empty body — POST the .cgbk file as application/octet-stream', code: 'BAD_REQUEST' });
+		res
+			.status(400)
+			.json({ error: 'Empty body — POST the .cgbk file as application/octet-stream', code: 'BAD_REQUEST' });
 		return;
 	}
 

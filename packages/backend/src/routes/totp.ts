@@ -48,7 +48,9 @@ totpRouter.post('/setup', requireAuth, requirePasswordSet, async (req, res) => {
 		return;
 	}
 	if (req.user.totp_enabled) {
-		res.status(400).json({ error: 'TOTP already enabled. Disable first to re-setup.', code: 'TOTP_ALREADY_ENABLED' });
+		res
+			.status(400)
+			.json({ error: 'TOTP already enabled. Disable first to re-setup.', code: 'TOTP_ALREADY_ENABLED' });
 		return;
 	}
 	const secret = authenticator.generateSecret();
@@ -92,13 +94,11 @@ totpRouter.post('/enable', requireAuth, requirePasswordSet, async (req, res) => 
 
 	const encrypted = encryptJson<EncryptedSecret>({ type: 'totp', secret });
 	const knex = getDb();
-	await knex('users')
-		.where({ id: req.user.id })
-		.update({
-			totp_secret: encrypted,
-			totp_enabled: 1,
-			updated_at: new Date().toISOString(),
-		});
+	await knex('users').where({ id: req.user.id }).update({
+		totp_secret: encrypted,
+		totp_enabled: 1,
+		updated_at: new Date().toISOString(),
+	});
 	record({ user_id: req.user.id, action: 'totp.enabled', ip: req.ip ?? null });
 	res.json({ ok: true });
 });
@@ -126,13 +126,11 @@ totpRouter.post('/disable', requireAuth, requirePasswordSet, async (req, res) =>
 		return;
 	}
 	const knex = getDb();
-	await knex('users')
-		.where({ id: req.user.id })
-		.update({
-			totp_secret: null,
-			totp_enabled: 0,
-			updated_at: new Date().toISOString(),
-		});
+	await knex('users').where({ id: req.user.id }).update({
+		totp_secret: null,
+		totp_enabled: 0,
+		updated_at: new Date().toISOString(),
+	});
 	record({ user_id: req.user.id, action: 'totp.disabled', ip: req.ip ?? null });
 	res.json({ ok: true });
 });

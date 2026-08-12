@@ -6,8 +6,10 @@
  *   GET    /:id         — single host
  *   PUT    /:id         — edit + redeploy
  *   DELETE /:id         — undeploy + remove
- *   POST   /:id/toggle  — flip enabled flag + redeploy/undeploy
- *   GET    /:id/test    — HEAD request against the hostname to verify reachability
+ *   POST   /:id/toggle   — flip enabled flag + redeploy/undeploy
+ *   GET    /:id/test     — HEAD request against the hostname to verify reachability
+ *   GET    /:id/diagnose — probe the origin from inside the container and
+ *                          explain why it is unhappy (read-only)
  */
 
 import { CreateProxyHostRequestSchema, HostAdvancedOptionsSchema } from '@cloudgate/shared';
@@ -20,6 +22,7 @@ import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { verifyDns } from '../services/dns-verify.js';
 import { publish } from '../services/events.js';
 import { deployHost, undeployHost } from '../services/host-deploy.js';
+import { probeUpstream } from '../services/upstream-probe.js';
 
 const log = childLogger('routes:hosts');
 export const hostsRouter: RouterType = Router();
@@ -615,5 +618,60 @@ hostsRouter.get('/:id/test', requireAuth, requirePasswordSet, async (req, res) =
 		res.json({ status: probeRes.status, ok: probeRes.ok });
 	} catch (err) {
 		res.status(200).json({ reachable: false, error: (err as Error).message });
+	}
+});
+
+// ---------------------------------------------------------------------------
+// GET /:id/diagnose
+//
+// On-demand upstream diagnosis. Deliberately separate from /test (which
+// checks the *public* URL): this one runs from inside the container against
+// the origin and answers "why is the origin unhappy", including the
+// forwarded-header rejection that makes Home Assistant return 400 to every
+// request coming through Cloudflare.
+//
+// Kept as GET + read-only so a user can hit it on a broken host without
+// re-deploying and without any risk of changing state.
+// ---------------------------------------------------------------------------
+hostsRouter.get('/:id/diagnose', requireAuth, requirePasswordSet, async (req, res) => {
+	if (!req.user) {
+		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+		return;
+	}
+	const id = Number.parseInt(String(req.params.id ?? ''), 10);
+	const row = await ownsHost(req.user.id, id);
+	if (!row) {
+		res.status(404).json({ error: 'Host not found', code: 'NOT_FOUND' });
+		return;
+	}
+
+	const protocol = row.protocol ?? 'http';
+	if (protocol !== 'http' && protocol !== 'https') {
+		res.json({
+			kind: 'skipped',
+			message: `Diagnostics only apply to http/https hosts (this one is ${protocol}).`,
+		});
+		return;
+	}
+
+	let tls: { no_tls_verify?: boolean } = {};
+	try {
+		tls = typeof row.tls_options === 'string' ? JSON.parse(row.tls_options) : {};
+	} catch {
+		tls = {};
+	}
+
+	try {
+		const outcome = await probeUpstream({
+			scheme: (row.forward_scheme as 'http' | 'https') ?? 'http',
+			host: row.forward_host,
+			port: row.forward_port,
+			no_tls_verify: Boolean(tls.no_tls_verify),
+			hostname: row.hostname,
+		});
+		res.json(outcome);
+	} catch (err) {
+		log.warn({ err: (err as Error).message, id }, 'diagnose failed');
+		res.status(200).json({ kind: 'unknown', message: `Diagnostics failed: ${(err as Error).message}` });
 	}
 });

@@ -19,7 +19,9 @@ export function LoginPage() {
 	// If already logged in, hop straight to the destination.
 	useEffect(() => {
 		if (me?.user) {
-			const dest = me.user.must_change_password ? '/password' : (location.state as { from?: string })?.from ?? '/';
+			const dest = me.user.must_change_password
+				? '/password'
+				: ((location.state as { from?: string })?.from ?? '/');
 			navigate(dest, { replace: true });
 		}
 	}, [me, navigate, location.state]);
@@ -35,7 +37,9 @@ export function LoginPage() {
 	const onSubmit = form.onSubmit(async (values) => {
 		try {
 			const result = await login.mutateAsync(values);
-			const dest = result.must_change_password ? '/password' : (location.state as { from?: string })?.from ?? '/';
+			const dest = result.must_change_password
+				? '/password'
+				: ((location.state as { from?: string })?.from ?? '/');
 			navigate(dest, { replace: true });
 		} catch {
 			/* error surfaced via login.error below */

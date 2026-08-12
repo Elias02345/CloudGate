@@ -50,6 +50,6 @@ export const CreateTunnelRequestSchema = z
 		},
 		{
 			message: 'cloudflared tunnels require cloudflare_account_id; playit tunnels require playit_account_id',
-		},
+		}
 	);
 export type CreateTunnelRequest = z.infer<typeof CreateTunnelRequestSchema>;
