@@ -23,19 +23,24 @@ import {
 	IconCheck,
 	IconCirclePlus,
 	IconFileText,
+	IconLifebuoy,
 	IconRefresh,
 	IconRefreshDot,
+	IconReload,
 	IconTerminal2,
 	IconTrash,
 } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useCloudflareAccounts } from '../api/cloudflare.js';
 import { ApiError } from '../api/client.js';
+import { useCloudflareAccounts } from '../api/cloudflare.js';
+import { usePlayitAccounts } from '../api/playit.js';
 import {
 	type TunnelDto,
 	useCreateTunnel,
 	useDeleteTunnel,
+	useForceSyncTunnel,
+	useRecreateTunnel,
 	useRedeployAllHosts,
 	useRestartTunnel,
 	useTunnelConfig,
@@ -62,9 +67,50 @@ export function TunnelsPage() {
 	const { t } = useTranslation();
 	const tunnels = useTunnels();
 	const accounts = useCloudflareAccounts();
+	const playitAccounts = usePlayitAccounts();
 	const createMutation = useCreateTunnel();
 	const deleteMutation = useDeleteTunnel();
 	const restartMutation = useRestartTunnel();
+	const recreateMutation = useRecreateTunnel();
+	const forceSyncMutation = useForceSyncTunnel();
+
+	const onForceSync = async (row: TunnelDto): Promise<void> => {
+		const ok = confirm(
+			`Force-sync tunnel "${row.name}"?\n\nTears down the cloudflared process completely, re-renders the config from the current DB state, restarts fresh, then re-deploys every host so DNS records refresh. Use this when the daemon shows "running" but your hostnames return "page not found".\n\nIdempotent — safe to retry.`
+		);
+		if (!ok) return;
+		try {
+			const r = await forceSyncMutation.mutateAsync(row.id);
+			notifications.show({
+				color: r.host_errors.length > 0 ? 'orange' : 'green',
+				icon: <IconCheck size={18} />,
+				title: 'Tunnel force-synced',
+				message: `${r.hosts_redeployed}/${r.hosts_total} hosts re-deployed${r.host_errors.length ? ` — ${r.host_errors.length} failed` : ''}.`,
+				autoClose: 8000,
+			});
+		} catch (err) {
+			notifications.show({ color: 'red', message: (err as Error).message, autoClose: 10000 });
+		}
+	};
+
+	const onRecreate = async (row: TunnelDto): Promise<void> => {
+		const ok = confirm(
+			`Re-create CF tunnel "${row.name}"?\n\nThis deletes the broken tunnel from Cloudflare and creates a fresh one under the same account. Your hosts stay attached and DNS records will be updated to the new tunnel UUID on the next deploy.`
+		);
+		if (!ok) return;
+		try {
+			const r = await recreateMutation.mutateAsync(row.id);
+			notifications.show({
+				color: 'green',
+				icon: <IconCheck size={18} />,
+				title: 'Tunnel recreated',
+				message: `${r.hosts_redeployed}/${r.hosts_total} hosts re-deployed onto new UUID ${r.new_uuid.slice(0, 8)}…`,
+				autoClose: 8000,
+			});
+		} catch (err) {
+			notifications.show({ color: 'red', message: (err as Error).message, autoClose: 10000 });
+		}
+	};
 
 	const [modalOpened, modal] = useDisclosure(false);
 	const [drawerOpened, drawer] = useDisclosure(false);
@@ -72,7 +118,15 @@ export function TunnelsPage() {
 	const [logsForId, setLogsForId] = useState<number | null>(null);
 	const [configForId, setConfigForId] = useState<number | null>(null);
 	const [name, setName] = useState('');
+	const [provider, setProvider] = useState<'cloudflared' | 'playit'>('cloudflared');
 	const [accountId, setAccountId] = useState<string | null>(null);
+
+	const providerAccounts = useMemo(() => {
+		if (provider === 'playit') {
+			return (playitAccounts.data?.accounts ?? []).map((a) => ({ value: String(a.id), label: a.label }));
+		}
+		return (accounts.data?.accounts ?? []).map((a) => ({ value: String(a.id), label: a.label }));
+	}, [provider, accounts.data, playitAccounts.data]);
 
 	const logs = useTunnelLogs(logsForId);
 	const config = useTunnelConfig(configForId);
@@ -106,13 +160,14 @@ export function TunnelsPage() {
 		}
 	};
 
-	const onCreate = async () => {
+	const onCreate = async (): Promise<void> => {
 		if (!accountId) return;
 		try {
-			const r = await createMutation.mutateAsync({
-				cloudflare_account_id: Number.parseInt(accountId, 10),
-				name,
-			});
+			const payload =
+				provider === 'playit'
+					? { provider: 'playit' as const, playit_account_id: Number.parseInt(accountId, 10), name }
+					: { provider: 'cloudflared' as const, cloudflare_account_id: Number.parseInt(accountId, 10), name };
+			const r = await createMutation.mutateAsync(payload);
 			notifications.show({
 				color: 'green',
 				icon: <IconCheck size={18} />,
@@ -121,6 +176,7 @@ export function TunnelsPage() {
 			});
 			setName('');
 			setAccountId(null);
+			setProvider('cloudflared');
 			modal.close();
 		} catch {
 			/* surfaced inline */
@@ -161,6 +217,7 @@ export function TunnelsPage() {
 							<Table.Thead>
 								<Table.Tr>
 									<Table.Th>{t('tunnels.col_name')}</Table.Th>
+									<Table.Th>Provider</Table.Th>
 									<Table.Th>{t('tunnels.col_status')}</Table.Th>
 									<Table.Th>{t('tunnels.col_tunnel_id')}</Table.Th>
 									<Table.Th>{t('tunnels.col_last_change')}</Table.Th>
@@ -172,12 +229,22 @@ export function TunnelsPage() {
 									<Table.Tr key={row.id}>
 										<Table.Td>
 											<Text fw={500}>{row.name}</Text>
+											{row.last_error && (
+												<Text size="xs" c="red" mt={2} style={{ maxWidth: 360 }}>
+													{row.last_error}
+												</Text>
+											)}
+										</Table.Td>
+										<Table.Td>
+											<Badge variant="light" color={row.provider === 'playit' ? 'orange' : 'blue'}>
+												{row.provider}
+											</Badge>
 										</Table.Td>
 										<Table.Td>
 											<Badge color={statusColor(row.live_status)}>{row.live_status}</Badge>
 										</Table.Td>
 										<Table.Td>
-											<Code>{row.tunnel_id.slice(0, 8)}…</Code>
+											<Code>{row.tunnel_id.slice(0, 12)}…</Code>
 										</Table.Td>
 										<Table.Td>
 											<Text size="xs" c="dimmed">
@@ -186,6 +253,28 @@ export function TunnelsPage() {
 										</Table.Td>
 										<Table.Td>
 											<Group gap="xs" justify="flex-end">
+												{row.recovery_needed && row.provider === 'cloudflared' && (
+													<ActionIcon
+														variant="filled"
+														color="orange"
+														onClick={() => void onRecreate(row)}
+														loading={recreateMutation.isPending}
+														title="Re-create broken tunnel under same CF account"
+													>
+														<IconLifebuoy size={16} />
+													</ActionIcon>
+												)}
+												{row.provider === 'cloudflared' && !row.recovery_needed && (
+													<ActionIcon
+														variant="subtle"
+														color="orange"
+														onClick={() => void onForceSync(row)}
+														loading={forceSyncMutation.isPending}
+														title="Force-sync: tear down + restart + re-deploy hosts (recovery for 'running but 404')"
+													>
+														<IconReload size={16} />
+													</ActionIcon>
+												)}
 												<ActionIcon
 													variant="subtle"
 													color="grape"
@@ -238,25 +327,40 @@ export function TunnelsPage() {
 
 			<Modal opened={modalOpened} onClose={modal.close} title={t('tunnels.create')} size="md">
 				<Stack>
-					{accounts.data?.accounts.length === 0 && (
-						<Alert color="orange">{t('tunnels.no_account_warning')}</Alert>
-					)}
 					{createError && (
 						<Alert color="red" icon={<IconAlertCircle size={18} />}>
 							{createError}
 						</Alert>
 					)}
 					<Select
-						label={t('tunnels.account_field')}
+						label="Provider"
+						description="cloudflared = HTTP/HTTPS apps. playit = Minecraft / raw TCP+UDP."
+						value={provider}
+						onChange={(v) => {
+							if (v === 'cloudflared' || v === 'playit') {
+								setProvider(v);
+								setAccountId(null);
+							}
+						}}
+						data={[
+							{ value: 'cloudflared', label: 'cloudflared (Cloudflare Tunnel)' },
+							{ value: 'playit', label: 'playit.gg (TCP/UDP)' },
+						]}
+					/>
+					{provider === 'cloudflared' && accounts.data?.accounts.length === 0 && (
+						<Alert color="orange">{t('tunnels.no_account_warning')}</Alert>
+					)}
+					{provider === 'playit' && playitAccounts.data?.accounts.length === 0 && (
+						<Alert color="orange">
+							No Playit accounts linked. Add one under Playit in the sidebar first.
+						</Alert>
+					)}
+					<Select
+						label={provider === 'playit' ? 'Playit account' : t('tunnels.account_field')}
 						placeholder={t('tunnels.pick_account')}
 						value={accountId}
 						onChange={setAccountId}
-						data={
-							accounts.data?.accounts.map((a) => ({
-								value: String(a.id),
-								label: a.label,
-							})) ?? []
-						}
+						data={providerAccounts}
 						required
 					/>
 					<TextInput
@@ -324,10 +428,14 @@ export function TunnelsPage() {
 										</Text>
 									) : (
 										config.data.hosts.map((h) => {
-											const inYaml = config.data?.yaml.includes(`hostname: ${h.hostname}`) ?? false;
+											const yaml = config.data?.yaml ?? '';
+											const inConfig =
+												config.data?.tunnel.provider === 'cloudflared'
+													? yaml.includes(`hostname: ${h.hostname}`)
+													: true;
 											return (
 												<Group key={h.id} gap="xs">
-													{inYaml ? (
+													{inConfig ? (
 														<Badge color="green" size="xs">
 															IN CONFIG
 														</Badge>
@@ -350,14 +458,26 @@ export function TunnelsPage() {
 									)}
 								</Stack>
 							</Box>
-							<Box>
-								<Text size="sm" fw={600}>
-									{t('tunnels.config_rendered_yaml')}
-								</Text>
-								<Code block style={{ maxHeight: '50vh', overflow: 'auto' }} mt={4}>
-									{config.data.yaml}
-								</Code>
-							</Box>
+							{config.data.tunnel.provider === 'cloudflared' && config.data.yaml && (
+								<Box>
+									<Text size="sm" fw={600}>
+										{t('tunnels.config_rendered_yaml')}
+									</Text>
+									<Code block style={{ maxHeight: '50vh', overflow: 'auto' }} mt={4}>
+										{config.data.yaml}
+									</Code>
+								</Box>
+							)}
+							{config.data.tunnel.provider === 'playit' && config.data.provider_meta !== undefined && (
+								<Box>
+									<Text size="sm" fw={600}>
+										Playit provider metadata
+									</Text>
+									<Code block style={{ maxHeight: '50vh', overflow: 'auto' }} mt={4}>
+										{JSON.stringify(config.data.provider_meta, null, 2)}
+									</Code>
+								</Box>
+							)}
 							<Text size="xs" c="dimmed">
 								{t('tunnels.config_hint')}
 							</Text>

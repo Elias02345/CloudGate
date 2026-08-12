@@ -55,6 +55,7 @@ describe('tunnel-config-writer', () => {
 					forward_host: '192.168.1.10',
 					forward_port: 8080,
 					no_tls_verify: false,
+					has_origin_request: false,
 				},
 				{
 					hostname: 'b.example.com',
@@ -63,6 +64,10 @@ describe('tunnel-config-writer', () => {
 					forward_host: '10.0.0.5',
 					forward_port: 8443,
 					no_tls_verify: true,
+					// Migration 006 unified all originRequest emission under this flag
+					// — has_origin_request gates the YAML block; individual fields decide
+					// which keys land inside it.
+					has_origin_request: true,
 				},
 			],
 		});
@@ -71,6 +76,54 @@ describe('tunnel-config-writer', () => {
 		expect(yaml).toContain('hostname: b.example.com');
 		expect(yaml).toContain('https://10.0.0.5:8443');
 		expect(yaml).toContain('noTLSVerify: true');
+	});
+
+	it('emits per-host originRequest options when set', async () => {
+		const { renderConfig } = await import('../src/services/tunnel-config-writer.js');
+		const yaml = await renderConfig({
+			tunnel_id: 'tid2',
+			credentials_path: '/p/cred.json',
+			metrics_addr: '127.0.0.1:36500',
+			hosts: [
+				{
+					hostname: 'ha.example.com',
+					path_prefix: '/',
+					forward_scheme: 'http',
+					forward_host: '192.168.1.50',
+					forward_port: 8123,
+					no_tls_verify: false,
+					has_origin_request: true,
+					http_host_header: 'homeassistant.local:8123',
+					http2_origin: true,
+					connect_timeout: '60s',
+				},
+			],
+		});
+		expect(yaml).toContain('httpHostHeader: "homeassistant.local:8123"');
+		expect(yaml).toContain('http2Origin: true');
+		expect(yaml).toContain('connectTimeout: 60s');
+		expect(yaml).not.toContain('noTLSVerify: true');
+	});
+
+	it('skips originRequest entirely when no flags set', async () => {
+		const { renderConfig } = await import('../src/services/tunnel-config-writer.js');
+		const yaml = await renderConfig({
+			tunnel_id: 'tid3',
+			credentials_path: '/p/cred.json',
+			metrics_addr: '127.0.0.1:36500',
+			hosts: [
+				{
+					hostname: 'plain.example.com',
+					path_prefix: '/',
+					forward_scheme: 'http',
+					forward_host: '10.0.0.10',
+					forward_port: 80,
+					no_tls_verify: false,
+					has_origin_request: false,
+				},
+			],
+		});
+		expect(yaml).not.toContain('originRequest:');
 	});
 
 	it('writeConfig produces an atomic file (no stray .tmp)', async () => {

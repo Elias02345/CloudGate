@@ -27,8 +27,7 @@ export function PasswordChangePage() {
 			current_password: (v) => (v.length >= 1 ? null : t('password.current_required')),
 			new_password: (v) => (v.length >= 12 ? null : t('password.too_short')),
 			confirm: (v, values) => (v === values.new_password ? null : t('password.mismatch')),
-			email: (v) =>
-				firstLogin && v ? (/^\S+@\S+\.\S+$/.test(v) ? null : t('login.invalid_email')) : null,
+			email: (v) => (firstLogin && v ? (/^\S+@\S+\.\S+$/.test(v) ? null : t('login.invalid_email')) : null),
 			name: (v) => (firstLogin ? (v.trim().length >= 1 ? null : t('password.name_required')) : null),
 		},
 	});

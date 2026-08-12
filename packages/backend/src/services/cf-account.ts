@@ -107,6 +107,49 @@ export async function touchValidated(id: number): Promise<void> {
 }
 
 /**
+ * Persist a freshly-fetched zone list for an account.
+ *
+ * CRITICAL: this UPSERTs on the (cloudflare_account_id, zone_id) unique key
+ * so existing zone rows keep their primary-key `id`. proxy_hosts.cf_zone_id
+ * references cf_zones.id with ON DELETE SET NULL — the previous delete-all +
+ * re-insert reassigned every zone a fresh id and thereby NULLed the
+ * cf_zone_id of every attached host on *every* sync. That is the root cause
+ * of the recurring "orphaned hosts" (a host stuck without a zone can't
+ * publish its DNS record). Zones Cloudflare no longer returns are pruned;
+ * SET NULL on their hosts is correct there because the zone is genuinely gone.
+ */
+export async function syncZonesForAccount(
+	accountId: number,
+	zones: Array<{ id: string; name: string; status: string }>
+): Promise<number> {
+	const knex = getDb();
+	const now = new Date().toISOString();
+	await knex.transaction(async (trx) => {
+		if (zones.length > 0) {
+			await trx('cf_zones')
+				.insert(
+					zones.map((z) => ({
+						cloudflare_account_id: accountId,
+						zone_id: z.id,
+						name: z.name,
+						status: z.status,
+						last_synced_at: now,
+					}))
+				)
+				.onConflict(['cloudflare_account_id', 'zone_id'])
+				.merge(['name', 'status', 'last_synced_at']);
+		}
+		// Prune only zones CF no longer returns — never touch the live ones,
+		// otherwise attached hosts would be orphaned again.
+		const liveZoneIds = zones.map((z) => z.id);
+		const prune = trx('cf_zones').where({ cloudflare_account_id: accountId });
+		if (liveZoneIds.length > 0) prune.whereNotIn('zone_id', liveZoneIds);
+		await prune.delete();
+	});
+	return zones.length;
+}
+
+/**
  * Materialise the stored credentials for use by the API client.
  * Throws if encryption key has changed (decryption fails).
  */

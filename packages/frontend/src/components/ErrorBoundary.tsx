@@ -36,8 +36,8 @@ export class ErrorBoundary extends Component<Props, State> {
 							CloudGate UI crashed
 						</Title>
 						<Alert color="red" title="Don't panic">
-							Your CloudGate data is not affected — this is only a frontend rendering error.
-							Reload the page to recover.
+							Your CloudGate data is not affected — this is only a frontend rendering error. Reload the page
+							to recover.
 						</Alert>
 						<Code block>{String(this.state.error?.stack ?? this.state.error?.message ?? 'unknown')}</Code>
 						<Button leftSection={<IconRefresh size={16} />} onClick={() => window.location.reload()}>

@@ -4,8 +4,8 @@
  *   GET /api/audit?page=1&per_page=50&action=...&entity_type=...
  */
 
-import { Router, type Router as RouterType } from 'express';
 import { PaginationSchema } from '@cloudgate/shared';
+import { Router, type Router as RouterType } from 'express';
 import { getDb } from '../db/db.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 

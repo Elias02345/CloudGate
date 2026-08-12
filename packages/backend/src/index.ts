@@ -24,6 +24,7 @@ import { childLogger, logger } from './logger.js';
 import { looksLikeApiKey, tryApiKey } from './middleware/api-key.js';
 import { apiKeyLimiter, globalLimiter } from './middleware/rate-limit.js';
 import { acmeRouter } from './routes/acme.js';
+import { adminRouter } from './routes/admin.js';
 import { aiRouter } from './routes/ai.js';
 import { apiKeysRouter } from './routes/api-keys.js';
 import { auditRouter } from './routes/audit.js';
@@ -35,6 +36,7 @@ import { healthRouter } from './routes/health.js';
 import { hostsBulkRouter } from './routes/hosts-bulk.js';
 import { hostsRouter } from './routes/hosts.js';
 import { openapiRouter } from './routes/openapi.js';
+import { playitRouter } from './routes/playit.js';
 import { restoreRouter } from './routes/restore.js';
 import { totpRouter } from './routes/totp.js';
 import { tunnelsRouter } from './routes/tunnels.js';
@@ -117,7 +119,7 @@ async function main(): Promise<void> {
 	// will be hit by curl / AI agents.
 	app.use((req, res, next) => {
 		const auth = req.header('authorization');
-		if (auth && auth.toLowerCase().startsWith('bearer cgk_')) {
+		if (auth?.toLowerCase().startsWith('bearer cgk_')) {
 			res.header('Access-Control-Allow-Origin', '*');
 			res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 		}
@@ -160,6 +162,7 @@ async function main(): Promise<void> {
 	app.use('/api/health', healthRouter);
 	app.use('/api/auth', authRouter);
 	app.use('/api/cloudflare', cloudflareRouter);
+	app.use('/api/playit', playitRouter);
 	app.use('/api/tunnels', tunnelsRouter);
 	app.use('/api/hosts', hostsBulkRouter);
 	app.use('/api/hosts', hostsRouter);
@@ -169,6 +172,7 @@ async function main(): Promise<void> {
 	app.use('/api/totp', totpRouter);
 	app.use('/api/updates', updatesRouter);
 	app.use('/api/acme', acmeRouter);
+	app.use('/api/admin', adminRouter);
 	app.use('/api/api-keys', apiKeysRouter);
 	app.use('/api/openapi.json', openapiRouter);
 	app.use('/api/ai', aiRouter);

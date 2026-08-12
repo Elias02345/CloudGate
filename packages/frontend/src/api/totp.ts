@@ -22,7 +22,8 @@ export function useTotpEnable() {
 export function useTotpDisable() {
 	const qc = useQueryClient();
 	return useMutation({
-		mutationFn: (password: string) => api<{ ok: true }>('/totp/disable', { method: 'POST', body: { password } }),
+		mutationFn: (password: string) =>
+			api<{ ok: true }>('/totp/disable', { method: 'POST', body: { password } }),
 		onSuccess: () => qc.invalidateQueries({ queryKey: ['auth', 'me'] }),
 	});
 }

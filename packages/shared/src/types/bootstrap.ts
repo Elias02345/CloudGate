@@ -28,6 +28,7 @@ export const BOOTSTRAP_STEPS = [
 	'disk-health',
 	'ensure-data-dirs',
 	'ensure-secrets',
+	'ensure-playit-binary',
 	'init-db',
 	'run-migrations',
 	'seed-admin-if-missing',

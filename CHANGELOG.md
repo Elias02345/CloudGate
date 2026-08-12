@@ -9,6 +9,450 @@ _Nothing yet._
 
 ---
 
+## [0.2.6] — 2026-08-12
+
+### Fixed — Home Assistant answered "400: Bad Request" through every tunnel
+
+Home Assistant behind a CloudGate tunnel returned a bare **400 Bad
+Request** to every browser and to the companion app, while the LAN
+address kept working and push notifications kept arriving. Other
+services on the same tunnel were unaffected, which made it look like a
+CloudGate routing bug. It is not.
+
+HA's `forwarded_middleware`
+(`homeassistant/components/http/forwarded.py`) raises `HTTPBadRequest`
+whenever a request carries `X-Forwarded-For` and either
+`use_x_forwarded_for` is off (HA's **default**) or the connecting peer
+is absent from `trusted_proxies`. Cloudflare's edge adds
+`X-Forwarded-For` to *every* proxied request, and cloudflared has no
+option to strip or rewrite it — so an unconfigured HA rejects 100% of
+tunnel traffic. LAN requests carry no such header, and push
+notifications leave HA outbound via HA Cloud, which is why both kept
+working and hid the cause.
+
+The fix has to be applied in Home Assistant. CloudGate now finds it for
+you instead of leaving a bare 400:
+
+- **New forwarded-header probe.** After a deploy — and on demand via the
+  new read-only `GET /api/hosts/:id/diagnose` — CloudGate requests the
+  origin twice, once plain and once with `X-Forwarded-For`. A clean
+  "works, then 400s" transition is reported as the cause rather than as
+  a generic "upstream returned 400".
+- **The diagnosis carries the remedy.** CloudGate detects Home Assistant
+  and emits a ready-to-paste `configuration.yaml` block containing the
+  address it actually reaches the origin from. It recommends the `/24`
+  rather than the pinned container IP, because Docker hands the
+  container a new address on every re-create — the most common way this
+  fix silently breaks again a week later.
+- **Corrected misleading advice.** 0.2.1 suggested `http_host_header`
+  and `trusted_proxies: [127.0.0.1]` for this symptom. Neither works:
+  the check never looks at the `Host` header, and CloudGate connects
+  from a Docker bridge address, not localhost. The hint and the field
+  help text have been rewritten.
+- New `docs/HOME-ASSISTANT.md` covers the root cause, the fix, the usual
+  mistakes, and why the companion app can still fail afterwards when
+  Cloudflare Access is enabled on the hostname.
+
+### Fixed — local_nginx hosts could never deploy
+
+The nginx host template was rendered by a Liquid engine configured with
+`trimOutputLeft: true`, which strips the whitespace to the left of every
+`{{ … }}`. `server {{ forward_host }}:{{ forward_port }};` therefore
+rendered as `server192.168.1.50:8123;`, and `server_name {{ hostname }};`
+as `server_nameha.example.com;`. Both are unknown directives, so
+`nginx -t` rejected the file and `writeHostConfig()` rolled back — every
+`local_nginx` deploy failed. The TLS branch had a matching defect that
+ran `listen 443 ssl http2;` onto the end of the `server_name` line.
+
+Whitespace control is now explicit (`{%-` / `-%}`), and the new
+`tests/nginx-host-template.test.ts` renders each variant and runs it
+through a real `nginx -t` so a string-level regression cannot slip
+through again.
+
+### Fixed — `Connection: upgrade` was sent on every request
+
+The nginx template hard-coded `proxy_set_header Connection "upgrade";`,
+announcing a protocol upgrade even for ordinary requests that never
+asked for one. This defeats keep-alive and upsets strict origins. Each
+host config now declares its own `map $http_upgrade $cg_conn_upgrade_<id>`
+so `Connection` is `upgrade` only for real WebSocket handshakes and
+`close` otherwise.
+
+The map is deliberately per-host and id-suffixed: the self-updater
+replaces `/app` but never `/etc/nginx-cloudgate/`, so a generated host
+file may not depend on anything declared in the image-level config.
+
+### Added — forwarded-header control for `local_nginx` hosts
+
+New per-host advanced option `forwarded_headers`:
+
+| Value | Behaviour |
+|---|---|
+| `standard` (default) | Appends CloudGate's hop, preserving the client IP. Unchanged behaviour. |
+| `client_ip_only` | Sends exactly one `X-Forwarded-For` entry, for origins that choke on multi-hop chains. |
+| `strip` | Sends no `X-Forwarded-*` at all — makes Home Assistant work with no HA-side configuration. |
+
+`strip` is a documented trade-off, not a recommendation: the origin then
+sees every visitor as CloudGate, so its per-client brute-force banning
+can no longer tell clients apart and one attacker can get everyone
+banned. `trusted_proxies` remains the recommended fix.
+
+The setting has **no effect** in `cloudflare_tunnel` mode, and the UI
+says so — Cloudflare attaches the header at its edge, upstream of
+anything CloudGate controls.
+
+### Changed — nginx hosts no longer cap request bodies at 1 MB
+
+`client_max_body_size 0` defers the limit to the origin, which is the
+side that knows. nginx's 1 MB default silently broke uploads, backup
+restores and media sync. `large_client_header_buffers 4 32k` was raised
+for the same reason: Cloudflare's cookies overflow the 8 KB default and
+nginx rejected those requests with a 400 of its own before the origin
+ever saw them.
+
+No migration is required for this release — `forwarded_headers` lives in
+the existing `proxy_hosts.advanced_options` JSON column added in 0.2.1.
+
+---
+
+## [0.2.5] — 2026-07-06
+
+### Fixed — hosts orphaned again on every Cloudflare zone re-sync
+
+0.2.4 recovered hosts orphaned by migration 004's one-time table
+rebuild, but a second, recurring source of the same symptom
+survived: **zone sync**. `doZoneSync` refreshed the cached zone list
+by `DELETE`-ing every `cf_zones` row for the account and re-`INSERT`ing
+them — which handed each zone a brand-new auto-increment `id`. Because
+`proxy_hosts.cf_zone_id` references `cf_zones.id` with
+`ON DELETE SET NULL`, every host attached to a zone had its
+`cf_zone_id` NULLed on **every** sync (the "Sync" button, and the
+automatic sync when adding an account). The host then failed to
+publish its DNS record ("host has no cf_zone_id …") and the browser
+saw a 404.
+
+- Zone persistence now **upserts** on the `(cloudflare_account_id,
+  zone_id)` unique key, so existing zone rows keep their primary-key
+  `id` and attached hosts stay bound. Zones Cloudflare no longer
+  returns are pruned (SET NULL on their hosts is correct there — the
+  zone is genuinely gone).
+- New regression test `tests/zone-sync.test.ts` asserts a re-sync
+  preserves `cf_zone_id` and that stale zones are pruned.
+
+### Fixed — dashboard falsely reported cloudflared "down"
+
+The deep health check (`GET /api/health/deep`) probed a hardcoded
+`127.0.0.1:36500`, but since 0.2.2 each tunnel binds its own metrics
+port (`36500 + tunnel id`) to avoid multi-tunnel collisions. The
+check therefore always missed the real port and reported cloudflared
+unreachable even on healthy systems. It now enumerates the
+cloudflared tunnels and probes each tunnel's actual metrics port.
+
+### Fixed — migrations + tests broken on Windows dev machines
+
+- `db.ts` derived the migrations directory via `new URL(...).pathname`,
+  which yields `/C:/…` on Windows and made Knex miss the migrations
+  folder. Now uses `fileURLToPath()` (the same idiom already used in
+  `knexfile.ts` / `run-migrations.ts`).
+- Vitest now loads migration `.ts` files through the `tsx` loader and
+  allows a longer bootstrap hook/test timeout, so the required
+  bootstrap/persistence/updater suites run on Windows too (they were
+  already green on the Linux CI).
+
+---
+
+## [0.2.4] — 2026-05-25
+
+### Fixed — root cause of "tunnel assignment got reset"
+
+Migration 004's `.alter()` calls on the `tunnels` table forced a
+SQLite table rebuild (no native `ALTER COLUMN`). Knex sets
+`PRAGMA foreign_keys=OFF` around the rebuild, but in some
+better-sqlite3 connection-pool configurations the pragma doesn't
+stick to the connection doing the work. When that happens the
+`DROP TABLE tunnels` step fires the `proxy_hosts.tunnel_id ON DELETE
+SET NULL` cascade, orphaning every host. The browser then sees
+cloudflared's `http_status:404` because `buildContext` filters out
+hosts with `tunnel_id IS NULL`.
+
+**Migration 008** detects + recovers:
+- If exactly one cloudflared tunnel exists, every orphan is
+  re-attached to it automatically.
+- Otherwise each orphan gets a clear `last_error` pointing at the
+  new Reassign UI.
+
+### Added — tunnel + zone are now editable
+
+Previously the edit modal locked tunnel/zone as immutable. After
+0.2.0+ that turned into "I have no way to fix an orphaned host
+without deleting and re-creating it from scratch". `EditHostModal`
+gains a **Reassign tunnel/zone** panel (auto-opens for orphans),
+with cross-validation: protocol must match the new tunnel's
+provider, hostname must end with the new zone's name. The backend
+tears the host down from the old tunnel/zone before mutating —
+no orphan DNS records.
+
+### Fixed — false-positive DNS warning on hosts that work
+
+Post-deploy the backend was polling 1.1.1.1 DoH for the new CNAME
+and storing the timeout as `last_error` when the resolver didn't
+see the record within 12s. But 1.1.1.1 caches negative responses
+for a few minutes, so a brand-new record often "doesn't exist" via
+DoH while the browser (which hits Cloudflare's edge directly) sees
+it fine. Working hosts displayed a red error badge for hours.
+
+- `no_record` and `timeout` outcomes now go into a non-blocking
+  `meta.last_warning` slot instead of `last_error`. The host stays
+  "deployed" in the UI.
+- Only `nxdomain` and `wrong_target` (genuine misconfigurations)
+  still surface as `last_error`.
+- Wording softened from "⚠" to "ℹ" with explicit "if the page loads
+  you can ignore this".
+
+### Tests
+
+Existing tests cover the contract; the orphan-recovery migration's
+behaviour is asserted in CI via the migration apply step on a
+seeded broken state.
+
+---
+
+## [0.2.3] — 2026-05-25
+
+### Fixed — "live and running but page not found"
+
+After the 0.2.2 metrics-port fix, the cloudflared daemon stayed up and
+`/ready` returned 200 — so the UI happily reported `running` — but every
+hostname still served Cloudflare's "page not found" page. Two
+independent causes, both fixed here:
+
+**1. Stale `tunnelUuid` after Recreate.**
+`CloudflaredProvider.stop()` killed the daemon but **left the
+`CloudflaredProcess` instance in its in-memory cache**. The next
+`start()` reused the cached instance — including the `tunnelUuid`
+baked into its constructor at boot time. After a Recreate (the DB
+row's `tunnel_id` changes to the new UUID), cloudflared therefore
+spawned with the OLD UUID positional arg even though `config.yml`
+pointed at the NEW one. Result: the daemon connected to Cloudflare as
+the wrong tunnel (or failed auth and respawned silently), the DNS
+CNAME pointed to the NEW UUID's `cfargotunnel.com` target, and CF had
+no daemon answering for the right UUID.
+
+Fix: `stop()` now deletes the entry from the cache. The next `start()`
+constructs a fresh `CloudflaredProcess` with the current DB state.
+
+**2. Hosts silently dropped from `config.yml` ingress when `protocol IS NULL`.**
+`buildContext` used `whereIn('protocol', ['http','https'])` which
+doesn't match `NULL`. If migration 004's backfill didn't take on some
+rows (we've seen this on installs that paused mid-upgrade), those
+hosts disappeared from the rendered config. cloudflared then served
+its `http_status:404` catch-all for them — the "page not found" UI
+behaviour. Now `buildContext` treats `NULL` as `http` and migration
+007 backfills any straggling rows.
+
+### Added — recovery + diagnosis
+
+- **`POST /api/tunnels/:id/force-sync`** + 🔄 sidebar button (orange,
+  next to logs). One-click recovery: drops the cached process,
+  re-renders config from current DB, restarts fresh, re-deploys every
+  host so DNS records re-converge. Idempotent.
+- **`/api/admin/diagnostics`** now includes:
+  - the full rendered `cloudflared/config.yml` so the user can verify
+    what cloudflared actually sees,
+  - per-tunnel attached-host audit listing which rows would land in
+    ingress and which would be silently excluded (and why).
+- **Stale cred file cleanup**: `CloudflaredProvider.ensureCredentialsFile`
+  now sweeps `/data/cloudflared/*.json` for UUIDs no DB row owns — kills
+  the ambiguous-credentials-on-disk failure mode after Recreate.
+- **`upsertCnameRecord` / `upsertSrvRecord` fall back to `create()`
+  on 404** when the persisted `dns_record_id` no longer exists at
+  Cloudflare (manual dashboard deletion, side effect of tunnel delete,
+  etc.). Previously every deploy threw and the host never recovered.
+
+### Migration 007
+
+Backfills `proxy_hosts.protocol = 'http'` for any row left with
+`NULL` by migration 004. Purely additive, idempotent, no-op `down()`.
+
+### Tests
+
+- `cloudflared-stop-clears-cache.test.ts` — direct regression for the
+  cache-invalidation contract that the stale-UUID fix relies on.
+
+---
+
+## [0.2.2] — 2026-05-25
+
+### Fixed — cloudflared "address already in use" respawn loop
+
+The 0.2.1 install kept logging:
+
+```
+Error opening metrics server listener: failed to bind to address (127.0.0.1:36500): listen tcp 127.0.0.1:36500: bind: address already in use
+```
+
+…every 1 / 2 / 4 / 8 / 16 / 32 / 60 seconds, forever. Root cause was a
+race in `ManagedProcess`: when a manual `start()` came in while the exit
+handler had already queued a backoff respawn (`setTimeout`), the queued
+spawn fired ~ms after our manual spawn and overwrote `this.child` with
+a second instance. The first child kept the metrics-port listener, the
+second couldn't bind, exited, queued another backoff, repeat.
+
+- **Supervisor tracks the pending backoff timer** and cancels it on
+  `start()` / `stop()`. No more racing respawns against a queued one.
+- **`spawnOnce()` kills any live `this.child` before spawning**
+  (belt-and-braces — the cancellation above should mean we never enter
+  with a live child, but the kill catches anything we missed).
+- **`exit` handler only nulls `this.child`** when it still points at
+  the exited process (avoids clobbering a freshly-spawned successor).
+
+### Fixed — multi-tunnel installs collided on the metrics port
+
+The cloudflared metrics listener was hardcoded to `127.0.0.1:36500`, so
+once you had two CF tunnels the second one always failed to bind. Each
+`CloudflaredProcess` now gets `127.0.0.1:36500 + tunnelDbId` derived
+from its DB row. Single-tunnel installs that have just `id=1` now bind
+36501 — picked deliberately so cached "what was that port again" muscle
+memory doesn't conflict if you happened to know about 36500.
+
+### Added — orphan-cloudflared sweep on Linux
+
+Before spawning, `CloudflaredProcess.start()` walks `/proc/*/cmdline`
+and `SIGKILL`s any other `cloudflared` process whose command line
+mentions our tunnel UUID. Belt-and-braces safety net for cases where
+the supervisor genuinely lost track of a child (across an upgrade, a
+crash + restart, or someone exec'd cloudflared manually in the
+container). No-op on non-Linux.
+
+### Tests
+
+- `managed-process-race.test.ts` — repro for the supervisor race:
+  start during a queued backoff must result in exactly one extra
+  spawn, not two. Stop during a queued backoff must result in zero.
+
+---
+
+## [0.2.1] — 2026-05-25
+
+### Fixed — broken tunnels after 0.2.0 upgrade
+
+Migration `004` made several `tunnels` columns nullable via knex's
+SQLite `.alter()` table-rebuild path, and some installs came out with
+cloudflared tunnel rows that ended up with `NULL` in
+`encrypted_tunnel_secret` / `account_tag` / `credentials_path`. The
+cloudflared daemon never started, every host returned an error, and
+the only available remedy was to wipe `/data` and start over. Not
+acceptable.
+
+This release contains both detection and recovery:
+
+- **`CloudflaredProvider.start` is now tolerant** — missing credentials
+  surface as `provider_meta.last_error` ("needs re-link") and the boot
+  sequence continues. One bad tunnel can no longer brick the whole
+  install.
+- **Migration `005` flags damaged tunnels** at upgrade time — it scans
+  for the breakage signature and marks affected rows `status='error'`
+  with an actionable message instead of leaving them in an unexplained
+  "stopped" state.
+- **New `POST /api/tunnels/:id/recreate`** + sidebar "🆘 Re-create"
+  button. Creates a fresh Cloudflare tunnel under the same account,
+  swaps the UUID + secret in place, and re-deploys every attached host
+  so DNS records point at the new `cfargotunnel.com` target. Hosts and
+  their configuration survive.
+- **`buildContext` silently skips hosts** with invalid `forward_host` /
+  `forward_port` so a single corrupt row can't drop the whole tunnel's
+  ingress.
+
+### Fixed — HomeAssistant "400 Bad Request" and similar proxied apps
+
+HomeAssistant rejects proxied requests it doesn't recognise via
+`trusted_proxies` + Host-header matching. CloudGate now exposes the
+relevant cloudflared `originRequest` knobs per host:
+
+- **HTTP Host header override** (`http_host_header`) — pin the Host
+  header sent to origin (`homeassistant.local:8123` or your LAN IP).
+- **Origin server name** (SNI) for HTTPS origins with mismatched certs.
+- **HTTP/2 origin**, **no Happy Eyeballs**, **disable chunked encoding**.
+- **Connect timeout** override.
+
+Surfaced via a new "Advanced (originRequest)" panel in the Edit Host
+modal. Schema lives in `proxy_hosts.advanced_options` (migration `006`).
+
+### Added — encrypted Backup &amp; Restore UI
+
+New `/backup` page (admin-only) with two cards:
+
+- **Export** — passphrase → `cloudgate-backup-YYYY-MM-DD….cgbk`. The
+  archive contains the SQLite DB, all secrets, Cloudflare tunnel
+  credentials, nginx custom snippets and Let's Encrypt certs.
+- **Import** — file upload + passphrase + explicit overwrite
+  confirmation. Calls the admin `POST /api/restore?force=true` path;
+  container restart required afterwards.
+
+The backup format itself was extended to include `nginx/custom` and
+`nginx/certs` (previously omitted) so a restored install boots with the
+user's full reverse-proxy state intact. `cloudflared/bin` and
+`playit/bin` are deliberately skipped — they're downloadable.
+
+### Added — `/api/admin/diagnostics`
+
+Admin-only endpoint that dumps SQLite `PRAGMA integrity_check`,
+migration history, row counts, null-column survey on critical tables,
+and `/data` path presence. No secrets. Intended as a "paste-into-issue"
+JSON when triaging post-upgrade problems.
+
+### Security
+
+- **Fixed an ownership-validation bug** on `POST /api/hosts` introduced
+  by 0.2.0: the `.orWhereNotNull('tunnels.provider_meta')` fallback
+  matched every tunnel (all rows have `provider_meta='{}'`), so an
+  authenticated user could attach a host to a tunnel they didn't own.
+  Single-user installs were unaffected in practice — fixed regardless.
+
+---
+
+## [0.2.0] — 2026-05-24
+
+### Added — pluggable tunnel-provider abstraction + Playit.gg for TCP/UDP
+
+CloudGate can now host **Minecraft servers** (Java + Bedrock), SSH, and arbitrary TCP/UDP services that Cloudflare Tunnel can't deliver to vanilla clients on the free plan. Done via a new `TunnelProvider` interface so additional backends (ngrok, FRP, …) can be added without touching `host-deploy`.
+
+**New host types in the UI:**
+- **Web app (HTTP/HTTPS)** — existing behaviour, via cloudflared.
+- **Minecraft (Java Edition)** — TCP via Playit.gg. CloudGate auto-creates an SRV record (`_minecraft._tcp.<host>`) on your Cloudflare zone so vanilla Java clients connect with just the hostname.
+- **Minecraft (Bedrock Edition)** — UDP via Playit.gg. SRV is not supported by the Bedrock client; the UI shows the exact `host:port` players paste into the Servers tab.
+- **Raw TCP / Raw UDP** — anything else (SSH, game servers, custom services).
+
+**Under the hood:**
+- New `ManagedProcess` base class — shared supervisor (spawn, log ring buffer, exp-backoff restart, health FSM) for cloudflared and playit-agent.
+- `TunnelProvider` interface + registry resolves `tunnels.provider` to the right implementation.
+- `host-deploy.ts` dispatches via `provider.addHost()` and writes the right DNS record kind per returned `ProviderEdgeEndpoint` (CNAME / SRV / `host_port`).
+- Playit account-linking page with TCP/UDP quota bar (Playit free tier: 4 TCP + 4 UDP per account).
+- Playit-assigned external endpoint shown on the Hosts list with a copy button — critical for Bedrock since players need the literal `host:port`.
+
+### Database — migration `20260524_004_tunnel_providers.ts`
+
+Purely additive per `CLAUDE.md` §3:
+- `tunnels.provider` (default `'cloudflared'`), `tunnels.provider_meta` (JSON), `tunnels.playit_account_id` (nullable FK).
+- CF-specific tunnel columns (`cloudflare_account_id`, `encrypted_tunnel_secret`, `credentials_path`, `account_tag`) made nullable so Playit tunnels can co-exist.
+- `proxy_hosts.protocol` (default `'http'`), `proxy_hosts.edge_endpoint` (JSON snapshot).
+- New `playit_accounts` table (analog to `cloudflare_accounts`).
+- Idempotent, with working `down()`. Existing HTTP hosts continue to work with zero user action.
+
+### Bootstrap
+
+- New step `ensure-playit-binary` — idempotent download of `/data/playit/bin/playit-agent` with sha256 verification.
+- Skipped when `CLOUDGATE_PLAYIT_ENABLED=false` (locked-down installs).
+- `/data/playit/{bin,logs}` added to the sacred-path list — survives updates.
+
+### Honest limitations (documented in-app)
+
+- Bedrock players need the literal `host:port` — UI shows it.
+- Playit free tier: 4 TCP + 4 UDP per account. Quota bar surfaces usage; hitting the cap shows a clear upgrade link.
+- Playit-assigned ports may change on tunnel rebuild → SRV TTL kept at 60 s; CloudGate re-reads the assigned endpoint on every `provider.reload()`.
+
+---
+
 ## [0.1.7] — 2026-05-22
 
 ### Fixed — self-updater "migrations failed" rollback

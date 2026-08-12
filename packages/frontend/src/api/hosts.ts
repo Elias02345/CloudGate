@@ -1,3 +1,4 @@
+import type { HostAdvancedOptions, HostProtocol, ProviderEdgeEndpoint } from '@cloudgate/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client.js';
 
@@ -6,13 +7,16 @@ export interface HostDto {
 	tunnel_id: number | null;
 	cf_zone_id: number | null;
 	mode: 'cloudflare_tunnel' | 'local_nginx';
+	protocol: HostProtocol;
 	hostname: string;
 	forward_scheme: 'http' | 'https';
 	forward_host: string;
 	forward_port: number;
 	path_prefix: string;
 	enabled: boolean;
+	edge_endpoint: ProviderEdgeEndpoint | null;
 	tls_options: { no_tls_verify?: boolean };
+	advanced_options?: HostAdvancedOptions;
 	last_deployed_at: string | null;
 	last_error: string | null;
 	created_at: string;
@@ -21,6 +25,7 @@ export interface HostDto {
 
 export interface CreateHostInput {
 	mode: 'cloudflare_tunnel' | 'local_nginx';
+	protocol?: HostProtocol;
 	hostname: string;
 	forward_scheme: 'http' | 'https';
 	forward_host: string;
@@ -65,7 +70,8 @@ export function useToggleHost() {
 
 export function useTestHost() {
 	return useMutation({
-		mutationFn: (id: number) => api<{ ok?: boolean; status?: number; reachable?: false; error?: string }>(`/hosts/${id}/test`),
+		mutationFn: (id: number) =>
+			api<{ ok?: boolean; status?: number; reachable?: false; error?: string }>(`/hosts/${id}/test`),
 	});
 }
 
@@ -79,11 +85,14 @@ export function useRedeployHost() {
 }
 
 export interface UpdateHostInput {
+	tunnel_id?: number;
+	cf_zone_id?: number;
 	forward_scheme?: 'http' | 'https';
 	forward_host?: string;
 	forward_port?: number;
 	path_prefix?: string;
 	tls_options?: { no_tls_verify?: boolean };
+	advanced_options?: HostAdvancedOptions;
 	headers?: Record<string, string>;
 }
 
@@ -111,5 +120,38 @@ export interface DnsVerifyResponse {
 export function useVerifyDns() {
 	return useMutation({
 		mutationFn: (id: number) => api<DnsVerifyResponse>(`/hosts/${id}/verify-dns`),
+	});
+}
+
+/** Machine-readable payload behind a `forwarded_header_rejected` outcome. */
+export interface ForwardedRejectionDiagnosis {
+	plain_status: number;
+	forwarded_status: number;
+	proxy_source_ip: string | null;
+	proxy_source_cidr: string | null;
+	is_home_assistant: boolean;
+	/** Ready-to-paste configuration.yaml block, when we could produce one. */
+	remedy_yaml: string | null;
+}
+
+export type ProbeOutcome =
+	| { kind: 'ok'; statusCode: number; latency_ms: number }
+	| { kind: 'tcp_refused'; message: string }
+	| { kind: 'tcp_timeout'; message: string }
+	| { kind: 'tls_on_http_port'; message: string }
+	| { kind: 'http_on_tls_port'; message: string }
+	| { kind: 'self_signed_tls'; message: string }
+	| { kind: 'http_error'; statusCode: number; message: string }
+	| { kind: 'forwarded_header_rejected'; message: string; diagnosis: ForwardedRejectionDiagnosis }
+	| { kind: 'unknown'; message: string }
+	| { kind: 'skipped'; message: string };
+
+export function diagnoseHost(id: number): Promise<ProbeOutcome> {
+	return api<ProbeOutcome>(`/hosts/${id}/diagnose`);
+}
+
+export function useDiagnoseHost() {
+	return useMutation({
+		mutationFn: (id: number) => diagnoseHost(id),
 	});
 }

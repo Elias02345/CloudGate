@@ -17,7 +17,7 @@ import { dirname } from 'node:path';
 import type { BootstrapStatus, BootstrapStep, BootstrapStepName } from '@cloudgate/shared';
 import { BOOTSTRAP_STEPS } from '@cloudgate/shared';
 import argon2 from 'argon2';
-import { dataPath, getConfig, VERSION } from './config.js';
+import { VERSION, dataPath, getConfig } from './config.js';
 import { childLogger } from './logger.js';
 
 const log = childLogger('bootstrap');
@@ -26,6 +26,7 @@ const STEP_RUNNERS: Record<BootstrapStepName, () => Promise<void>> = {
 	'disk-health': checkDiskHealth,
 	'ensure-data-dirs': ensureDataDirs,
 	'ensure-secrets': ensureSecrets,
+	'ensure-playit-binary': ensurePlayitBinaryStep,
 	'init-db': initDb,
 	'run-migrations': runMigrations,
 	'seed-admin-if-missing': seedAdminIfMissing,
@@ -128,6 +129,9 @@ async function ensureDataDirs(): Promise<void> {
 		dataPath('db', 'backups'),
 		dataPath('cloudflared'),
 		dataPath('cloudflared', 'bin'),
+		dataPath('playit'),
+		dataPath('playit', 'bin'),
+		dataPath('playit', 'logs'),
 		dataPath('nginx', 'hosts'),
 		dataPath('nginx', 'custom'),
 		dataPath('nginx', 'certs'),
@@ -173,6 +177,34 @@ async function ensureSecrets(): Promise<void> {
 	const cfg = getConfig();
 	await ensureSecret(dataPath('secrets', 'encryption.key'), 32, cfg.CLOUDGATE_ENCRYPTION_KEY);
 	await ensureSecret(dataPath('secrets', 'jwt.key'), 32, cfg.CLOUDGATE_JWT_SECRET);
+}
+
+/**
+ * Materialise /data/playit/bin/playit-agent so tunnels using the Playit
+ * provider can spawn. Gated on CLOUDGATE_PLAYIT_ENABLED so locked-down
+ * setups that never want outbound binary downloads can opt out.
+ *
+ * Default: enabled. When disabled (or on missing pin), the step logs and
+ * succeeds — actual tunnel start will fail loudly later if the binary is
+ * truly required.
+ */
+async function ensurePlayitBinaryStep(): Promise<void> {
+	if (process.env.CLOUDGATE_PLAYIT_ENABLED === 'false') {
+		log.info('CLOUDGATE_PLAYIT_ENABLED=false — skipping Playit binary download');
+		return;
+	}
+	try {
+		const { ensurePlayitBinary } = await import('./services/playit-binary.js');
+		const result = await ensurePlayitBinary();
+		log.info({ path: result.path, downloaded: result.downloaded }, 'Playit binary ready');
+	} catch (err) {
+		// Don't block boot — Playit is optional. Tunnels using it will fail
+		// with a clear error when actually started.
+		log.warn(
+			{ err: (err as Error).message },
+			'Playit binary not available — playit-backed tunnels will fail until resolved'
+		);
+	}
 }
 
 async function initDb(): Promise<void> {
@@ -315,4 +347,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 			process.exit(1);
 		});
 }
-

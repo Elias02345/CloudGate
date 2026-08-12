@@ -11,7 +11,7 @@
 import { Router, type Router as RouterType } from 'express';
 import { childLogger } from '../logger.js';
 import { findUserById, verifyAccessToken } from '../services/auth.js';
-import { subscribe, type EventTopic } from '../services/events.js';
+import { type EventTopic, subscribe } from '../services/events.js';
 
 const log = childLogger('routes:events');
 export const eventsRouter: RouterType = Router();
@@ -41,9 +41,7 @@ eventsRouter.get('/', async (req, res) => {
 	}
 
 	const topicsParam = typeof req.query.topics === 'string' ? req.query.topics : null;
-	const topics = topicsParam
-		? (topicsParam.split(',').filter(Boolean) as EventTopic[])
-		: undefined;
+	const topics = topicsParam ? (topicsParam.split(',').filter(Boolean) as EventTopic[]) : undefined;
 
 	subscribe(res, { ...(topics ? { topics } : {}) });
 });

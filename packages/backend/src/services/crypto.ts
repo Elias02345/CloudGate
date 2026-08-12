@@ -33,8 +33,7 @@ function loadKey(): Buffer {
 	const key = Buffer.from(raw, 'base64');
 	if (key.length !== KEY_LENGTH) {
 		throw new Error(
-			`Invalid encryption key length: expected ${KEY_LENGTH} bytes, got ${key.length}. ` +
-				`The key file at /data/secrets/encryption.key is corrupted.`
+			`Invalid encryption key length: expected ${KEY_LENGTH} bytes, got ${key.length}. The key file at /data/secrets/encryption.key is corrupted.`
 		);
 	}
 	cachedKey = key;

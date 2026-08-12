@@ -5,8 +5,8 @@
  * doesn't support custom headers).
  */
 
-import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { getStoredToken } from './client.js';
 
 const TOPIC_QUERY_KEYS: Record<string, string[][]> = {

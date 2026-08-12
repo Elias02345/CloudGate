@@ -34,7 +34,7 @@ import {
 	getLlmSettings,
 	updateLlmSettings,
 } from '../services/llm-settings.js';
-import { type LlmMessage, chat, testConnection } from '../services/llm.js';
+import { type ChatResponse, type LlmMessage, chat, testConnection } from '../services/llm.js';
 
 const log = childLogger('routes:ai');
 export const aiRouter: RouterType = Router();
@@ -264,7 +264,7 @@ aiRouter.post('/chat', async (req, res) => {
 	const tools = listTools(settings.autonomy);
 
 	// First LLM call
-	let response;
+	let response: ChatResponse;
 	try {
 		response = await chat({
 			provider: settings.provider,

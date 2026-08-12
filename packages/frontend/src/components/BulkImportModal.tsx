@@ -85,11 +85,17 @@ function parseCsv(text: string): string[][] {
 	return rows;
 }
 
-function rowsToHosts(rows: string[][], defaultTunnelId: number | null, defaultZoneId: number | null): Record<string, unknown>[] {
+function rowsToHosts(
+	rows: string[][],
+	defaultTunnelId: number | null,
+	defaultZoneId: number | null
+): Record<string, unknown>[] {
 	if (rows.length === 0) return [];
 	const head = rows[0]!;
 	const hasHeader = head.some((c) => c.toLowerCase() === 'hostname');
-	const fields = hasHeader ? head.map((h) => h.toLowerCase()) : ['hostname', 'forward_host', 'forward_port', 'forward_scheme'];
+	const fields = hasHeader
+		? head.map((h) => h.toLowerCase())
+		: ['hostname', 'forward_host', 'forward_port', 'forward_scheme'];
 	const dataRows = hasHeader ? rows.slice(1) : rows;
 	return dataRows.map((cells) => {
 		const obj: Record<string, unknown> = {};
@@ -247,7 +253,9 @@ export function BulkImportModal({ opened, onClose }: Props) {
 						/>
 						<Textarea
 							label={t('bulk.paste_field')}
-							placeholder={'hostname,forward_host,forward_port\nimmich.example.com,192.168.1.10,2283\nnextcloud.example.com,192.168.1.11,80'}
+							placeholder={
+								'hostname,forward_host,forward_port\nimmich.example.com,192.168.1.10,2283\nnextcloud.example.com,192.168.1.11,80'
+							}
 							value={csvText}
 							onChange={(e) => setCsvText(e.currentTarget.value)}
 							autosize

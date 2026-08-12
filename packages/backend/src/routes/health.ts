@@ -1,6 +1,6 @@
 import { existsSync, statSync } from 'node:fs';
 import { Router, type Router as RouterType } from 'express';
-import { dataPath, VERSION } from '../config.js';
+import { VERSION, dataPath } from '../config.js';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 
@@ -72,15 +72,40 @@ healthRouter.get('/deep', async (_req, res) => {
 				: 'missing key file(s) — bootstrap incomplete',
 	};
 
-	// Cloudflared daemon — best-effort metrics endpoint check
+	// Cloudflared daemon — probe each cloudflared tunnel's OWN metrics port
+	// (36500 + tunnel db id). A single hardcoded 36500 stopped matching once
+	// tunnels got per-tunnel ports, so this check always reported "down".
+	// "ok" when there are no tunnels, or at least one responds.
 	try {
-		const ac = new AbortController();
-		const timer = setTimeout(() => ac.abort(), 2000);
-		const r = await fetch('http://127.0.0.1:36500/ready', { signal: ac.signal });
-		clearTimeout(timer);
-		checks.cloudflared = { ok: r.ok, detail: r.ok ? 'metrics endpoint healthy' : `HTTP ${r.status}` };
-	} catch {
-		checks.cloudflared = { ok: false, detail: 'metrics endpoint unreachable (daemon may be idle)' };
+		const knex = getDb();
+		const { metricsAddrFor } = await import('../services/tunnel-providers/cloudflared/process.js');
+		const q = knex<{ id: number }>('tunnels').select('id');
+		if (await knex.schema.hasColumn('tunnels', 'provider')) q.where('provider', 'cloudflared');
+		const cfTunnels = await q;
+		if (cfTunnels.length === 0) {
+			checks.cloudflared = { ok: true, detail: 'no cloudflared tunnels configured' };
+		} else {
+			let healthy = 0;
+			await Promise.all(
+				cfTunnels.map(async (t) => {
+					try {
+						const ac = new AbortController();
+						const timer = setTimeout(() => ac.abort(), 2000);
+						const r = await fetch(`http://${metricsAddrFor(t.id)}/ready`, { signal: ac.signal });
+						clearTimeout(timer);
+						if (r.ok) healthy++;
+					} catch {
+						/* count as unhealthy */
+					}
+				})
+			);
+			checks.cloudflared = {
+				ok: healthy > 0,
+				detail: `${healthy}/${cfTunnels.length} tunnel metrics endpoint(s) healthy`,
+			};
+		}
+	} catch (err) {
+		checks.cloudflared = { ok: false, detail: (err as Error).message };
 	}
 
 	// Disk space on /data
