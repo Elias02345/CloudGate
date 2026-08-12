@@ -122,3 +122,36 @@ export function useVerifyDns() {
 		mutationFn: (id: number) => api<DnsVerifyResponse>(`/hosts/${id}/verify-dns`),
 	});
 }
+
+/** Machine-readable payload behind a `forwarded_header_rejected` outcome. */
+export interface ForwardedRejectionDiagnosis {
+	plain_status: number;
+	forwarded_status: number;
+	proxy_source_ip: string | null;
+	proxy_source_cidr: string | null;
+	is_home_assistant: boolean;
+	/** Ready-to-paste configuration.yaml block, when we could produce one. */
+	remedy_yaml: string | null;
+}
+
+export type ProbeOutcome =
+	| { kind: 'ok'; statusCode: number; latency_ms: number }
+	| { kind: 'tcp_refused'; message: string }
+	| { kind: 'tcp_timeout'; message: string }
+	| { kind: 'tls_on_http_port'; message: string }
+	| { kind: 'http_on_tls_port'; message: string }
+	| { kind: 'self_signed_tls'; message: string }
+	| { kind: 'http_error'; statusCode: number; message: string }
+	| { kind: 'forwarded_header_rejected'; message: string; diagnosis: ForwardedRejectionDiagnosis }
+	| { kind: 'unknown'; message: string }
+	| { kind: 'skipped'; message: string };
+
+export function diagnoseHost(id: number): Promise<ProbeOutcome> {
+	return api<ProbeOutcome>(`/hosts/${id}/diagnose`);
+}
+
+export function useDiagnoseHost() {
+	return useMutation({
+		mutationFn: (id: number) => diagnoseHost(id),
+	});
+}

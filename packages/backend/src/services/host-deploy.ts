@@ -7,7 +7,13 @@
  * the user's Cloudflare zone accordingly.
  */
 
-import type { HostProtocol, ProviderEdgeEndpoint, TunnelProviderName } from '@cloudgate/shared';
+import {
+	type HostAdvancedOptions,
+	HostAdvancedOptionsSchema,
+	type HostProtocol,
+	type ProviderEdgeEndpoint,
+	type TunnelProviderName,
+} from '@cloudgate/shared';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { decryptCredentials } from './cf-account.js';
@@ -38,6 +44,7 @@ interface HostRow {
 	forward_port: number;
 	path_prefix: string;
 	tls_options: string;
+	advanced_options: string | null;
 	dns_record_id: string | null;
 	edge_endpoint: string | null;
 }
@@ -216,12 +223,26 @@ function parseTls(raw: string | null | undefined): { no_tls_verify?: boolean } {
 	}
 }
 
+function parseAdvanced(raw: string | null | undefined): HostAdvancedOptions {
+	if (!raw) return {};
+	try {
+		const parsed = typeof raw === 'string' ? JSON.parse(raw) : {};
+		// A hand-edited or older row can hold anything; a bad value here
+		// would land verbatim in an nginx directive.
+		const result = HostAdvancedOptionsSchema.safeParse(parsed);
+		return result.success ? result.data : {};
+	} catch {
+		return {};
+	}
+}
+
 // ---------------------------------------------------------------------------
 // local_nginx (unchanged)
 // ---------------------------------------------------------------------------
 async function deployLocalNginx(hostId: number, host: HostRow): Promise<void> {
 	const knex = getDb();
 	const tls = parseTls(host.tls_options);
+	const adv = parseAdvanced(host.advanced_options);
 	try {
 		await writeHostConfig({
 			id: host.id,
@@ -231,6 +252,8 @@ async function deployLocalNginx(hostId: number, host: HostRow): Promise<void> {
 			forward_port: host.forward_port,
 			path_prefix: host.path_prefix,
 			no_tls_verify: Boolean(tls.no_tls_verify),
+			forwarded_headers: adv.forwarded_headers,
+			http_host_header: adv.http_host_header,
 		});
 		await knex('proxy_hosts')
 			.where({ id: hostId })
@@ -336,6 +359,7 @@ async function probeAndDiagnose(hostId: number, host: HostRow): Promise<void> {
 		host: host.forward_host,
 		port: host.forward_port,
 		no_tls_verify: tlsOpts.no_tls_verify,
+		hostname: host.hostname,
 	});
 
 	log.info({ hostId, hostname: host.hostname, outcome: outcome.kind }, 'upstream probe done');
@@ -361,6 +385,13 @@ async function probeAndDiagnose(hostId: number, host: HostRow): Promise<void> {
 			break;
 		case 'http_error':
 			label = `⚠ Upstream returned ${outcome.statusCode}`;
+			break;
+		case 'forwarded_header_rejected':
+			// Already a full explanation with the remedy — prefixing a
+			// generic label would only push the fix further down.
+			label = outcome.diagnosis.is_home_assistant
+				? '⚠ Home Assistant rejects proxied requests'
+				: '⚠ Upstream rejects proxied requests';
 			break;
 		default:
 			label = '⚠ Upstream probe inconclusive';

@@ -16,7 +16,9 @@ import {
 	Box,
 	Button,
 	Checkbox,
+	Code,
 	Collapse,
+	CopyButton,
 	Divider,
 	Group,
 	Modal,
@@ -31,17 +33,24 @@ import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
 	IconAlertCircle,
+	IconAlertTriangle,
 	IconBulb,
 	IconCheck,
 	IconChevronDown,
 	IconChevronUp,
+	IconCopy,
+	IconCopyCheck,
 	IconExchange,
+	IconStethoscope,
 } from '@tabler/icons-react';
-import { useEffect, useMemo } from 'react';
+import type { TFunction } from 'i18next';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useZones } from '../api/cloudflare.js';
-import { type HostDto, useUpdateHost } from '../api/hosts.js';
+import { type HostDto, type ProbeOutcome, useDiagnoseHost, useUpdateHost } from '../api/hosts.js';
 import { useTunnels } from '../api/tunnels.js';
+
+const HOME_ASSISTANT_DOCS_URL = 'https://github.com/Elias02345/CloudGate/blob/dev/docs/HOME-ASSISTANT.md';
 
 interface EditHostModalProps {
 	host: HostDto | null;
@@ -53,6 +62,8 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 	const { t } = useTranslation();
 	const update = useUpdateHost();
 	const tunnels = useTunnels();
+	const diagnose = useDiagnoseHost();
+	const [diagnoseResult, setDiagnoseResult] = useState<ProbeOutcome | null>(null);
 	const [advancedOpen, advanced] = useDisclosure(false);
 	const [reassignOpen, reassign] = useDisclosure(false);
 	const form = useForm({
@@ -65,6 +76,7 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 			path_prefix: '/',
 			no_tls_verify: false,
 			http_host_header: '',
+			forwarded_headers: 'standard' as 'standard' | 'client_ip_only' | 'strip',
 			origin_server_name: '',
 			no_happy_eyeballs: false,
 			http2_origin: false,
@@ -86,12 +98,14 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 			path_prefix: host.path_prefix,
 			no_tls_verify: Boolean(host.tls_options?.no_tls_verify),
 			http_host_header: adv.http_host_header ?? '',
+			forwarded_headers: adv.forwarded_headers ?? 'standard',
 			origin_server_name: adv.origin_server_name ?? '',
 			no_happy_eyeballs: Boolean(adv.no_happy_eyeballs),
 			http2_origin: Boolean(adv.http2_origin),
 			disable_chunked_encoding: Boolean(adv.disable_chunked_encoding),
 			connect_timeout_seconds: adv.connect_timeout_seconds ?? 30,
 		});
+		setDiagnoseResult(null);
 		// Auto-open the reassign panel if the host is currently orphaned —
 		// the user almost certainly opened this modal to fix that.
 		if (!host.tunnel_id) {
@@ -129,6 +143,9 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 		try {
 			const advanced_options = {
 				...(values.http_host_header ? { http_host_header: values.http_host_header } : {}),
+				...(values.forwarded_headers && values.forwarded_headers !== 'standard'
+					? { forwarded_headers: values.forwarded_headers }
+					: {}),
 				...(values.origin_server_name ? { origin_server_name: values.origin_server_name } : {}),
 				...(values.no_happy_eyeballs ? { no_happy_eyeballs: true } : {}),
 				...(values.http2_origin ? { http2_origin: true } : {}),
@@ -164,6 +181,17 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 		}
 	});
 
+	const onDiagnose = async () => {
+		if (!host) return;
+		setDiagnoseResult(null);
+		try {
+			const result = await diagnose.mutateAsync(host.id);
+			setDiagnoseResult(result);
+		} catch (err) {
+			notifications.show({ color: 'red', message: (err as Error).message });
+		}
+	};
+
 	const guessIsHttpsTarget = guessHttpsForPort(form.values.forward_port);
 	const schemeMismatch =
 		guessIsHttpsTarget && form.values.forward_scheme === 'http' && host?.last_error?.includes('Wrong scheme');
@@ -182,6 +210,40 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 							{t('hosts.edit_scheme_hint')}
 						</Alert>
 					)}
+					{/* The origin diagnosis is the whole point of opening this modal on a
+					    broken host, so it sits at the top rather than inside the
+					    collapsed Advanced panel. `last_error` can be a multi-line block
+					    (the Home Assistant remedy includes YAML), which is unreadable in
+					    the host list's tooltip — render it properly here. */}
+					{host?.last_error && (
+						<Alert
+							color="red"
+							icon={<IconAlertCircle size={18} />}
+							title={t('hosts.last_error_title')}
+							variant="light"
+						>
+							<Text size="xs" style={{ whiteSpace: 'pre-wrap' }}>
+								{host.last_error}
+							</Text>
+						</Alert>
+					)}
+					{host && (
+						<Group>
+							<Button
+								variant="light"
+								size="xs"
+								leftSection={<IconStethoscope size={14} />}
+								onClick={() => void onDiagnose()}
+								loading={diagnose.isPending}
+							>
+								{t('hosts.diagnose_button')}
+							</Button>
+							<Text size="xs" c="dimmed">
+								{t('hosts.diagnose_hint')}
+							</Text>
+						</Group>
+					)}
+					{diagnoseResult && <DiagnoseResultPanel result={diagnoseResult} t={t} />}
 					{host && !host.tunnel_id && (
 						<Alert color="orange" icon={<IconAlertCircle size={18} />} title="Host has no tunnel">
 							This host lost its tunnel assignment during a previous upgrade. Use the{' '}
@@ -288,61 +350,81 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 						onClick={advanced.toggle}
 						style={{ alignSelf: 'flex-start' }}
 					>
-						Advanced (originRequest)
+						{t('hosts.advanced_panel_title')}
 					</Button>
 					<Collapse in={advancedOpen}>
 						<Stack gap="sm">
 							<Alert color="blue" variant="light">
 								<Text size="xs">
-									HomeAssistant returning <strong>400 Bad Request</strong>? Set <code>http_host_header</code>{' '}
-									to <code>homeassistant.local:8123</code> (or your LAN IP + port) so HA recognises the
-									proxied Host header. You may also need <code>trusted_proxies: [127.0.0.1]</code> in HA's{' '}
-									<code>configuration.yaml</code>.
+									{t('hosts.advanced_ha_hint')}{' '}
+									<Anchor href={HOME_ASSISTANT_DOCS_URL} target="_blank">
+										{t('hosts.advanced_ha_docs_link')}
+									</Anchor>
 								</Text>
 							</Alert>
 							<TextInput
-								label="HTTP Host header override"
-								description="Sent to origin in the Host header. Useful for apps that check trusted_proxies."
+								label={t('hosts.http_host_header_label')}
+								description={t('hosts.http_host_header_hint')}
 								placeholder="homeassistant.local:8123"
 								{...form.getInputProps('http_host_header')}
 							/>
+							<Select
+								label={t('hosts.forwarded_headers_label')}
+								description={
+									host?.mode === 'cloudflare_tunnel'
+										? t('hosts.forwarded_headers_tunnel_note')
+										: t('hosts.forwarded_headers_hint')
+								}
+								disabled={host?.mode === 'cloudflare_tunnel'}
+								data={[
+									{ value: 'standard', label: t('hosts.forwarded_headers_standard') },
+									{ value: 'client_ip_only', label: t('hosts.forwarded_headers_client_ip_only') },
+									{ value: 'strip', label: t('hosts.forwarded_headers_strip') },
+								]}
+								{...form.getInputProps('forwarded_headers')}
+							/>
+							{form.values.forwarded_headers === 'strip' && (
+								<Alert color="orange" variant="light" icon={<IconAlertTriangle size={16} />}>
+									<Text size="xs">{t('hosts.forwarded_headers_strip_warning')}</Text>
+								</Alert>
+							)}
 							<TextInput
-								label="Origin server name (SNI)"
-								description="Set SNI when forwarding to HTTPS with a cert that doesn't match the IP."
+								label={t('hosts.origin_server_name_label')}
+								description={t('hosts.origin_server_name_hint')}
 								placeholder="my-app.local"
 								{...form.getInputProps('origin_server_name')}
 							/>
 							<Group grow>
 								<Checkbox
-									label="HTTP/2 to origin"
-									description="Force HTTP/2 — speeds up apps that support it."
+									label={t('hosts.http2_origin_label')}
+									description={t('hosts.http2_origin_hint')}
 									{...form.getInputProps('http2_origin', { type: 'checkbox' })}
 								/>
 								<Checkbox
-									label="No Happy Eyeballs"
-									description="Disable IPv6 fallback — set if your origin is IPv4-only."
+									label={t('hosts.no_happy_eyeballs_label')}
+									description={t('hosts.no_happy_eyeballs_hint')}
 									{...form.getInputProps('no_happy_eyeballs', { type: 'checkbox' })}
 								/>
 							</Group>
 							<Checkbox
-								label="Disable chunked encoding"
-								description="Needed for some old HTTP/1.0 origins that mishandle Transfer-Encoding: chunked."
+								label={t('hosts.disable_chunked_encoding_label')}
+								description={t('hosts.disable_chunked_encoding_hint')}
 								{...form.getInputProps('disable_chunked_encoding', { type: 'checkbox' })}
 							/>
 							<NumberInput
-								label="Connect timeout (seconds)"
-								description="TCP connect timeout to origin. Default 30s."
+								label={t('hosts.connect_timeout_label')}
+								description={t('hosts.connect_timeout_hint')}
 								min={1}
 								max={600}
 								{...form.getInputProps('connect_timeout_seconds')}
 							/>
 							<Text size="xs" c="dimmed">
-								Full list of options:{' '}
+								{t('hosts.advanced_full_list')}{' '}
 								<Anchor
 									href="https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/configure-tunnels/cloudflared-parameters/origin-parameters/"
 									target="_blank"
 								>
-									cloudflared origin parameters
+									{t('hosts.advanced_full_list_link')}
 								</Anchor>
 							</Text>
 						</Stack>
@@ -366,4 +448,84 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 /** Heuristic: common ports that are HTTPS-only by default. */
 function guessHttpsForPort(port: number): boolean {
 	return [443, 8443, 8006, 9090, 9443, 4443].includes(port);
+}
+
+function diagnoseColor(kind: ProbeOutcome['kind']): string {
+	if (kind === 'ok') return 'green';
+	if (kind === 'forwarded_header_rejected') return 'red';
+	if (kind === 'skipped') return 'gray';
+	return 'yellow';
+}
+
+/** Renders the result of GET /hosts/:id/diagnose. `forwarded_header_rejected` gets
+ * the full treatment — it's the one outcome with an actionable, copy-pasteable fix. */
+function DiagnoseResultPanel({ result, t }: { result: ProbeOutcome; t: TFunction }) {
+	const color = diagnoseColor(result.kind);
+	const icon =
+		result.kind === 'ok' ? (
+			<IconCheck size={18} />
+		) : result.kind === 'forwarded_header_rejected' ? (
+			<IconAlertTriangle size={18} />
+		) : (
+			<IconAlertCircle size={18} />
+		);
+	const title =
+		result.kind === 'ok'
+			? t('hosts.diagnose_title_ok')
+			: result.kind === 'forwarded_header_rejected'
+				? t('hosts.diagnose_title_fhr')
+				: t('hosts.diagnose_title_other');
+
+	return (
+		<Alert color={color} icon={icon} title={title} variant="light">
+			{result.kind === 'ok' ? (
+				<Text size="sm">
+					{t('hosts.diagnose_result_ok', { status: result.statusCode, latency: result.latency_ms })}
+				</Text>
+			) : (
+				<Stack gap="xs">
+					<Text size="sm">{result.message}</Text>
+					{result.kind === 'forwarded_header_rejected' && (
+						<>
+							{result.diagnosis.proxy_source_ip && (
+								<Text size="xs" c="dimmed">
+									{t('hosts.diagnose_proxy_ip', {
+										ip: result.diagnosis.proxy_source_cidr ?? result.diagnosis.proxy_source_ip,
+									})}
+								</Text>
+							)}
+							{result.diagnosis.remedy_yaml && (
+								<Box>
+									<Group justify="space-between" align="center" mb={4}>
+										<Text size="xs" fw={600}>
+											{t('hosts.diagnose_remedy_label')}
+										</Text>
+										<CopyButton value={result.diagnosis.remedy_yaml}>
+											{({ copied, copy }) => (
+												<Button
+													size="xs"
+													variant="light"
+													color={copied ? 'green' : 'blue'}
+													leftSection={copied ? <IconCopyCheck size={14} /> : <IconCopy size={14} />}
+													onClick={copy}
+												>
+													{copied ? t('hosts.diagnose_copied') : t('hosts.diagnose_copy')}
+												</Button>
+											)}
+										</CopyButton>
+									</Group>
+									<Code block>{result.diagnosis.remedy_yaml}</Code>
+								</Box>
+							)}
+							<Text size="xs">
+								<Anchor href={HOME_ASSISTANT_DOCS_URL} target="_blank">
+									{t('hosts.diagnose_docs_link')}
+								</Anchor>
+							</Text>
+						</>
+					)}
+				</Stack>
+			)}
+		</Alert>
+	);
 }

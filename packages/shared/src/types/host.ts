@@ -53,10 +53,43 @@ const HostnameRegex = /^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0
  * Naming kept snake_case at the API boundary; mapped to cloudflared's
  * camelCase originRequest keys at config-render time.
  */
+/**
+ * How the proxy should populate `X-Forwarded-*` towards the origin.
+ *
+ * Only honoured in `local_nginx` mode — in `cloudflare_tunnel` mode the
+ * Cloudflare edge adds `X-Forwarded-For` before cloudflared ever sees the
+ * request and cloudflared has no header-rewriting knob, so nothing we
+ * render into config.yml can change what the origin receives.
+ *
+ * - `standard`        — append our hop to the incoming chain
+ *                       (`$proxy_add_x_forwarded_for`). Default; preserves
+ *                       the real client IP.
+ * - `client_ip_only`  — send exactly one entry, the peer we received the
+ *                       request from. Fixes origins that choke on multi-hop
+ *                       chains while keeping a usable client IP.
+ * - `strip`           — send no `X-Forwarded-*` at all. Last resort for
+ *                       origins that reject proxied requests outright
+ *                       (Home Assistant without `trusted_proxies`).
+ *                       WARNING: the origin then sees every visitor as
+ *                       CloudGate's IP, which defeats per-client rate
+ *                       limiting and brute-force banning on the origin.
+ */
+export const ForwardedHeaderModeSchema = z.enum(['standard', 'client_ip_only', 'strip']);
+export type ForwardedHeaderMode = z.infer<typeof ForwardedHeaderModeSchema>;
+
 export const HostAdvancedOptionsSchema = z.object({
-	/** Override Host header sent to origin. Fixes "Bad Request" from apps
-	 * that check `trusted_proxies` (HomeAssistant, some Django setups). */
+	/**
+	 * Override the Host header sent to the origin.
+	 *
+	 * NOTE: this does NOT fix Home Assistant's "400 Bad Request". That check
+	 * is `use_x_forwarded_for` / `trusted_proxies` in HA's
+	 * `homeassistant/components/http/forwarded.py` and inspects the TCP peer
+	 * plus `X-Forwarded-For` — never the Host header. See
+	 * docs/HOME-ASSISTANT.md.
+	 */
 	http_host_header: z.string().optional(),
+	/** See {@link ForwardedHeaderModeSchema}. `local_nginx` mode only. */
+	forwarded_headers: ForwardedHeaderModeSchema.optional(),
 	/** SNI value for TLS to origin. Only meaningful when forward_scheme=https. */
 	origin_server_name: z.string().optional(),
 	/** Disable HappyEyeballs (IPv6 fallback) — set if your origin is IPv4-only. */
