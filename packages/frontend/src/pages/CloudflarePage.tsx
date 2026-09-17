@@ -126,10 +126,8 @@ export function CloudflarePage() {
 											{accounts.data.accounts.map((a) => (
 												<Table.Tr
 													key={a.id}
-													style={{
-														cursor: 'pointer',
-														background: selectedId === a.id ? 'var(--mantine-color-dark-6)' : undefined,
-													}}
+													className="cg-clickable"
+													data-selected={selectedId === a.id || undefined}
 													onClick={() => setSelectedId(a.id)}
 												>
 													<Table.Td>
@@ -178,10 +176,8 @@ export function CloudflarePage() {
 										withBorder
 										radius="md"
 										p="sm"
-										style={{
-											cursor: 'pointer',
-											background: selectedId === a.id ? 'var(--mantine-color-dark-6)' : undefined,
-										}}
+										className="cg-clickable"
+										data-selected={selectedId === a.id || undefined}
 										onClick={() => setSelectedId(a.id)}
 									>
 										<Stack gap={6}>

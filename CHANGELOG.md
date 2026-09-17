@@ -9,6 +9,47 @@ _Nothing yet._
 
 ---
 
+## [0.2.8] — 2026-09-17
+
+### Fixed — light theme
+
+- The page background stayed dark in the light theme, and navigation and
+  heading text inherited a near-white colour on it. The light theme now uses a
+  light grey ground with white surfaces and dark text.
+- Accent icons (logo, AI assistant, health indicators) use darker shades in the
+  light theme so they stay readable on white; shadows are softer there.
+
+### Fixed — guided app tour
+
+- Starting the tour after onboarding or via `?tour=replay` did nothing: removing
+  the URL parameter cancelled the pending start.
+- Stops on other pages were skipped at random, because the tour resumed after a
+  fixed delay instead of waiting for the page to render its target.
+- The "Next" button (with step progress) was always English, even with the
+  German UI.
+- Phones: the navigation stop points at the menu button instead of the hidden
+  sidebar, and stops on long lists highlight the first entry so the tooltip
+  stays on screen. The tooltip fits the screen width.
+- The tooltip follows the new design (surface colours, shadow, rounded buttons)
+  in both themes.
+
+### Changed — interaction feedback
+
+- Buttons and icon buttons lift slightly on hover and settle when pressed;
+  navigation entries shift on hover. Respects "reduce motion".
+- Selectable lists (Cloudflare and Playit accounts) show a clear hover state,
+  and the selected account gets an orange tint with an accent edge — previously
+  the selection was barely visible in dark mode and dark-on-light in light mode.
+
+### Fixed — layout
+
+- Audit log: the `{}` details chip sat below the row centre; it is now
+  vertically centred. On phones it sits beside the entity and IP lines.
+- Onboarding: the horizontal stepper overflowed the page on tablets and small
+  laptops; it switches to the vertical layout below 1200 px.
+
+---
+
 ## [0.2.7] — 2026-09-17
 
 ### Changed — new design language

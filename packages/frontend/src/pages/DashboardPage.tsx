@@ -42,7 +42,7 @@ function StatCard({
 	const content = (
 		<Card shadow="sm" radius="md" withBorder style={{ height: '100%' }}>
 			<Group>
-				<div style={{ color: color ?? '#ff9966' }}>{icon}</div>
+				<div style={{ color: color ?? 'var(--cg-accent-logo)' }}>{icon}</div>
 				<Stack gap={0}>
 					<Text size="sm" c="dimmed">
 						{label}
@@ -140,7 +140,7 @@ export function DashboardPage() {
 					value={`${hostsLive} / ${hostsCount}`}
 					loading={hosts.isLoading}
 					to="/hosts"
-					color={hostsError > 0 ? '#fa5252' : '#51cf66'}
+					color={hostsError > 0 ? '#fa5252' : 'var(--cg-accent-ok)'}
 				/>
 				<StatCard
 					icon={<IconWorld size={28} />}

@@ -2,6 +2,7 @@ import {
 	Badge,
 	Box,
 	Card,
+	Center,
 	Code,
 	Group,
 	Pagination,
@@ -32,6 +33,41 @@ function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 			</Text>
 			<Box style={{ minWidth: 0 }}>{children}</Box>
 		</Group>
+	);
+}
+
+/** `{}` chip that opens an entry's metadata as JSON. A flex box rather than inline-flex, so it no longer sits on the text baseline below the row centre. */
+function MetaChip({
+	meta,
+	position,
+	size,
+	maw,
+}: { meta: unknown; position: 'left' | 'bottom'; size: number; maw: number }) {
+	return (
+		<Popover position={position} withArrow shadow="sm">
+			<Popover.Target>
+				<Code
+					className="cg-clickable"
+					w={size}
+					h={size}
+					style={{
+						display: 'flex',
+						alignItems: 'center',
+						justifyContent: 'center',
+						padding: 0,
+						flexShrink: 0,
+						fontSize: size < 20 ? 11 : 12,
+					}}
+				>
+					{'{}'}
+				</Code>
+			</Popover.Target>
+			<Popover.Dropdown>
+				<Code block maw={maw} mah={300} style={{ overflow: 'auto' }}>
+					{JSON.stringify(meta ?? {}, null, 2)}
+				</Code>
+			</Popover.Dropdown>
+		</Popover>
 	);
 }
 
@@ -98,30 +134,10 @@ export function AuditLogPage() {
 															{row.ip ?? '—'}
 														</Text>
 													</Table.Td>
-													<Table.Td ta="center">
-														<Popover position="left" withArrow shadow="sm">
-															<Popover.Target>
-																<Code
-																	w={18}
-																	h={18}
-																	style={{
-																		display: 'inline-flex',
-																		alignItems: 'center',
-																		justifyContent: 'center',
-																		padding: 0,
-																		fontSize: 11,
-																		cursor: 'pointer',
-																	}}
-																>
-																	{'{}'}
-																</Code>
-															</Popover.Target>
-															<Popover.Dropdown>
-																<Code block maw={400} mah={300} style={{ overflow: 'auto' }}>
-																	{JSON.stringify(row.meta ?? {}, null, 2)}
-																</Code>
-															</Popover.Dropdown>
-														</Popover>
+													<Table.Td>
+														<Center>
+															<MetaChip meta={row.meta} position="left" size={18} maw={400} />
+														</Center>
 													</Table.Td>
 												</Table.Tr>
 											))}
@@ -142,40 +158,21 @@ export function AuditLogPage() {
 													{row.created_at.replace('T', ' ').slice(0, 19)}
 												</Text>
 											</Group>
-											<InfoLine label={t('audit.col_entity')}>
-												<Text size="sm">
-													{row.entity_type ? `${row.entity_type}#${row.entity_id ?? '—'}` : '—'}
-												</Text>
-											</InfoLine>
-											<InfoLine label={t('audit.col_ip')}>
-												<Text size="xs" ff="monospace" c="dimmed">
-													{row.ip ?? '—'}
-												</Text>
-											</InfoLine>
-											<Group justify="flex-end">
-												<Popover position="bottom" withArrow shadow="sm">
-													<Popover.Target>
-														<Code
-															w={22}
-															h={22}
-															style={{
-																display: 'inline-flex',
-																alignItems: 'center',
-																justifyContent: 'center',
-																padding: 0,
-																fontSize: 12,
-																cursor: 'pointer',
-															}}
-														>
-															{'{}'}
-														</Code>
-													</Popover.Target>
-													<Popover.Dropdown>
-														<Code block maw={320} mah={300} style={{ overflow: 'auto' }}>
-															{JSON.stringify(row.meta ?? {}, null, 2)}
-														</Code>
-													</Popover.Dropdown>
-												</Popover>
+											{/* Details chip vertically centred beside entity + IP */}
+											<Group justify="space-between" wrap="nowrap" gap="xs">
+												<Stack gap={6} style={{ minWidth: 0 }}>
+													<InfoLine label={t('audit.col_entity')}>
+														<Text size="sm">
+															{row.entity_type ? `${row.entity_type}#${row.entity_id ?? '—'}` : '—'}
+														</Text>
+													</InfoLine>
+													<InfoLine label={t('audit.col_ip')}>
+														<Text size="xs" ff="monospace" c="dimmed">
+															{row.ip ?? '—'}
+														</Text>
+													</InfoLine>
+												</Stack>
+												<MetaChip meta={row.meta} position="bottom" size={22} maw={320} />
 											</Group>
 										</Stack>
 									</Paper>
