@@ -14,7 +14,6 @@ import {
 	Box,
 	Button,
 	Card,
-	CopyButton,
 	Group,
 	Modal,
 	Paper,
@@ -24,7 +23,6 @@ import {
 	Text,
 	TextInput,
 	Title,
-	Tooltip,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
@@ -40,6 +38,8 @@ import {
 	useRotateApiKey,
 } from '../api/api-keys.js';
 import { ApiError } from '../api/client.js';
+import { CopyButton } from '../components/CopyButton.js';
+import { Tooltip } from '../components/Tooltip.js';
 
 function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 	return (

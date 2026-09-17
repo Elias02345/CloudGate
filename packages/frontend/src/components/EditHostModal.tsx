@@ -18,7 +18,6 @@ import {
 	Checkbox,
 	Code,
 	Collapse,
-	CopyButton,
 	Divider,
 	Group,
 	Modal,
@@ -49,6 +48,7 @@ import { useTranslation } from 'react-i18next';
 import { useZones } from '../api/cloudflare.js';
 import { type HostDto, type ProbeOutcome, useDiagnoseHost, useUpdateHost } from '../api/hosts.js';
 import { useTunnels } from '../api/tunnels.js';
+import { CopyButton } from './CopyButton.js';
 
 const HOME_ASSISTANT_DOCS_URL = 'https://github.com/Elias02345/CloudGate/blob/dev/docs/HOME-ASSISTANT.md';
 

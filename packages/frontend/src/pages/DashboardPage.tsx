@@ -114,9 +114,17 @@ export function DashboardPage() {
 			</Group>
 
 			{hostsError > 0 && (
-				<Alert color="red" icon={<IconAlertTriangle size={18} />} title={t('dashboard.hosts_errors_title')}>
-					{t('dashboard.hosts_errors_message', { count: hostsError })}
-				</Alert>
+				// The alert is the fastest route to the broken hosts — make it the link
+				<Anchor component={Link} to="/hosts" underline="never" c="inherit">
+					<Alert
+						className="cg-clickable"
+						color="red"
+						icon={<IconAlertTriangle size={18} />}
+						title={t('dashboard.hosts_errors_title')}
+					>
+						{t('dashboard.hosts_errors_message', { count: hostsError })}
+					</Alert>
+				</Anchor>
 			)}
 
 			<SimpleGrid cols={{ base: 1, xs: 2, lg: 4 }} spacing="md" data-tour="dashboard-health">
@@ -147,6 +155,7 @@ export function DashboardPage() {
 					label={t('dashboard.card_version')}
 					value={health.data?.version ?? '—'}
 					loading={health.isLoading}
+					to="/updates"
 				/>
 			</SimpleGrid>
 

@@ -3,6 +3,7 @@
  */
 
 import { type MantineColorsTuple, createTheme } from '@mantine/core';
+import { MOBILE_BREAKPOINT } from './layout.js';
 
 // CloudGate orange — accents on logo, primary buttons, badges
 const cgOrange: MantineColorsTuple = [
@@ -26,6 +27,15 @@ export const theme = createTheme({
 	},
 	fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif',
 	defaultRadius: 'md',
+	// `sm` is the phone/desktop switch everywhere (AppShell, hiddenFrom/visibleFrom, responsive props).
+	// Touch-only devices move it up to 1200px; `md` follows so the scale stays ascending.
+	breakpoints: {
+		xs: '36em',
+		sm: MOBILE_BREAKPOINT,
+		md: MOBILE_BREAKPOINT === '48em' ? '62em' : MOBILE_BREAKPOINT,
+		lg: '75em',
+		xl: '88em',
+	},
 	// Surface shadow from the Penpot design; per-component shadows live in styles/global.css
 	shadows: {
 		xs: '4px 4px 4px 0 rgba(0, 0, 0, 0.05)',

@@ -58,6 +58,7 @@ import {
 	VerifyAnim,
 	WelcomeAnim,
 } from '../components/onboarding/animations/index.js';
+import { MOBILE_QUERY } from '../layout.js';
 
 // Kept for the dashboard's existing fallback check on browsers without an
 // account yet — we leave the localStorage flag in place for legacy users.
@@ -129,7 +130,7 @@ export function OnboardingPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const [active, setActive] = useState(0);
-	const isMobile = useMediaQuery('(max-width: 48em)') ?? false;
+	const isMobile = useMediaQuery(MOBILE_QUERY) ?? false;
 	// Five horizontal steps need ~1000px of content; tablets and small laptops (sidebar open) get the vertical stepper
 	const verticalStepper = useMediaQuery('(max-width: 75em)') ?? false;
 

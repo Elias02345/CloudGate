@@ -5,7 +5,6 @@ import {
 	Badge,
 	Box,
 	Card,
-	CopyButton,
 	Group,
 	Paper,
 	Stack,
@@ -13,7 +12,6 @@ import {
 	Table,
 	Text,
 	Title,
-	Tooltip,
 } from '@mantine/core';
 import { Button } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
@@ -47,7 +45,9 @@ import {
 	useVerifyDns,
 } from '../api/hosts.js';
 import { BulkImportModal } from '../components/BulkImportModal.js';
+import { CopyButton } from '../components/CopyButton.js';
 import { EditHostModal } from '../components/EditHostModal.js';
+import { Tooltip } from '../components/Tooltip.js';
 
 function protocolBadge(protocol: string): { icon: ReactElement; label: string; color: string } {
 	switch (protocol) {
