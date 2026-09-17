@@ -6,9 +6,18 @@ body,
 
 body {
 	margin: 0;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Page ground sits a step darker than the surfaces (header, navbar, cards) floating on it */
+:root[data-mantine-color-scheme="dark"] body {
 	background: #0f1419;
 	color: #e6e6e6;
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+:root[data-mantine-color-scheme="light"] body {
+	background: var(--mantine-color-gray-1);
+	color: var(--mantine-color-black);
 }
 
 * {
@@ -24,6 +33,27 @@ body {
 	--cg-shadow-surface: 4px 4px 4px 0 rgba(0, 0, 0, 0.2);
 	--cg-shadow-inset: inset 4px 4px 4px 0 rgba(0, 0, 0, 0.2);
 	--cg-shadow-pill: 4px 4px 4px 0 rgba(0, 0, 0, 0.05);
+}
+
+/* Accent icon colours: bright on dark, darker shades on light so they keep ≥3:1 contrast */
+:root {
+	--cg-accent-logo: #ff9966;
+	--cg-accent-ai: #22d3ee;
+	--cg-accent-ok: #51cf66;
+	--cg-accent-warn: #fbbf24;
+}
+
+/* Light scheme: darker accents; the dark-theme shadow strength reads as smudges on a light ground */
+:root[data-mantine-color-scheme="light"] {
+	--cg-accent-logo: var(--mantine-color-cg-orange-6);
+	--cg-accent-ai: var(--mantine-color-cyan-8);
+	--cg-accent-ok: var(--mantine-color-green-8);
+	--cg-accent-warn: var(--mantine-color-yellow-8);
+	--cg-shadow-surface: 4px 4px 4px 0 rgba(0, 0, 0, 0.08);
+	--cg-shadow-inset: inset 2px 2px 3px 0 rgba(0, 0, 0, 0.08);
+	--cg-shadow-pill: 2px 2px 3px 0 rgba(0, 0, 0, 0.05);
+	--mantine-shadow-sm: var(--cg-shadow-surface);
+	--mantine-shadow-md: var(--cg-shadow-surface);
 }
 
 .mantine-Button-root:not([data-variant="subtle"], [data-variant="transparent"]),
@@ -54,6 +84,88 @@ body {
 
 .mantine-NavLink-root {
 	border-radius: var(--mantine-radius-md);
+}
+
+/*
+ * Interaction feedback: controls lift slightly on hover and settle on press.
+ * `.cg-clickable` marks custom clickable surfaces (selectable list rows/cards).
+ */
+.mantine-Button-root,
+.mantine-ActionIcon-root,
+.mantine-NavLink-root,
+.mantine-Chip-label,
+.mantine-SegmentedControl-control,
+.cg-clickable {
+	transition: transform 120ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms
+		ease, color 150ms ease;
+}
+
+.cg-clickable {
+	cursor: pointer;
+}
+
+@media (hover: hover) {
+	.mantine-Button-root:not(:disabled, [data-disabled], [data-loading]):hover,
+	.mantine-ActionIcon-root:not(:disabled, [data-disabled], [data-loading]):hover {
+		transform: translateY(-1px);
+	}
+
+	.mantine-Button-root:not(
+			[data-variant="subtle"],
+			[data-variant="transparent"],
+			:disabled,
+			[data-disabled]
+		):hover,
+	.mantine-ActionIcon-root[data-variant="filled"]:not(:disabled, [data-disabled]):hover {
+		box-shadow: 4px 6px 10px 0 rgba(0, 0, 0, 0.28);
+		filter: brightness(1.06);
+	}
+
+	.mantine-NavLink-root:not([data-active]):hover {
+		transform: translateX(2px);
+	}
+
+	.cg-clickable:not([data-selected]):hover {
+		background-color: var(--cg-clickable-hover);
+	}
+}
+
+.mantine-Button-root:not(:disabled, [data-disabled], [data-loading]):active,
+.mantine-ActionIcon-root:not(:disabled, [data-disabled], [data-loading]):active {
+	transform: translateY(1px);
+	box-shadow: none;
+}
+
+/* Selected row/card in a clickable list: orange tint + accent edge, readable in both schemes */
+/* Translucent so the hover reads on both card (#2e2e2e) and paper (#242424) grounds */
+:root {
+	--cg-clickable-hover: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-mantine-color-scheme="light"] {
+	--cg-clickable-hover: rgba(0, 0, 0, 0.045);
+}
+
+.cg-clickable[data-selected] {
+	background-color: var(--mantine-primary-color-light);
+}
+
+.mantine-Paper-root.cg-clickable[data-selected] {
+	border-color: var(--mantine-primary-color-filled);
+}
+
+tr.cg-clickable[data-selected] > td:first-child {
+	box-shadow: inset 3px 0 0 var(--mantine-primary-color-filled);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.mantine-Button-root,
+	.mantine-ActionIcon-root,
+	.mantine-NavLink-root,
+	.cg-clickable {
+		transition: none;
+		transform: none !important;
+	}
 }
 
 .mantine-NavLink-root[data-active] {

@@ -130,6 +130,8 @@ export function OnboardingPage() {
 	const navigate = useNavigate();
 	const [active, setActive] = useState(0);
 	const isMobile = useMediaQuery('(max-width: 48em)') ?? false;
+	// Five horizontal steps need ~1000px of content; tablets and small laptops (sidebar open) get the vertical stepper
+	const verticalStepper = useMediaQuery('(max-width: 75em)') ?? false;
 
 	const accounts = useCloudflareAccounts();
 	const tunnels = useTunnels();
@@ -227,12 +229,12 @@ export function OnboardingPage() {
 				onStepClick={setActive}
 				allowNextStepsSelect={false}
 				wrap={false}
-				orientation={isMobile ? 'vertical' : 'horizontal'}
+				orientation={verticalStepper ? 'vertical' : 'horizontal'}
 				mt={12}
 				w="100%"
 				maw={1015}
 				mx="auto"
-				styles={isMobile ? undefined : { content: { paddingTop: 90 } }}
+				styles={verticalStepper ? undefined : { content: { paddingTop: 90 } }}
 			>
 				{/* Step 1: Welcome */}
 				<Stepper.Step label={t('onboarding.step1_label')} description={t('onboarding.step1_desc')}>

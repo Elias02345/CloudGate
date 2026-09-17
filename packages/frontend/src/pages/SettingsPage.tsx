@@ -133,7 +133,7 @@ function HelpCard() {
 		<Card withBorder>
 			<Stack>
 				<Group>
-					<IconCompass size={20} color="#22d3ee" />
+					<IconCompass size={20} style={{ color: 'var(--cg-accent-ai)' }} />
 					<Title order={4}>{t('settings.help_title')}</Title>
 				</Group>
 				<Text size="sm" c="dimmed">
@@ -227,7 +227,10 @@ function TwoFactorCard() {
 			<Stack>
 				<Group justify="space-between" wrap="wrap" gap="sm">
 					<Group>
-						<IconShieldCheck size={20} color={isEnabled ? '#51cf66' : '#868e96'} />
+						<IconShieldCheck
+							size={20}
+							style={{ color: isEnabled ? 'var(--cg-accent-ok)' : 'var(--mantine-color-dimmed)' }}
+						/>
 						<Title order={4}>{t('settings.totp_title')}</Title>
 					</Group>
 					<Badge color={isEnabled ? 'green' : 'gray'} variant="light">
