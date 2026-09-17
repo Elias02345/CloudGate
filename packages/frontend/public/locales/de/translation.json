@@ -106,6 +106,14 @@
     "run_action": "Ausführen",
     "action_ok": "Aktion ausgeführt."
   },
+  "cloudy": {
+    "nudge_text": "Gefällt dir CloudGate? Eine kleine Spende hält es am Laufen.",
+    "nudge_cta": "Unterstützen",
+    "on_my_way": "Bin unterwegs…",
+    "working": "Ich kümmere mich…",
+    "done": "Fertig!",
+    "opening": "Öffne {{page}}…"
+  },
   "updates": {
     "title": "Self-Update",
     "current_version": "Aktuelle Version",
