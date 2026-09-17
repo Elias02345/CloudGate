@@ -33,7 +33,6 @@ import {
 	Stack,
 	Text,
 	Title,
-	Tooltip,
 } from '@mantine/core';
 import {
 	IconAlertTriangle,
@@ -58,6 +57,7 @@ import {
 	fetchUpdateLog,
 	pingHealth,
 } from '../api/updates.js';
+import { Tooltip } from './Tooltip.js';
 import './onboarding/animations/animations.css';
 
 interface UpdateProgressModalProps {

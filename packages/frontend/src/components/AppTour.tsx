@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import Joyride, { ACTIONS, EVENTS, STATUS, type CallBackProps, type Step } from 'react-joyride';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe, usePatchUserFlags } from '../api/auth.js';
+import { MOBILE_QUERY } from '../layout.js';
 import { TOUR_STOPS, type TourStop } from './tour/tour-steps.js';
 
 interface AppTourContextValue {
@@ -39,8 +40,6 @@ const AppTourContext = createContext<AppTourContextValue>({
 export function useAppTour(): AppTourContextValue {
 	return useContext(AppTourContext);
 }
-
-const MOBILE_QUERY = '(max-width: 48em)';
 
 function targetOf(stop: TourStop, mobile: boolean): string {
 	return mobile && stop.mobileTarget ? stop.mobileTarget : stop.target;
@@ -270,7 +269,7 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 					last: t('tour.last'),
 					next: t('tour.next'),
 					// Replaces `next` while showProgress is on — untranslated, it showed English buttons
-					nextLabelWithProgress: t('tour.next_progress'),
+					nextLabelWithProgress: t('tour.next_progress', { defaultValue: t('tour.next') }),
 					skip: t('tour.skip'),
 				}}
 			/>

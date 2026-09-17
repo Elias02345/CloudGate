@@ -13,6 +13,7 @@ import {
 	Alert,
 	Avatar,
 	Badge,
+	Box,
 	Button,
 	Card,
 	CloseButton,
@@ -24,9 +25,8 @@ import {
 	Stack,
 	Text,
 	Textarea,
-	Tooltip,
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
 	IconAlertTriangle,
@@ -34,7 +34,6 @@ import {
 	IconRobot,
 	IconSend,
 	IconSparkles,
-	IconUser,
 } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -49,6 +48,8 @@ import {
 	useSendMessage,
 } from '../api/ai.js';
 import { ApiError } from '../api/client.js';
+import { MOBILE_QUERY } from '../layout.js';
+import { Tooltip } from './Tooltip.js';
 
 /**
  * App-level mount point — renders the FAB conditionally on enabled state.
@@ -90,6 +91,7 @@ interface AiChatDrawerProps {
 
 function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 	const { t } = useTranslation();
+	const isMobile = useMediaQuery(MOBILE_QUERY) ?? false;
 	const [conversationId, setConversationId] = useState<string | null>(null);
 	const conversations = useConversations();
 	const conversation = useConversation(conversationId);
@@ -159,35 +161,57 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 	const messages = conversation.data?.messages ?? [];
 
 	return (
-		<Drawer opened={opened} onClose={onClose} position="right" size="md" withCloseButton={false} padding={0}>
-			<Stack gap={0} h="100vh">
+		<Drawer
+			opened={opened}
+			onClose={onClose}
+			position={isMobile ? 'bottom' : 'right'}
+			size={isMobile ? '92%' : 'md'}
+			withCloseButton={false}
+			padding={0}
+			// The drawer body has to carry the height, otherwise the input row floats
+			// under the messages instead of sitting at the bottom edge
+			styles={{
+				content: {
+					display: 'flex',
+					flexDirection: 'column',
+					...(isMobile ? { borderRadius: 'var(--mantine-radius-md) var(--mantine-radius-md) 0 0' } : {}),
+				},
+				body: { flex: 1, minHeight: 0 },
+			}}
+		>
+			<Stack gap={0} h="100%">
 				{/* Header */}
 				<Group
 					justify="space-between"
 					px="md"
 					py="sm"
-					style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}
+					wrap="nowrap"
+					style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
 				>
-					<Group gap="xs">
-						<IconRobot size={20} style={{ color: 'var(--cg-accent-ai)' }} />
+					<Group gap="xs" wrap="nowrap">
+						<IconRobot size={20} style={{ color: 'var(--cg-accent-ai)', flexShrink: 0 }} />
 						<Text fw={600}>{t('ai_chat.title')}</Text>
 					</Group>
-					<Group gap="xs">
+					<Group gap="xs" wrap="nowrap">
 						<Tooltip label={t('ai_chat.new_conversation')}>
-							<ActionIcon variant="subtle" onClick={onNewConversation}>
+							<ActionIcon
+								variant="subtle"
+								onClick={onNewConversation}
+								aria-label={t('ai_chat.new_conversation')}
+							>
 								<IconSparkles size={16} />
 							</ActionIcon>
 						</Tooltip>
-						<CloseButton onClick={onClose} />
+						<CloseButton onClick={onClose} aria-label={t('common.close')} />
 					</Group>
 				</Group>
 
 				{/* Conversation picker */}
-				<Group px="md" py="xs" gap="xs">
+				<Group px="md" py="xs" gap="xs" wrap="nowrap">
 					<Select
 						placeholder={t('ai_chat.pick_conversation')}
 						size="xs"
-						style={{ flex: 1 }}
+						style={{ flex: 1, minWidth: 0 }}
 						value={conversationId}
 						onChange={setConversationId}
 						data={
@@ -199,7 +223,13 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 						clearable
 					/>
 					{conversationId && (
-						<Button size="xs" variant="subtle" color="red" onClick={onDeleteConversation}>
+						<Button
+							size="xs"
+							variant="subtle"
+							color="red"
+							onClick={onDeleteConversation}
+							style={{ flexShrink: 0 }}
+						>
 							{t('common.delete')}
 						</Button>
 					)}
@@ -245,7 +275,12 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 				</ScrollArea>
 
 				{/* Input */}
-				<Stack px="md" py="sm" gap="xs" style={{ borderTop: '1px solid var(--mantine-color-gray-3)' }}>
+				<Stack
+					px="md"
+					py="sm"
+					gap="xs"
+					style={{ borderTop: '1px solid var(--mantine-color-default-border)' }}
+				>
 					<Textarea
 						placeholder={t('ai_chat.input_placeholder')}
 						value={pendingMessage}
@@ -296,7 +331,8 @@ function MessageBubble({ role, content, toolResults, onConfirm }: MessageBubbleP
 		const pending = extractPending(toolResults);
 		if (pending) {
 			return (
-				<Card withBorder p="sm" bg="yellow.0">
+				// scheme-neutral tinted surface (same recipe as Badge/Alert's yellow "light" variant)
+				<Card withBorder p="sm" style={{ backgroundColor: 'var(--mantine-color-yellow-light)' }}>
 					<Stack gap="xs">
 						<Group gap="xs">
 							<IconAlertTriangle size={16} style={{ color: 'var(--cg-accent-warn)' }} />
@@ -318,22 +354,42 @@ function MessageBubble({ role, content, toolResults, onConfirm }: MessageBubbleP
 		return null;
 	}
 
-	const isUser = role === 'user';
-	return (
-		<Group align="flex-start" gap="xs" wrap="nowrap">
-			<Avatar size="sm" color={isUser ? 'gray' : 'cyan'} radius="xl">
-				{isUser ? <IconUser size={14} /> : <IconRobot size={14} />}
-			</Avatar>
-			<Card withBorder p="xs" style={{ flex: 1 }}>
-				{isUser ? (
-					<Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+	if (role === 'user') {
+		return (
+			<Group justify="flex-end">
+				<Box
+					maw="80%"
+					px="sm"
+					py="xs"
+					style={{
+						backgroundColor: 'var(--mantine-primary-color-light)',
+						borderRadius: 'var(--mantine-radius-md)',
+					}}
+				>
+					<Text size="sm" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
 						{content}
 					</Text>
-				) : (
-					<div className="ai-markdown">
-						<ReactMarkdown remarkPlugins={[remarkGfm]}>{content || ''}</ReactMarkdown>
-					</div>
-				)}
+				</Box>
+			</Group>
+		);
+	}
+
+	return (
+		<Group align="flex-start" gap="xs" wrap="nowrap">
+			<Avatar size="sm" color="cyan" radius="xl">
+				<IconRobot size={14} />
+			</Avatar>
+			<Card withBorder p="xs" style={{ flex: 1, minWidth: 0 }}>
+				<div className="ai-markdown" style={{ overflowWrap: 'anywhere' }}>
+					<ReactMarkdown
+						remarkPlugins={[remarkGfm]}
+						components={{
+							pre: (props) => <pre {...props} style={{ overflowX: 'auto', maxWidth: '100%' }} />,
+						}}
+					>
+						{content || ''}
+					</ReactMarkdown>
+				</div>
 			</Card>
 		</Group>
 	);

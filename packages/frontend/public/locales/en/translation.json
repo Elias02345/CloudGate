@@ -410,6 +410,8 @@
     "copy": "Copy",
     "copied": "Copied!",
     "one_click": "One-click PayPal",
+    "enlarge_qr": "Enlarge {{label}} QR code",
+    "close_qr": "Close",
     "paypal_hint": "Opens in a new tab. PayPal account, card or PayPal Credit.",
     "btc_hint": "Mainnet · scan with any wallet (BIP21-compatible).",
     "eth_hint": "Mainnet · scan with any wallet (EIP-681 URI).",
