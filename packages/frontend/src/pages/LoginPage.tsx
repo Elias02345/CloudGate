@@ -1,4 +1,15 @@
-import { Alert, Anchor, Button, Card, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+import {
+	Alert,
+	Anchor,
+	Button,
+	Card,
+	Center,
+	PasswordInput,
+	Stack,
+	Text,
+	TextInput,
+	Title,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconAlertCircle } from '@tabler/icons-react';
 import { useEffect } from 'react';
@@ -56,10 +67,12 @@ export function LoginPage() {
 				: null;
 
 	return (
-		<Stack align="center" mt="xl">
-			<Card shadow="sm" radius="md" withBorder w={400}>
+		<Center mih="calc(100dvh - 2 * var(--app-shell-header-offset, 56px) - 2 * var(--mantine-spacing-md))">
+			<Card shadow="sm" radius="md" withBorder w="100%" maw={400}>
 				<Stack>
-					<Title order={3}>{t('login.title')}</Title>
+					<Title order={3} ta="center">
+						{t('login.title')}
+					</Title>
 					{errMessage && (
 						<Alert color="red" icon={<IconAlertCircle size={18} />} title={t('login.failed')}>
 							{errMessage}
@@ -95,6 +108,6 @@ export function LoginPage() {
 					)}
 				</Stack>
 			</Card>
-		</Stack>
+		</Center>
 	);
 }

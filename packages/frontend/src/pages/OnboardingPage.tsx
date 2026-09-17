@@ -18,6 +18,7 @@ import {
 	Alert,
 	Anchor,
 	Badge,
+	Box,
 	Button,
 	Card,
 	Code,
@@ -32,6 +33,7 @@ import {
 	Transition,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import {
 	IconCheck,
@@ -85,10 +87,49 @@ interface DeepHealthResponse {
 const VERIFY_KEYS = ['db', 'secrets', 'cloudflared', 'disk', 'github'] as const;
 type VerifyKey = (typeof VERIFY_KEYS)[number];
 
+/**
+ * Centers the step's primary action button(s) while pinning the "skip
+ * onboarding" control to the far right of the same row (below, on mobile).
+ */
+function StepActionsRow({
+	isMobile,
+	onSkip,
+	skipLabel,
+	children,
+}: {
+	isMobile: boolean;
+	onSkip: () => void;
+	skipLabel: string;
+	children: React.ReactNode;
+}) {
+	const skipButton = (
+		<Button variant="subtle" size="sm" onClick={onSkip}>
+			{skipLabel}
+		</Button>
+	);
+	if (isMobile) {
+		return (
+			<Stack gap="xs" w="100%">
+				<Group justify="center">{children}</Group>
+				<Group justify="center">{skipButton}</Group>
+			</Stack>
+		);
+	}
+	return (
+		<Box pos="relative" w="100%">
+			<Group justify="center">{children}</Group>
+			<Box pos="absolute" right={0} top="50%" style={{ transform: 'translateY(-50%)' }}>
+				{skipButton}
+			</Box>
+		</Box>
+	);
+}
+
 export function OnboardingPage() {
 	const { t } = useTranslation();
 	const navigate = useNavigate();
 	const [active, setActive] = useState(0);
+	const isMobile = useMediaQuery('(max-width: 48em)') ?? false;
 
 	const accounts = useCloudflareAccounts();
 	const tunnels = useTunnels();
@@ -175,34 +216,54 @@ export function OnboardingPage() {
 	);
 
 	return (
-		<Stack maw={780} mx="auto" py="xl">
-			<Group justify="space-between">
-				<Title order={2}>{t('onboarding.title')}</Title>
-				<Button variant="subtle" onClick={onSkip}>
-					{t('onboarding.skip')}
-				</Button>
-			</Group>
+		<Stack pt={26} pb="xl">
+			<Title order={2} ta="center">
+				{t('onboarding.title')}
+			</Title>
 
-			<Stepper active={active} onStepClick={setActive} allowNextStepsSelect={false}>
+			{/* Spacing taken from the Penpot design: step card sits well below the stepper row */}
+			<Stepper
+				active={active}
+				onStepClick={setActive}
+				allowNextStepsSelect={false}
+				wrap={false}
+				orientation={isMobile ? 'vertical' : 'horizontal'}
+				mt={12}
+				w="100%"
+				maw={1015}
+				mx="auto"
+				styles={isMobile ? undefined : { content: { paddingTop: 90 } }}
+			>
 				{/* Step 1: Welcome */}
 				<Stepper.Step label={t('onboarding.step1_label')} description={t('onboarding.step1_desc')}>
 					{stepBody(
 						0,
-						<Card withBorder>
+						<Card withBorder maw={780} mx="auto" w="100%">
 							<Stack align="center">
 								<WelcomeAnim />
 								<Title order={4}>{t('onboarding.welcome_title')}</Title>
 								<Text ta="center">{t('onboarding.welcome_body')}</Text>
-								<Stack gap={4} w="100%">
-									<Text size="sm">• {t('onboarding.welcome_bullet1')}</Text>
-									<Text size="sm">• {t('onboarding.welcome_bullet2')}</Text>
-									<Text size="sm">• {t('onboarding.welcome_bullet3')}</Text>
+								{/* Manual bullet + flex text: wrapped lines hang under the text start, not
+								    under the marker — Mantine's <List> uses list-style-position:inside, which
+								    (a) doesn't hang-indent wrapped lines and (b) drops the marker glyph entirely
+								    when re-rendered outside a live browser (e.g. the Penpot mobile mockup). */}
+								<Stack gap={4} style={{ alignSelf: 'stretch' }}>
+									{(['welcome_bullet1', 'welcome_bullet2', 'welcome_bullet3'] as const).map((key) => (
+										<Group key={key} gap={8} wrap="nowrap" align="flex-start">
+											<Text size="sm" c="dimmed">
+												•
+											</Text>
+											<Text size="sm" style={{ flex: 1 }}>
+												{t(`onboarding.${key}`)}
+											</Text>
+										</Group>
+									))}
 								</Stack>
-								<Group>
+								<StepActionsRow isMobile={isMobile} onSkip={onSkip} skipLabel={t('onboarding.skip')}>
 									<Button onClick={() => setActive(1)} size="md">
 										{t('onboarding.lets_go')}
 									</Button>
-								</Group>
+								</StepActionsRow>
 							</Stack>
 						</Card>
 					)}
@@ -212,7 +273,7 @@ export function OnboardingPage() {
 				<Stepper.Step label={t('onboarding.step2_label')} description={t('onboarding.step2_desc')}>
 					{stepBody(
 						1,
-						<Card withBorder>
+						<Card withBorder maw={780} mx="auto" w="100%">
 							<Stack>
 								<Group justify="center">
 									<CloudflareAnim />
@@ -265,18 +326,18 @@ export function OnboardingPage() {
 												{...tokenForm.getInputProps('api_token')}
 												required
 											/>
-											<Group>
+											<StepActionsRow isMobile={isMobile} onSkip={onSkip} skipLabel={t('onboarding.skip')}>
 												<Button type="submit" loading={addAccount.isPending}>
 													{t('cloudflare.validate_and_add')}
 												</Button>
-											</Group>
+											</StepActionsRow>
 										</Stack>
 									</form>
 								)}
 								{hasAccount && (
-									<Group>
+									<StepActionsRow isMobile={isMobile} onSkip={onSkip} skipLabel={t('onboarding.skip')}>
 										<Button onClick={() => setActive(2)}>{t('onboarding.next')}</Button>
-									</Group>
+									</StepActionsRow>
 								)}
 							</Stack>
 						</Card>
@@ -287,7 +348,7 @@ export function OnboardingPage() {
 				<Stepper.Step label={t('onboarding.step3_label')} description={t('onboarding.step3_desc')}>
 					{stepBody(
 						2,
-						<Card withBorder>
+						<Card withBorder maw={780} mx="auto" w="100%">
 							<Stack>
 								<Group justify="center">
 									<TunnelAnim />
@@ -313,18 +374,18 @@ export function OnboardingPage() {
 												{...tunnelForm.getInputProps('name')}
 												required
 											/>
-											<Group>
+											<StepActionsRow isMobile={isMobile} onSkip={onSkip} skipLabel={t('onboarding.skip')}>
 												<Button type="submit" loading={createTunnel.isPending}>
 													{t('tunnels.submit')}
 												</Button>
-											</Group>
+											</StepActionsRow>
 										</Stack>
 									</form>
 								)}
 								{hasTunnel && (
-									<Group>
+									<StepActionsRow isMobile={isMobile} onSkip={onSkip} skipLabel={t('onboarding.skip')}>
 										<Button onClick={() => setActive(3)}>{t('onboarding.next')}</Button>
-									</Group>
+									</StepActionsRow>
 								)}
 							</Stack>
 						</Card>
@@ -335,21 +396,21 @@ export function OnboardingPage() {
 				<Stepper.Step label={t('onboarding.step4_label')} description={t('onboarding.step4_desc')}>
 					{stepBody(
 						3,
-						<Card withBorder>
+						<Card withBorder maw={780} mx="auto" w="100%">
 							<Stack>
 								<Group justify="center">
 									<FirstHostAnim />
 								</Group>
 								<Title order={4}>{t('onboarding.step4_title')}</Title>
 								<Text size="sm">{t('onboarding.step4_intro')}</Text>
-								<Group>
+								<StepActionsRow isMobile={isMobile} onSkip={onSkip} skipLabel={t('onboarding.skip')}>
 									<Button component={Link} to="/hosts/new" variant="filled">
 										{t('hosts.add')}
 									</Button>
 									<Button variant="default" onClick={() => setActive(4)}>
 										{t('onboarding.next')}
 									</Button>
-								</Group>
+								</StepActionsRow>
 							</Stack>
 						</Card>
 					)}
@@ -361,14 +422,17 @@ export function OnboardingPage() {
 					description={t('onboarding.step5_desc')}
 					icon={<IconShieldCheck size={18} />}
 				>
-					{stepBody(4, <VerificationStep onComplete={() => setActive(5)} />)}
+					{stepBody(
+						4,
+						<VerificationStep onComplete={() => setActive(5)} isMobile={isMobile} onSkip={onSkip} />
+					)}
 				</Stepper.Step>
 
 				{/* Step 6: Done */}
 				<Stepper.Completed>
 					{stepBody(
 						5,
-						<Card withBorder>
+						<Card withBorder maw={780} mx="auto" w="100%">
 							<Stack align="center">
 								<DoneAnim />
 								<Title order={4}>{t('onboarding.done_title')}</Title>
@@ -384,11 +448,11 @@ export function OnboardingPage() {
 										<Badge mr="xs">{t('nav.updates')}</Badge> {t('onboarding.done_hint_updates')}
 									</Text>
 								</Stack>
-								<Group>
+								<StepActionsRow isMobile={isMobile} onSkip={onSkip} skipLabel={t('onboarding.skip')}>
 									<Button onClick={onFinish} loading={patchFlags.isPending} size="md">
 										{t('onboarding.finish_with_tour')}
 									</Button>
-								</Group>
+								</StepActionsRow>
 								<Text size="xs" c="dimmed">
 									{t('onboarding.tour_hint')}
 								</Text>
@@ -403,9 +467,11 @@ export function OnboardingPage() {
 
 interface VerificationStepProps {
 	onComplete: () => void;
+	isMobile: boolean;
+	onSkip: () => void;
 }
 
-function VerificationStep({ onComplete }: VerificationStepProps) {
+function VerificationStep({ onComplete, isMobile, onSkip }: VerificationStepProps) {
 	const { t } = useTranslation();
 	const [statuses, setStatuses] = useState<Record<VerifyKey, 'pending' | 'ok' | 'failed'>>({
 		db: 'pending',
@@ -472,7 +538,7 @@ function VerificationStep({ onComplete }: VerificationStepProps) {
 	const allOk = okCount === VERIFY_KEYS.length;
 
 	return (
-		<Card withBorder>
+		<Card withBorder maw={780} mx="auto" w="100%">
 			<Stack>
 				<Group justify="space-between">
 					<Title order={4}>
@@ -495,14 +561,14 @@ function VerificationStep({ onComplete }: VerificationStepProps) {
 						{t('onboarding.verify_some_failed_body')}
 					</Alert>
 				)}
-				<Group>
+				<StepActionsRow isMobile={isMobile} onSkip={onSkip} skipLabel={t('onboarding.skip')}>
 					<Button onClick={onComplete} disabled={!done} variant={allOk ? 'filled' : 'default'}>
 						{allOk ? t('onboarding.next') : t('onboarding.continue_anyway')}
 					</Button>
 					<Button onClick={run} loading={running} variant="subtle">
 						{t('onboarding.verify_rerun')}
 					</Button>
-				</Group>
+				</StepActionsRow>
 			</Stack>
 		</Card>
 	);

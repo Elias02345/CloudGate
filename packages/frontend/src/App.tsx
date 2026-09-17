@@ -1,4 +1,5 @@
-import { ActionIcon, AppShell, Group, Menu, NavLink, Stack, Text, Title } from '@mantine/core';
+import { ActionIcon, AppShell, Burger, Group, Menu, NavLink, Stack, Text, Title } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import {
 	IconArrowUp,
 	IconBook,
@@ -51,7 +52,15 @@ export function App() {
 	const navigate = useNavigate();
 	const location = useLocation();
 
+	const [navOpened, nav] = useDisclosure(false);
+
 	const showShell = !!me?.user && !me.user.must_change_password;
+
+	// Close the mobile nav drawer after picking a page
+	const go = (path: string) => {
+		navigate(path);
+		nav.close();
+	};
 
 	// Subscribe to backend events for live query invalidation
 	useEventStream();
@@ -60,15 +69,25 @@ export function App() {
 		<AppTourProvider>
 			<AppShell
 				header={{ height: 56 }}
-				navbar={showShell ? { width: 220, breakpoint: 'sm' } : undefined}
+				navbar={showShell ? { width: 220, breakpoint: 'sm', collapsed: { mobile: !navOpened } } : undefined}
 				padding="md"
+				withBorder={false}
 			>
 				<AppShell.Header>
-					<Group h="100%" px="md" justify="space-between">
-						<Group gap="xs" data-tour="app-logo">
+					<Group h="100%" px="md" justify="space-between" wrap="nowrap">
+						<Group gap="xs" wrap="nowrap" data-tour="app-logo">
+							{showShell && (
+								<Burger
+									opened={navOpened}
+									onClick={nav.toggle}
+									hiddenFrom="sm"
+									size="sm"
+									aria-label={t('header.toggle_nav')}
+								/>
+							)}
 							<IconCloudComputing size={26} color="#ff9966" />
 							<Title order={3}>CloudGate</Title>
-							<Text size="xs" c="dimmed">
+							<Text size="xs" c="dimmed" visibleFrom="xs">
 								pre-alpha
 							</Text>
 						</Group>
@@ -107,79 +126,79 @@ export function App() {
 								label={t('nav.dashboard')}
 								leftSection={<IconHome size={16} />}
 								active={location.pathname === '/'}
-								onClick={() => navigate('/')}
+								onClick={() => go('/')}
 							/>
 							<NavLink
 								label={t('nav.cloudflare')}
 								leftSection={<IconCloudCheck size={16} />}
 								active={location.pathname.startsWith('/cloudflare')}
-								onClick={() => navigate('/cloudflare')}
+								onClick={() => go('/cloudflare')}
 							/>
 							<NavLink
 								label="Playit"
 								leftSection={<IconDeviceGamepad2 size={16} />}
 								active={location.pathname.startsWith('/playit')}
-								onClick={() => navigate('/playit')}
+								onClick={() => go('/playit')}
 							/>
 							<NavLink
 								label={t('nav.tunnels')}
 								leftSection={<IconRoute size={16} />}
 								active={location.pathname.startsWith('/tunnels')}
-								onClick={() => navigate('/tunnels')}
+								onClick={() => go('/tunnels')}
 							/>
 							<NavLink
 								label={t('nav.hosts')}
 								leftSection={<IconServer2 size={16} />}
 								active={location.pathname.startsWith('/hosts')}
-								onClick={() => navigate('/hosts')}
+								onClick={() => go('/hosts')}
 							/>
 							<NavLink
 								label={t('nav.audit')}
 								leftSection={<IconClipboardList size={16} />}
 								active={location.pathname.startsWith('/audit')}
-								onClick={() => navigate('/audit')}
+								onClick={() => go('/audit')}
 							/>
 							<NavLink
 								label={t('nav.updates')}
 								leftSection={<IconArrowUp size={16} />}
 								active={location.pathname.startsWith('/updates')}
-								onClick={() => navigate('/updates')}
+								onClick={() => go('/updates')}
 							/>
 							<NavLink
 								label={t('nav.settings')}
 								leftSection={<IconSettings size={16} />}
 								active={location.pathname.startsWith('/settings')}
-								onClick={() => navigate('/settings')}
+								onClick={() => go('/settings')}
 							/>
 							<NavLink
 								label="Backup"
 								leftSection={<IconDatabaseExport size={16} />}
 								active={location.pathname.startsWith('/backup')}
-								onClick={() => navigate('/backup')}
+								onClick={() => go('/backup')}
 							/>
 							<NavLink
 								label={t('nav.api_keys')}
 								leftSection={<IconKey size={16} />}
 								active={location.pathname.startsWith('/api-keys')}
-								onClick={() => navigate('/api-keys')}
+								onClick={() => go('/api-keys')}
 							/>
 							<NavLink
 								label={t('nav.api_docs')}
 								leftSection={<IconBook size={16} />}
 								active={location.pathname.startsWith('/api-docs')}
-								onClick={() => navigate('/api-docs')}
+								onClick={() => go('/api-docs')}
 							/>
 							<NavLink
 								label={t('nav.ai')}
 								leftSection={<IconRobot size={16} color="#22d3ee" />}
 								active={location.pathname.startsWith('/ai')}
-								onClick={() => navigate('/ai')}
+								onClick={() => go('/ai')}
 							/>
 							<NavLink
 								label={t('nav.donate')}
 								leftSection={<IconHeart size={16} color="#ff6620" />}
 								active={location.pathname.startsWith('/donate')}
-								onClick={() => navigate('/donate')}
+								onClick={() => go('/donate')}
 							/>
 						</Stack>
 					</AppShell.Navbar>

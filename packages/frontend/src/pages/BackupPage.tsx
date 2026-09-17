@@ -8,7 +8,6 @@ import {
 	Divider,
 	FileInput,
 	Group,
-	List,
 	PasswordInput,
 	Stack,
 	Text,
@@ -23,6 +22,13 @@ import {
 } from '@tabler/icons-react';
 import { useState } from 'react';
 import { runAdminRestore, runBackupExport } from '../api/restore.js';
+
+const BACKUP_CONTENTS = [
+	{ paths: ['db/db.sqlite'], desc: 'all hosts, tunnels, accounts, settings' },
+	{ paths: ['secrets/'], desc: 'encryption + JWT keys (required to decrypt the DB)' },
+	{ paths: ['cloudflared/'], desc: 'tunnel credentials so existing CF tunnels keep working' },
+	{ paths: ['nginx/custom/', 'nginx/certs/'], desc: "your snippets and Let's Encrypt certs" },
+];
 
 export function BackupPage() {
 	return (
@@ -83,9 +89,14 @@ function ExportCard() {
 					<IconCloudDownload size={20} color="#3b82f6" />
 					<Title order={4}>Export backup</Title>
 				</Group>
+				{/* Filename pattern on its own line: a code span mid-sentence wraps fine in a
+				    live browser, but exports as a separate, misaligned fragment in the Penpot
+				    mockup — a standalone line captures and reflows cleanly everywhere. */}
 				<Text size="sm" c="dimmed">
-					Downloads <code>cloudgate-backup-YYYY-MM-DD…cgbk</code> encrypted with your passphrase (AES-256-GCM,
-					PBKDF2 200k iterations).
+					Downloads an encrypted backup file (AES-256-GCM, PBKDF2 200k iterations):
+				</Text>
+				<Text size="sm" c="dimmed" ff="monospace">
+					cloudgate-backup-YYYY-MM-DD…cgbk
 				</Text>
 				{err && (
 					<Alert color="red" icon={<IconAlertCircle size={18} />}>
@@ -204,20 +215,27 @@ function ImportCard() {
 				<Text size="xs" c="dimmed">
 					Backup contents:
 				</Text>
-				<List size="xs" c="dimmed">
-					<List.Item>
-						<code>db/db.sqlite</code> — all hosts, tunnels, accounts, settings
-					</List.Item>
-					<List.Item>
-						<code>secrets/</code> — encryption + JWT keys (required to decrypt the DB)
-					</List.Item>
-					<List.Item>
-						<code>cloudflared/</code> — tunnel credentials so existing CF tunnels keep working
-					</List.Item>
-					<List.Item>
-						<code>nginx/custom/</code> + <code>nginx/certs/</code> — your snippets and Let's Encrypt certs
-					</List.Item>
-				</List>
+				{/* Manual bullet + flex text (see the onboarding page for why: Mantine's <List>
+				    doesn't hang-indent wrapped lines and drops its marker outside a live browser). */}
+				<Stack gap={6}>
+					{BACKUP_CONTENTS.map((item) => (
+						<Group key={item.desc} gap={8} wrap="nowrap" align="flex-start">
+							<Text size="xs" c="dimmed">
+								•
+							</Text>
+							<Text size="xs" c="dimmed" style={{ flex: 1 }}>
+								{item.paths.map((p, i) => (
+									<span key={p}>
+										{i > 0 && ' + '}
+										<code>{p}</code>
+									</span>
+								))}
+								{' — '}
+								{item.desc}
+							</Text>
+						</Group>
+					))}
+				</Stack>
 			</Stack>
 		</Card>
 	);

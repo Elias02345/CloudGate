@@ -114,7 +114,7 @@ export function UpdatesPage() {
 
 			<Card withBorder data-tour="updates-status">
 				<Stack>
-					<Group justify="space-between">
+					<Group justify="space-between" wrap="wrap" gap="sm">
 						<Stack gap={0}>
 							<Text size="sm" c="dimmed">
 								{t('updates.current_version')}
@@ -203,7 +203,7 @@ export function UpdatesPage() {
 								{ value: 'nightly', label: t('updates.channel_nightly') },
 								{ value: 'disabled', label: t('updates.channel_disabled') },
 							]}
-							w={200}
+							w={{ base: '100%', sm: 260 }}
 						/>
 					</Group>
 					<Group justify="space-between">
@@ -220,7 +220,7 @@ export function UpdatesPage() {
 								{ value: 'notify', label: t('updates.mode_notify') },
 								{ value: 'auto', label: t('updates.mode_auto') },
 							]}
-							w={200}
+							w={{ base: '100%', sm: 260 }}
 						/>
 					</Group>
 				</Stack>

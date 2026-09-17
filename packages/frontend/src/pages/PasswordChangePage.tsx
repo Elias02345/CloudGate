@@ -1,4 +1,15 @@
-import { Alert, Button, Card, Divider, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+import {
+	Alert,
+	Button,
+	Card,
+	Center,
+	Divider,
+	PasswordInput,
+	Stack,
+	Text,
+	TextInput,
+	Title,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { IconCheck, IconShieldLock, IconUserPlus } from '@tabler/icons-react';
@@ -64,8 +75,8 @@ export function PasswordChangePage() {
 				: null;
 
 	return (
-		<Stack align="center" mt="xl">
-			<Card shadow="sm" radius="md" withBorder w={520}>
+		<Center mih="calc(100dvh - var(--app-shell-header-offset, 56px) - 2 * var(--mantine-spacing-md))">
+			<Card shadow="sm" radius="md" withBorder w="100%" maw={520}>
 				<Stack>
 					<Title order={3}>
 						{firstLogin ? (
@@ -137,6 +148,6 @@ export function PasswordChangePage() {
 					</form>
 				</Stack>
 			</Card>
-		</Stack>
+		</Center>
 	);
 }

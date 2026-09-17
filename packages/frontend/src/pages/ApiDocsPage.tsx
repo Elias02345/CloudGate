@@ -6,7 +6,7 @@
  * link to the JSON for proper tools (Insomnia, Postman, agent code).
  */
 
-import { Anchor, Badge, Card, Code, Group, Stack, Text, Title } from '@mantine/core';
+import { Anchor, Badge, Box, Card, Code, Flex, Group, Stack, Text, Title } from '@mantine/core';
 import { IconBook, IconDownload, IconExternalLink } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -76,7 +76,8 @@ export function ApiDocsPage() {
 			</Group>
 			{spec.data.info.description && (
 				<Text c="dimmed" size="sm" style={{ whiteSpace: 'pre-line' }}>
-					{spec.data.info.description}
+					{/* Single newlines in the spec are soft wraps; keep only paragraph breaks so text reflows on phones */}
+					{spec.data.info.description.replace(/(?<!\n)\n(?!\n)/g, ' ')}
 				</Text>
 			)}
 			<Group gap="md">
@@ -108,21 +109,32 @@ export function ApiDocsPage() {
 								<Title order={4}>{tag}</Title>
 								{tagInfo?.description && (
 									<Text size="xs" c="dimmed">
-										— {tagInfo.description}
+										{`— ${tagInfo.description}`}
 									</Text>
 								)}
 							</Group>
 							<Stack gap={4}>
 								{endpoints.map((e) => (
-									<Group key={`${e.method}:${e.path}`} gap="sm" wrap="nowrap">
-										<Badge color={HTTP_COLOURS[e.method.toLowerCase()] ?? 'gray'} w={70} ta="center">
-											{e.method}
-										</Badge>
-										<Code style={{ flexShrink: 0 }}>{e.path}</Code>
-										<Text size="sm" c="dimmed">
-											— {e.op.summary ?? ''}
+									// Phones: summary moves below method + path instead of squeezing beside it
+									<Flex
+										key={`${e.method}:${e.path}`}
+										direction={{ base: 'column', sm: 'row' }}
+										align={{ base: 'flex-start', sm: 'center' }}
+										gap={{ base: 2, sm: 'sm' }}
+									>
+										<Group gap="sm" wrap="nowrap" maw="100%" style={{ flexShrink: 0 }}>
+											<Badge color={HTTP_COLOURS[e.method.toLowerCase()] ?? 'gray'} w={70} ta="center">
+												{e.method}
+											</Badge>
+											<Code style={{ minWidth: 0, wordBreak: 'break-all' }}>{e.path}</Code>
+										</Group>
+										<Text size="sm" c="dimmed" style={{ minWidth: 0, flex: 1 }}>
+											<Box component="span" visibleFrom="sm">
+												—{' '}
+											</Box>
+											{e.op.summary ?? ''}
 										</Text>
-									</Group>
+									</Flex>
 								))}
 							</Stack>
 						</Stack>

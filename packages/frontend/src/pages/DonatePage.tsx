@@ -13,6 +13,7 @@ import {
 	Box,
 	Card,
 	CopyButton,
+	Flex,
 	Group,
 	SimpleGrid,
 	Stack,
@@ -135,7 +136,7 @@ function DonationCard({ option }: { option: DonationOption }) {
 	return (
 		<Card withBorder radius="md" padding="lg">
 			<Stack gap="sm">
-				<Group justify="space-between">
+				<Group justify="space-between" wrap="wrap" gap="sm">
 					<Group gap="xs">
 						<Box style={{ color: option.color }}>{option.icon}</Box>
 						<Text fw={600} size="lg">
@@ -149,13 +150,14 @@ function DonationCard({ option }: { option: DonationOption }) {
 					)}
 				</Group>
 
-				<Group align="flex-start" wrap="nowrap">
+				{/* Phones: QR above the address so the address gets the full card width */}
+				<Flex direction={{ base: 'column', sm: 'row' }} align={{ base: 'center', sm: 'flex-start' }} gap="md">
 					{/* QR code */}
 					<Box
 						style={{
 							background: 'white',
 							padding: 8,
-							borderRadius: 6,
+							borderRadius: 'var(--mantine-radius-sm)',
 							lineHeight: 0,
 							flexShrink: 0,
 						}}
@@ -171,21 +173,13 @@ function DonationCard({ option }: { option: DonationOption }) {
 					</Box>
 
 					{/* Address + copy */}
-					<Stack gap={6} style={{ flex: 1, minWidth: 0 }}>
-						<Text size="xs" c="dimmed">
-							{option.externalLink ? t('donate.label_link') : t('donate.label_address')}
-						</Text>
-						<Group gap={4} wrap="nowrap">
-							<Text
-								size="xs"
-								ff="monospace"
-								style={{
-									flex: 1,
-									wordBreak: 'break-all',
-									overflowWrap: 'anywhere',
-								}}
-							>
-								{option.addressOrUrl}
+					<Stack gap={6} w={{ base: '100%', sm: 'auto' }} style={{ flex: 1, minWidth: 0 }}>
+						{/* Copy button sits next to the label, not the value: a long wrapped
+						    address then gets the full card width with nothing beside it to
+						    crowd into. */}
+						<Group gap={4} justify="space-between" wrap="nowrap">
+							<Text size="xs" c="dimmed">
+								{option.externalLink ? t('donate.label_link') : t('donate.label_address')}
 							</Text>
 							<CopyButton value={option.addressOrUrl} timeout={1500}>
 								{({ copied, copy }) => (
@@ -193,15 +187,26 @@ function DonationCard({ option }: { option: DonationOption }) {
 										<ActionIcon
 											color={copied ? 'green' : 'gray'}
 											variant="subtle"
+											size="sm"
 											onClick={copy}
 											aria-label={t('donate.copy')}
 										>
-											{copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
+											{copied ? <IconCheck size={14} /> : <IconCopy size={14} />}
 										</ActionIcon>
 									</Tooltip>
 								)}
 							</CopyButton>
 						</Group>
+						<Text
+							size="xs"
+							ff="monospace"
+							style={{
+								wordBreak: 'break-all',
+								overflowWrap: 'anywhere',
+							}}
+						>
+							{option.addressOrUrl}
+						</Text>
 						{option.hint && (
 							<Text size="xs" c="dimmed">
 								{t(`donate.${option.hint}`)}
@@ -213,7 +218,7 @@ function DonationCard({ option }: { option: DonationOption }) {
 							</Badge>
 						)}
 					</Stack>
-				</Group>
+				</Flex>
 			</Stack>
 		</Card>
 	);
