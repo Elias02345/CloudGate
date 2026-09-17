@@ -23,6 +23,7 @@ import Joyride, { ACTIONS, EVENTS, STATUS, type CallBackProps, type Step } from 
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe, usePatchUserFlags } from '../api/auth.js';
 import { MOBILE_QUERY } from '../layout.js';
+import { useCloudy } from './cloudy/useCloudy.js';
 import { TOUR_STOPS, type TourStop } from './tour/tour-steps.js';
 
 interface AppTourContextValue {
@@ -70,6 +71,7 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 	const patchFlags = usePatchUserFlags();
 	const isMobile = useMediaQuery(MOBILE_QUERY) ?? false;
 	const scheme = useComputedColorScheme('dark');
+	const cloudy = useCloudy();
 
 	const [running, setRunning] = useState(false);
 	const [stepIndex, setStepIndex] = useState(0);
@@ -111,15 +113,19 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 			setStepIndex(index);
 			if (pathRef.current === stop.route && document.querySelector(selector)) {
 				setRunning(true);
+				void cloudy.walkTo(selector, { pose: 'point' });
 				return;
 			}
 			setRunning(false);
 			if (pathRef.current !== stop.route) navigate(stop.route);
 			void waitForTarget(selector).then(() => {
-				if (goToken.current === token) setRunning(true);
+				if (goToken.current !== token) return;
+				setRunning(true);
+				// Cloudy hosts the tour: he walks along and stands next to each stop
+				void cloudy.walkTo(selector, { pose: 'point' });
 			});
 		},
-		[navigate]
+		[navigate, cloudy]
 	);
 
 	const start = useCallback(() => goTo(0), [goTo]);
@@ -127,7 +133,8 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 	const stop = useCallback(() => {
 		goToken.current++;
 		setRunning(false);
-	}, []);
+		void cloudy.goHome();
+	}, [cloudy]);
 
 	// Auto-start triggers. Deliberately no timer + cleanup: stripping the `tour`
 	// param re-runs this effect, and that cleanup used to cancel the start.
@@ -179,6 +186,16 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 		},
 		[goTo, stop, patchFlags]
 	);
+
+	// Joyride's overlay sits at 10000 — lift Cloudy above it while he hosts the tour
+	useEffect(() => {
+		const root = document.documentElement;
+		if (running) root.style.setProperty('--cg-cloudy-z', '10001');
+		else root.style.removeProperty('--cg-cloudy-z');
+		return () => {
+			root.style.removeProperty('--cg-cloudy-z');
+		};
+	}, [running]);
 
 	const ctx = useMemo<AppTourContextValue>(() => ({ running, start, stop }), [running, start, stop]);
 

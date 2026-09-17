@@ -9,6 +9,35 @@ _Nothing yet._
 
 ---
 
+## [0.3.0] — 2026-09-17
+
+### Added — meet Cloudy
+
+CloudGate has a mascot. Cloudy is a small cloud with arms and legs, drawn as
+SVG and animated with CSS — he idles, walks, waves, points, works, cheers and
+sleeps, and he can hold up a little sign.
+
+- **He is the assistant.** The AI button is now Cloudy, and so is his face in
+  the chat. Give him a task and he steps out of the chat window, walks across
+  the UI to the pages and controls the task touches, works there, cheers when
+  he's done and returns to his spot.
+- **He hosts the guided tour.** Cloudy walks along and stands next to whatever
+  the current step is talking about.
+- **He asks for support, rarely.** After every twelfth change you make — at
+  most once a day, never while he is busy — he strolls in with a heart sign and
+  a link to the support page. Tap him to send him away.
+
+Everything he does respects the "reduce motion" system setting: he then simply
+appears where he is needed instead of animating there.
+
+### Changed — clearer hover feedback
+
+Icons inside buttons, links and the sidebar give a short playful wobble on
+hover, and switches show a ring and a knob that leans towards the side it would
+move to. The previous version's feedback was too subtle to notice.
+
+---
+
 ## [0.2.9] — 2026-09-17
 
 ### Fixed — copy buttons did nothing on LAN installs

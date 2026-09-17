@@ -1,0 +1,482 @@
+/* Cloudy tokens — dark scheme is the app default (see global.css), light overrides below. */
+:root {
+	--cg-cloudy-body: #e8eef5;
+	--cg-cloudy-ink: #2b3440;
+	/* Limbs need to read on the dark page background AND on the light body they cross — a mid tone does both */
+	--cg-cloudy-limb: #9fb0c4;
+	--cg-cloudy-accent: var(--mantine-primary-color-filled);
+}
+
+:root[data-mantine-color-scheme="light"] {
+	--cg-cloudy-body: #dce6f0;
+	--cg-cloudy-ink: #232b36;
+	--cg-cloudy-limb: #5d6b7d;
+}
+
+.cg-cloudy {
+	display: inline-block;
+	overflow: visible;
+}
+
+/* --- parts -------------------------------------------------------------- */
+
+.cg-cloudy__body {
+	fill: var(--cg-cloudy-body, #e8eef5);
+	stroke: var(--cg-cloudy-ink, #2b3440);
+	stroke-width: 3;
+	stroke-linejoin: round;
+	transform-box: fill-box;
+	transform-origin: 50% 100%; /* hips/ground — bob and lean pivot from the feet up */
+}
+
+.cg-cloudy__arm-left,
+.cg-cloudy__arm-right {
+	fill: var(--cg-cloudy-limb, #9fb0c4);
+	stroke: var(--cg-cloudy-limb, #9fb0c4);
+	stroke-width: 6;
+	stroke-linecap: round;
+	transform-box: fill-box;
+	transform-origin: 50% 0%; /* shoulder — arm is drawn hanging down from local (0,0) */
+}
+
+.cg-cloudy__leg-left,
+.cg-cloudy__leg-right {
+	fill: var(--cg-cloudy-limb, #9fb0c4);
+	stroke: var(--cg-cloudy-limb, #9fb0c4);
+	stroke-width: 7;
+	stroke-linecap: round;
+	transform-box: fill-box;
+	transform-origin: 50% 0%; /* hip — leg is drawn hanging down from local (0,0) */
+}
+
+.cg-cloudy__cheek {
+	fill: var(--cg-cloudy-accent, var(--mantine-primary-color-filled));
+	opacity: 0.55;
+}
+
+.cg-cloudy__eyes {
+	transform-box: fill-box;
+	transform-origin: 50% 50%;
+}
+
+.cg-cloudy__eye {
+	fill: var(--cg-cloudy-ink, #2b3440);
+}
+
+.cg-cloudy__eye-lid {
+	fill: var(--cg-cloudy-body, #e8eef5);
+	transform-box: fill-box;
+	transform-origin: 50% 0%; /* top of the lid — grows down to close over the eye */
+	transform: scaleY(0);
+}
+
+.cg-cloudy__mouth {
+	fill: none;
+	stroke: var(--cg-cloudy-ink, #2b3440);
+	stroke-width: 2.5;
+	stroke-linecap: round;
+}
+
+.cg-cloudy__z {
+	fill: var(--cg-cloudy-accent, var(--mantine-primary-color-filled));
+	font-size: 13px;
+	font-family: inherit;
+	opacity: 0;
+	transform-box: fill-box;
+}
+
+.cg-cloudy__sign {
+	transform-box: fill-box;
+	transform-origin: 50% 100%;
+}
+
+.cg-cloudy__sign rect {
+	fill: var(--cg-cloudy-body, #e8eef5);
+	stroke: var(--cg-cloudy-ink, #2b3440);
+	stroke-width: 2.5;
+}
+
+/* --- facing --------------------------------------------------------------
+ * The whole figure mirrors; sign content and zzz counter-mirror themselves
+ * inline (Cloudy.tsx) so text/emoji never reads backwards.
+ */
+.cg-cloudy__figure {
+	transform-box: view-box;
+	transform-origin: 50% 50%;
+}
+
+.cg-cloudy[data-facing="left"] .cg-cloudy__figure {
+	transform: scaleX(-1);
+}
+
+/* --- idle ----------------------------------------------------------------
+ * Breathing bob + occasional blink + a faint arm sway. Base (no transform)
+ * already IS the correct reduced-motion still: standing, eyes open.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="idle"] .cg-cloudy__body {
+		animation: cg-cloudy-breathe 3.2s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="idle"] .cg-cloudy__eye-lid {
+		animation: cg-cloudy-blink 5s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="idle"] .cg-cloudy__arm-left,
+	.cg-cloudy[data-pose="idle"] .cg-cloudy__arm-right {
+		animation: cg-cloudy-sway 4s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="idle"] .cg-cloudy__arm-right {
+		animation-delay: -2s; /* opposite phase, reads as a gentle independent sway */
+	}
+}
+
+@keyframes cg-cloudy-breathe {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-2px);
+	}
+}
+
+@keyframes cg-cloudy-blink {
+	0%,
+	92%,
+	100% {
+		transform: scaleY(0);
+	}
+	95% {
+		transform: scaleY(1);
+	}
+}
+
+@keyframes cg-cloudy-sway {
+	0%,
+	100% {
+		transform: rotate(0deg);
+	}
+	50% {
+		transform: rotate(4deg);
+	}
+}
+
+/* --- walk ------------------------------------------------------------
+ * Legs alternate from the hip, arms counter-swing, body bobs twice per
+ * stride. ~0.6s per full leg cycle, loops seamlessly (keyframes start
+ * and end identical).
+ */
+.cg-cloudy[data-pose="walk"] .cg-cloudy__body {
+	transform: rotate(-3deg); /* slight forward lean, static fallback under reduced motion */
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="walk"] .cg-cloudy__body {
+		animation: cg-cloudy-walk-bob 0.3s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="walk"] .cg-cloudy__leg-left {
+		animation: cg-cloudy-leg-swing 0.6s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="walk"] .cg-cloudy__leg-right {
+		animation: cg-cloudy-leg-swing 0.6s ease-in-out infinite;
+		animation-delay: -0.3s; /* opposite foot */
+	}
+	.cg-cloudy[data-pose="walk"] .cg-cloudy__arm-left {
+		animation: cg-cloudy-arm-swing 0.6s ease-in-out infinite;
+		animation-delay: -0.3s; /* contralateral: syncs with the right leg */
+	}
+	.cg-cloudy[data-pose="walk"] .cg-cloudy__arm-right {
+		animation: cg-cloudy-arm-swing 0.6s ease-in-out infinite;
+	}
+}
+
+@keyframes cg-cloudy-walk-bob {
+	0%,
+	100% {
+		transform: rotate(-3deg) translateY(0);
+	}
+	50% {
+		transform: rotate(-3deg) translateY(-3px);
+	}
+}
+
+@keyframes cg-cloudy-leg-swing {
+	0%,
+	100% {
+		transform: rotate(-24deg);
+	}
+	50% {
+		transform: rotate(24deg);
+	}
+}
+
+@keyframes cg-cloudy-arm-swing {
+	0%,
+	100% {
+		transform: rotate(16deg);
+	}
+	50% {
+		transform: rotate(-16deg);
+	}
+}
+
+/* --- wave --------------------------------------------------------------
+ * Arm raises, waves 2-3 times, holds. One-shot (not infinite).
+ */
+.cg-cloudy[data-pose="wave"] .cg-cloudy__body {
+	transform: rotate(2deg);
+}
+.cg-cloudy[data-pose="wave"] .cg-cloudy__arm-right {
+	transform: rotate(-35deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="wave"] .cg-cloudy__arm-right {
+		animation: cg-cloudy-wave 1.6s ease-in-out 1;
+	}
+}
+
+@keyframes cg-cloudy-wave {
+	0% {
+		transform: rotate(-35deg);
+	}
+	15% {
+		transform: rotate(-58deg);
+	}
+	35% {
+		transform: rotate(-35deg);
+	}
+	50% {
+		transform: rotate(-58deg);
+	}
+	65%,
+	100% {
+		transform: rotate(-35deg);
+	}
+}
+
+/* --- point ---------------------------------------------------------------
+ * Arm extends and holds; a small one-shot emphasis pulse on entry.
+ */
+.cg-cloudy[data-pose="point"] .cg-cloudy__arm-right {
+	transform: rotate(-90deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="point"] .cg-cloudy__arm-right {
+		animation: cg-cloudy-point-pulse 0.5s ease-out 1;
+	}
+}
+
+@keyframes cg-cloudy-point-pulse {
+	0% {
+		transform: rotate(-90deg) scale(1);
+	}
+	40% {
+		transform: rotate(-90deg) scale(1.12);
+	}
+	100% {
+		transform: rotate(-90deg) scale(1);
+	}
+}
+
+/* --- work ------------------------------------------------------------
+ * Leaning in, eyes narrowed, both arms tap quickly. Loops.
+ */
+.cg-cloudy[data-pose="work"] .cg-cloudy__body {
+	transform: rotate(-4deg);
+}
+.cg-cloudy[data-pose="work"] .cg-cloudy__eyes {
+	transform: scaleY(0.55);
+}
+.cg-cloudy[data-pose="work"] .cg-cloudy__arm-left {
+	transform: rotate(18deg);
+}
+.cg-cloudy[data-pose="work"] .cg-cloudy__arm-right {
+	transform: rotate(-18deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="work"] .cg-cloudy__arm-left {
+		animation: cg-cloudy-tap-left 0.35s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="work"] .cg-cloudy__arm-right {
+		animation: cg-cloudy-tap-right 0.35s ease-in-out infinite;
+		animation-delay: -0.175s; /* alternating taps */
+	}
+}
+
+@keyframes cg-cloudy-tap-left {
+	0%,
+	100% {
+		transform: rotate(18deg);
+	}
+	50% {
+		transform: rotate(30deg);
+	}
+}
+
+@keyframes cg-cloudy-tap-right {
+	0%,
+	100% {
+		transform: rotate(-18deg);
+	}
+	50% {
+		transform: rotate(-30deg);
+	}
+}
+
+/* --- cheer -----------------------------------------------------------
+ * A little squash-and-stretch jump: body up, arms up, legs tucked. Loops.
+ */
+.cg-cloudy[data-pose="cheer"] .cg-cloudy__body {
+	transform: translateY(-3px);
+}
+.cg-cloudy[data-pose="cheer"] .cg-cloudy__arm-left {
+	transform: rotate(150deg);
+}
+.cg-cloudy[data-pose="cheer"] .cg-cloudy__arm-right {
+	transform: rotate(-150deg);
+}
+.cg-cloudy[data-pose="cheer"] .cg-cloudy__leg-left {
+	transform: rotate(14deg);
+}
+.cg-cloudy[data-pose="cheer"] .cg-cloudy__leg-right {
+	transform: rotate(-14deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="cheer"] .cg-cloudy__body {
+		animation: cg-cloudy-cheer-body 1.1s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="cheer"] .cg-cloudy__arm-left {
+		animation: cg-cloudy-cheer-arm-left 1.1s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="cheer"] .cg-cloudy__arm-right {
+		animation: cg-cloudy-cheer-arm-right 1.1s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="cheer"] .cg-cloudy__leg-left,
+	.cg-cloudy[data-pose="cheer"] .cg-cloudy__leg-right {
+		animation: cg-cloudy-cheer-leg 1.1s ease-in-out infinite;
+	}
+}
+
+@keyframes cg-cloudy-cheer-body {
+	0%,
+	100% {
+		transform: translateY(-3px) scale(1, 1);
+	}
+	30% {
+		transform: translateY(-11px) scale(1.06, 0.92);
+	}
+	55% {
+		transform: translateY(-3px) scale(0.95, 1.08);
+	}
+}
+
+@keyframes cg-cloudy-cheer-arm-left {
+	0%,
+	100% {
+		transform: rotate(150deg);
+	}
+	30% {
+		transform: rotate(165deg);
+	}
+}
+
+@keyframes cg-cloudy-cheer-arm-right {
+	0%,
+	100% {
+		transform: rotate(-150deg);
+	}
+	30% {
+		transform: rotate(-165deg);
+	}
+}
+
+@keyframes cg-cloudy-cheer-leg {
+	0%,
+	100% {
+		transform: rotate(0deg);
+	}
+	30% {
+		transform: rotate(6deg);
+	}
+}
+
+/* --- sleep -----------------------------------------------------------
+ * Eyes closed (always, not just under motion), slow float, drifting zzz.
+ */
+.cg-cloudy[data-pose="sleep"] .cg-cloudy__eye-lid {
+	transform: scaleY(1);
+}
+.cg-cloudy[data-pose="sleep"] .cg-cloudy__z {
+	opacity: 0.85; /* static fallback under reduced motion */
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="sleep"] .cg-cloudy__body {
+		animation: cg-cloudy-float 3.6s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="sleep"] .cg-cloudy__z--a {
+		animation: cg-cloudy-z-drift 2.6s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="sleep"] .cg-cloudy__z--b {
+		animation: cg-cloudy-z-drift 2.6s ease-in-out infinite;
+		animation-delay: -1.3s; /* the two z's cascade instead of pulsing together */
+	}
+}
+
+@keyframes cg-cloudy-float {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-4px);
+	}
+}
+
+@keyframes cg-cloudy-z-drift {
+	0% {
+		opacity: 0;
+		transform: translate(0, 0);
+	}
+	15% {
+		opacity: 1;
+	}
+	70% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+		transform: translate(4px, -14px);
+	}
+}
+
+/* --- sign ----------------------------------------------------------------
+ * Gentle bob for the held plate, independent of pose.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy__sign {
+		animation: cg-cloudy-sign-bob 3s ease-in-out infinite;
+	}
+}
+
+@keyframes cg-cloudy-sign-bob {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	50% {
+		transform: translateY(-2px);
+	}
+}
+
+/* Raised sign arm is a fixed static pose, never driven by [data-pose] animations above.
+ * Placed last so it wins the tie in source order against the equal-specificity pose rules.
+ */
+.cg-cloudy__arm-right.cg-cloudy__arm-right--raised {
+	transform: rotate(18deg);
+	transform-origin: 50% 100%; /* this arm is drawn upward from (0,0), so the shoulder is at the bottom */
+	animation: none;
+}

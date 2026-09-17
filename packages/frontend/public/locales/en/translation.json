@@ -106,6 +106,14 @@
     "run_action": "Run",
     "action_ok": "Action ran."
   },
+  "cloudy": {
+    "nudge_text": "Enjoying CloudGate? A small tip keeps it going.",
+    "nudge_cta": "Show support options",
+    "on_my_way": "On it — heading over…",
+    "working": "Working on it…",
+    "done": "Done!",
+    "opening": "Opening {{page}}…"
+  },
   "updates": {
     "title": "Self-update",
     "current_version": "Current version",

@@ -1,0 +1,59 @@
+/* Cloudy's stage layer: fixed over the whole app, transparent to clicks
+   except on Cloudy himself and his speech bubble (both opt back in below). */
+.cloudy-stage-layer {
+	position: fixed;
+	inset: 0;
+	pointer-events: none;
+	/* above the AI chat FAB/drawer, below Mantine modals */
+	/* Raised by the guided tour so Cloudy stays in front of its overlay */
+	z-index: var(--cg-cloudy-z, 250);
+}
+
+.cloudy-figure-wrap {
+	position: absolute;
+	top: 0;
+	left: 0;
+	/* Only clickable when he is actually offering something — otherwise he would
+	   swallow clicks on whatever he stands in front of (e.g. the chat button). */
+	pointer-events: none;
+	will-change: transform;
+	transition-property: transform;
+	transition-timing-function: ease-out;
+}
+
+.cloudy-figure-wrap[data-dismissible="true"] {
+	pointer-events: auto;
+	cursor: pointer;
+}
+
+.cloudy-bubble {
+	position: absolute;
+	top: 50%;
+	/* the wrap is only as wide as Cloudy, so the bubble has to size itself */
+	width: max-content;
+	max-width: min(220px, 40vw);
+	line-height: 1.35;
+	padding: 8px 10px;
+	background: var(--mantine-color-body);
+	border: 1px solid var(--mantine-color-default-border);
+	border-radius: var(--mantine-radius-md);
+	box-shadow: var(--cg-shadow-surface);
+	font-size: var(--mantine-font-size-sm);
+	pointer-events: auto;
+}
+
+.cloudy-bubble[data-side="right"] {
+	left: calc(100% + 10px);
+	transform: translateY(-50%);
+}
+
+.cloudy-bubble[data-side="left"] {
+	right: calc(100% + 10px);
+	transform: translateY(-50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.cloudy-figure-wrap {
+		transition: none !important;
+	}
+}
