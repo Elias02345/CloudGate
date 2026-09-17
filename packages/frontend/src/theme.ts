@@ -26,10 +26,23 @@ export const theme = createTheme({
 	},
 	fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif',
 	defaultRadius: 'md',
+	// Surface shadow from the Penpot design; per-component shadows live in styles/global.css
+	shadows: {
+		xs: '4px 4px 4px 0 rgba(0, 0, 0, 0.05)',
+		sm: '4px 4px 4px 0 rgba(0, 0, 0, 0.2)',
+		md: '4px 4px 4px 0 rgba(0, 0, 0, 0.2)',
+	},
 	components: {
 		Card: {
 			defaultProps: {
 				shadow: 'sm',
+				withBorder: true,
+			},
+		},
+		// Native overflow: no reserved scrollbar gutter under tables on desktop
+		TableScrollContainer: {
+			defaultProps: {
+				type: 'native',
 			},
 		},
 		Button: {

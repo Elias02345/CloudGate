@@ -7,6 +7,7 @@ import {
 	Group,
 	NumberInput,
 	Select,
+	SimpleGrid,
 	Stack,
 	Text,
 	TextInput,
@@ -292,7 +293,7 @@ export function HostFormPage() {
 							required
 						/>
 
-						<Group grow>
+						<SimpleGrid cols={{ base: 1, sm: spec.showScheme ? 3 : 2 }}>
 							{spec.showScheme && (
 								<Select
 									label={t('hosts.scheme_field')}
@@ -316,7 +317,7 @@ export function HostFormPage() {
 								{...form.getInputProps('forward_port')}
 								required
 							/>
-						</Group>
+						</SimpleGrid>
 
 						{spec.showPath && (
 							<TextInput
@@ -334,7 +335,7 @@ export function HostFormPage() {
 							/>
 						)}
 
-						<Group justify="flex-end">
+						<Group justify="flex-end" wrap="wrap">
 							<Button variant="default" onClick={() => navigate('/hosts')}>
 								{t('common.cancel')}
 							</Button>

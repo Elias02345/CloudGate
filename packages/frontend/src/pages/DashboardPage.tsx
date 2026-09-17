@@ -1,4 +1,4 @@
-import { Alert, Anchor, Badge, Card, Grid, Group, Skeleton, Stack, Text, Title } from '@mantine/core';
+import { Alert, Anchor, Badge, Card, Group, SimpleGrid, Skeleton, Stack, Text, Title } from '@mantine/core';
 import {
 	IconAlertTriangle,
 	IconCheck,
@@ -106,7 +106,7 @@ export function DashboardPage() {
 
 	return (
 		<Stack>
-			<Group justify="space-between" align="center">
+			<Group justify="space-between" align="center" wrap="wrap">
 				<Title order={2}>{t('dashboard.title')}</Title>
 				<Badge color={backendHealthy ? 'green' : 'red'} variant="light" leftSection={<IconCheck size={14} />}>
 					{backendHealthy ? t('dashboard.healthy') : t('dashboard.degraded')}
@@ -119,44 +119,36 @@ export function DashboardPage() {
 				</Alert>
 			)}
 
-			<Grid data-tour="dashboard-health">
-				<Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-					<StatCard
-						icon={<IconCloudCheck size={28} />}
-						label={t('dashboard.card_accounts')}
-						value={accountsCount}
-						loading={accounts.isLoading}
-						to="/cloudflare"
-					/>
-				</Grid.Col>
-				<Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-					<StatCard
-						icon={<IconRoute size={28} />}
-						label={t('dashboard.card_tunnels')}
-						value={`${tunnelsRunning} / ${tunnelsCount}`}
-						loading={tunnels.isLoading}
-						to="/tunnels"
-					/>
-				</Grid.Col>
-				<Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-					<StatCard
-						icon={<IconServer2 size={28} />}
-						label={t('dashboard.card_hosts')}
-						value={`${hostsLive} / ${hostsCount}`}
-						loading={hosts.isLoading}
-						to="/hosts"
-						color={hostsError > 0 ? '#fa5252' : '#51cf66'}
-					/>
-				</Grid.Col>
-				<Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
-					<StatCard
-						icon={<IconWorld size={28} />}
-						label={t('dashboard.card_version')}
-						value={health.data?.version ?? '—'}
-						loading={health.isLoading}
-					/>
-				</Grid.Col>
-			</Grid>
+			<SimpleGrid cols={{ base: 1, xs: 2, lg: 4 }} spacing="md" data-tour="dashboard-health">
+				<StatCard
+					icon={<IconCloudCheck size={28} />}
+					label={t('dashboard.card_accounts')}
+					value={accountsCount}
+					loading={accounts.isLoading}
+					to="/cloudflare"
+				/>
+				<StatCard
+					icon={<IconRoute size={28} />}
+					label={t('dashboard.card_tunnels')}
+					value={`${tunnelsRunning} / ${tunnelsCount}`}
+					loading={tunnels.isLoading}
+					to="/tunnels"
+				/>
+				<StatCard
+					icon={<IconServer2 size={28} />}
+					label={t('dashboard.card_hosts')}
+					value={`${hostsLive} / ${hostsCount}`}
+					loading={hosts.isLoading}
+					to="/hosts"
+					color={hostsError > 0 ? '#fa5252' : '#51cf66'}
+				/>
+				<StatCard
+					icon={<IconWorld size={28} />}
+					label={t('dashboard.card_version')}
+					value={health.data?.version ?? '—'}
+					loading={health.isLoading}
+				/>
+			</SimpleGrid>
 
 			{accountsCount === 0 && (
 				<Alert color="blue" title={t('dashboard.first_steps_title')}>

@@ -8,6 +8,7 @@ import {
 	Card,
 	Group,
 	Modal,
+	Paper,
 	PasswordInput,
 	Progress,
 	Stack,
@@ -19,7 +20,7 @@ import {
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconAlertCircle, IconCheck, IconPlugConnected, IconTrash } from '@tabler/icons-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client.js';
 import {
@@ -28,6 +29,17 @@ import {
 	usePlayitAccounts,
 	usePlayitQuota,
 } from '../api/playit.js';
+
+function InfoLine({ label, children }: { label: string; children: ReactNode }) {
+	return (
+		<Group gap={6} wrap="nowrap" align="baseline">
+			<Text size="xs" c="dimmed" w={88} style={{ flexShrink: 0 }}>
+				{label}
+			</Text>
+			<Box style={{ minWidth: 0 }}>{children}</Box>
+		</Group>
+	);
+}
 
 export function PlayitPage() {
 	const { t } = useTranslation();
@@ -67,7 +79,7 @@ export function PlayitPage() {
 
 	return (
 		<Stack>
-			<Group justify="space-between">
+			<Group justify="space-between" wrap="wrap" gap="sm">
 				<Title order={2}>Playit.gg accounts</Title>
 				<Button leftSection={<IconPlugConnected size={18} />} onClick={modal.open}>
 					Link account
@@ -92,57 +104,114 @@ export function PlayitPage() {
 					)}
 
 					{accounts.data && accounts.data.accounts.length > 0 && (
-						<Table>
-							<Table.Thead>
-								<Table.Tr>
-									<Table.Th>Label</Table.Th>
-									<Table.Th>Status</Table.Th>
-									<Table.Th>Linked</Table.Th>
-									<Table.Th />
-								</Table.Tr>
-							</Table.Thead>
-							<Table.Tbody>
+						<>
+							<Box visibleFrom="sm">
+								<Table.ScrollContainer minWidth={600}>
+									<Table>
+										<Table.Thead>
+											<Table.Tr>
+												<Table.Th w={127}>Label</Table.Th>
+												<Table.Th ta="center" w={363}>
+													Status
+												</Table.Th>
+												<Table.Th w={307}>Linked</Table.Th>
+												<Table.Th />
+											</Table.Tr>
+										</Table.Thead>
+										<Table.Tbody>
+											{accounts.data.accounts.map((a) => (
+												<Table.Tr
+													key={a.id}
+													style={{
+														cursor: 'pointer',
+														background: selectedId === a.id ? 'var(--mantine-color-dark-6)' : undefined,
+													}}
+													onClick={() => setSelectedId(a.id)}
+												>
+													<Table.Td>
+														<Text fw={500}>{a.label}</Text>
+													</Table.Td>
+													<Table.Td ta="center">
+														<Badge color={a.status === 'active' ? 'green' : 'gray'} variant="light">
+															{a.status}
+														</Badge>
+													</Table.Td>
+													<Table.Td>
+														<Text size="xs" c="dimmed">
+															{a.created_at?.replace('T', ' ').slice(0, 16) ?? '—'}
+														</Text>
+													</Table.Td>
+													<Table.Td>
+														<Group justify="flex-end">
+															<ActionIcon
+																variant="subtle"
+																color="red"
+																onClick={(e) => {
+																	e.stopPropagation();
+																	if (confirm(`Unlink Playit account "${a.label}"?`)) {
+																		void deleteMutation.mutate(a.id);
+																		if (selectedId === a.id) setSelectedId(null);
+																	}
+																}}
+															>
+																<IconTrash size={16} />
+															</ActionIcon>
+														</Group>
+													</Table.Td>
+												</Table.Tr>
+											))}
+										</Table.Tbody>
+									</Table>
+								</Table.ScrollContainer>
+							</Box>
+							<Stack gap="xs" hiddenFrom="sm">
 								{accounts.data.accounts.map((a) => (
-									<Table.Tr
+									<Paper
 										key={a.id}
+										withBorder
+										radius="md"
+										p="sm"
 										style={{
 											cursor: 'pointer',
 											background: selectedId === a.id ? 'var(--mantine-color-dark-6)' : undefined,
 										}}
 										onClick={() => setSelectedId(a.id)}
 									>
-										<Table.Td>
-											<Text fw={500}>{a.label}</Text>
-										</Table.Td>
-										<Table.Td>
-											<Badge color={a.status === 'active' ? 'green' : 'gray'} variant="light">
-												{a.status}
-											</Badge>
-										</Table.Td>
-										<Table.Td>
-											<Text size="xs" c="dimmed">
-												{a.created_at?.replace('T', ' ').slice(0, 16) ?? '—'}
-											</Text>
-										</Table.Td>
-										<Table.Td>
-											<ActionIcon
-												variant="subtle"
-												color="red"
-												onClick={(e) => {
-													e.stopPropagation();
-													if (confirm(`Unlink Playit account "${a.label}"?`)) {
-														void deleteMutation.mutate(a.id);
-														if (selectedId === a.id) setSelectedId(null);
-													}
-												}}
-											>
-												<IconTrash size={16} />
-											</ActionIcon>
-										</Table.Td>
-									</Table.Tr>
+										<Stack gap={6}>
+											<Group justify="space-between" wrap="nowrap" align="flex-start">
+												<Text fw={600} style={{ wordBreak: 'break-word', minWidth: 0 }}>
+													{a.label}
+												</Text>
+												<Badge color={a.status === 'active' ? 'green' : 'gray'} variant="light">
+													{a.status}
+												</Badge>
+											</Group>
+											<InfoLine label="Linked">
+												<Text size="xs" c="dimmed">
+													{a.created_at?.replace('T', ' ').slice(0, 16) ?? '—'}
+												</Text>
+											</InfoLine>
+											<Group gap="xs" justify="flex-end">
+												<ActionIcon
+													variant="subtle"
+													color="red"
+													size="lg"
+													onClick={(e) => {
+														e.stopPropagation();
+														if (confirm(`Unlink Playit account "${a.label}"?`)) {
+															void deleteMutation.mutate(a.id);
+															if (selectedId === a.id) setSelectedId(null);
+														}
+													}}
+												>
+													<IconTrash size={18} />
+												</ActionIcon>
+											</Group>
+										</Stack>
+									</Paper>
 								))}
-							</Table.Tbody>
-						</Table>
+							</Stack>
+						</>
 					)}
 				</Stack>
 			</Card>
