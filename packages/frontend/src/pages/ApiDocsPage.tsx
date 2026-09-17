@@ -70,7 +70,7 @@ export function ApiDocsPage() {
 	return (
 		<Stack maw={1000} mx="auto">
 			<Group>
-				<IconBook size={26} color="#22d3ee" />
+				<IconBook size={26} style={{ color: 'var(--cg-accent-ai)' }} />
 				<Title order={2}>{spec.data.info.title}</Title>
 				<Badge variant="light">v{spec.data.info.version}</Badge>
 			</Group>

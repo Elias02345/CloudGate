@@ -83,9 +83,10 @@ export function App() {
 									hiddenFrom="sm"
 									size="sm"
 									aria-label={t('header.toggle_nav')}
+									data-tour="nav-burger"
 								/>
 							)}
-							<IconCloudComputing size={26} color="#ff9966" />
+							<IconCloudComputing size={26} style={{ color: 'var(--cg-accent-logo)' }} />
 							<Title order={3}>CloudGate</Title>
 							<Text size="xs" c="dimmed" visibleFrom="xs">
 								pre-alpha
@@ -190,7 +191,7 @@ export function App() {
 							/>
 							<NavLink
 								label={t('nav.ai')}
-								leftSection={<IconRobot size={16} color="#22d3ee" />}
+								leftSection={<IconRobot size={16} style={{ color: 'var(--cg-accent-ai)' }} />}
 								active={location.pathname.startsWith('/ai')}
 								onClick={() => go('/ai')}
 							/>

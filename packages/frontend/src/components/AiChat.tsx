@@ -169,7 +169,7 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 					style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}
 				>
 					<Group gap="xs">
-						<IconRobot size={20} color="#22d3ee" />
+						<IconRobot size={20} style={{ color: 'var(--cg-accent-ai)' }} />
 						<Text fw={600}>{t('ai_chat.title')}</Text>
 					</Group>
 					<Group gap="xs">
@@ -299,7 +299,7 @@ function MessageBubble({ role, content, toolResults, onConfirm }: MessageBubbleP
 				<Card withBorder p="sm" bg="yellow.0">
 					<Stack gap="xs">
 						<Group gap="xs">
-							<IconAlertTriangle size={16} color="#fbbf24" />
+							<IconAlertTriangle size={16} style={{ color: 'var(--cg-accent-warn)' }} />
 							<Badge color="yellow" variant="light">
 								{t('ai_chat.confirm_required')}
 							</Badge>

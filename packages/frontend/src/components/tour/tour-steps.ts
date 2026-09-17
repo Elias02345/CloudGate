@@ -24,6 +24,11 @@ export interface TourStop {
 	i18nKey: string;
 	/** CSS selector pointing to the spotlight target element. */
 	target: string;
+	/**
+	 * Target on phones, where `target` is hidden (collapsed sidebar) or taller than the
+	 * screen (whole lists — the tooltip then gets pushed off-screen). Uses `<i18nKey>_body_mobile` if that key exists.
+	 */
+	mobileTarget?: string;
 	/** Optional preferred placement. */
 	placement?: Placement;
 	/** Whether to skip the beacon "pulse" before the tooltip shows. */
@@ -48,6 +53,7 @@ export const TOUR_STOPS: TourStop[] = [
 		route: '/',
 		i18nKey: 'tour.stop_3',
 		target: '[data-tour="sidebar-nav"]',
+		mobileTarget: '[data-tour="nav-burger"]',
 		placement: 'right',
 	},
 	{
@@ -60,6 +66,7 @@ export const TOUR_STOPS: TourStop[] = [
 		route: '/hosts',
 		i18nKey: 'tour.stop_5',
 		target: '[data-tour="hosts-mode-switch"]',
+		mobileTarget: '[data-tour="hosts-mode-switch"] .mantine-Paper-root',
 		placement: 'bottom',
 	},
 	{
@@ -90,6 +97,7 @@ export const TOUR_STOPS: TourStop[] = [
 		route: '/audit',
 		i18nKey: 'tour.stop_10',
 		target: '[data-tour="audit-filters"]',
+		mobileTarget: '[data-tour="audit-filters"] .mantine-Paper-root',
 		placement: 'bottom',
 	},
 	{
@@ -102,6 +110,7 @@ export const TOUR_STOPS: TourStop[] = [
 		route: '/donate',
 		i18nKey: 'tour.stop_12',
 		target: '[data-tour="donate-cards"]',
+		mobileTarget: '[data-tour="donate-cards"] > .mantine-Card-root',
 		placement: 'top',
 	},
 ];
