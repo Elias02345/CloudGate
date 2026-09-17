@@ -8,6 +8,7 @@
   },
   "header": {
     "user_menu": "Benutzermenü",
+    "toggle_nav": "Navigation ein-/ausblenden",
     "logout": "Abmelden"
   },
   "nav": {
@@ -177,7 +178,7 @@
     "open_recovery": "Recovery-UI öffnen →"
   },
   "login": {
-    "title": "Anmelden",
+    "title": "Bei CloudGate anmelden",
     "email": "E-Mail",
     "password": "Passwort",
     "submit": "Anmelden",

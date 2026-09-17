@@ -14,3 +14,88 @@ body {
 * {
 	box-sizing: border-box;
 }
+
+/*
+ * Design language (Penpot file "CloudGate_UI"): raised surfaces cast a soft
+ * drop shadow, recessed controls get the same shadow inset, small pills a faint one.
+ * Mantine static class names are targeted so modals, drawers etc. inherit it too.
+ */
+:root {
+	--cg-shadow-surface: 4px 4px 4px 0 rgba(0, 0, 0, 0.2);
+	--cg-shadow-inset: inset 4px 4px 4px 0 rgba(0, 0, 0, 0.2);
+	--cg-shadow-pill: 4px 4px 4px 0 rgba(0, 0, 0, 0.05);
+}
+
+.mantine-Button-root:not([data-variant="subtle"], [data-variant="transparent"]),
+.mantine-ActionIcon-root[data-variant="filled"],
+.mantine-SegmentedControl-indicator,
+.mantine-Stepper-separator,
+.mantine-Chip-label,
+.mantine-Switch-track {
+	box-shadow: var(--cg-shadow-surface);
+}
+
+.mantine-Input-input,
+.mantine-Checkbox-input,
+.mantine-SegmentedControl-root,
+.mantine-Switch-thumb {
+	box-shadow: var(--cg-shadow-inset);
+}
+
+.mantine-Stepper-stepIcon {
+	box-shadow: var(--cg-shadow-surface), var(--cg-shadow-inset);
+}
+
+.mantine-Badge-root,
+.mantine-Radio-radio,
+.mantine-Alert-root {
+	box-shadow: var(--cg-shadow-pill);
+}
+
+.mantine-NavLink-root {
+	border-radius: var(--mantine-radius-md);
+}
+
+.mantine-NavLink-root[data-active] {
+	box-shadow: var(--cg-shadow-surface);
+}
+
+/* Vertical stepper (mobile): centred connector with a gap to both icons and rounded ends */
+.mantine-Stepper-verticalSeparator {
+	inset-inline-start: calc(var(--stepper-icon-size) / 2 - var(--stepper-outline-thickness) / 2);
+	top: calc(var(--stepper-icon-size) + 6px);
+	height: 30px;
+	width: var(--stepper-outline-thickness);
+	border-inline-start: 0;
+	border-radius: var(--stepper-outline-thickness);
+	background-color: var(--stepper-outline-color);
+}
+
+.mantine-Stepper-verticalSeparator[data-active] {
+	background-color: var(--stepper-color);
+}
+
+/* Phones: keep page content clear of the floating AI chat button */
+@media (max-width: 47.99em) {
+	.mantine-AppShell-main {
+		padding-bottom: calc(44px + 32px + var(--mantine-spacing-md));
+	}
+}
+
+/* Shell: header with rounded bottom corners, floating content-height sidebar on desktop */
+.mantine-AppShell-header {
+	border-radius: 0 0 var(--mantine-radius-md) var(--mantine-radius-md);
+	box-shadow: var(--cg-shadow-surface);
+}
+
+@media (min-width: 48em) {
+	.mantine-AppShell-navbar {
+		top: calc(var(--app-shell-header-offset, 0rem) + 20px);
+		bottom: auto;
+		height: auto;
+		max-height: calc(100dvh - var(--app-shell-header-offset, 0rem) - 40px);
+		overflow-y: auto;
+		border-radius: 0 var(--mantine-radius-md) var(--mantine-radius-md) 0;
+		box-shadow: var(--cg-shadow-surface);
+	}
+}

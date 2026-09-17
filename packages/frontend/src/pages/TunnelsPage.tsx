@@ -9,6 +9,7 @@ import {
 	Drawer,
 	Group,
 	Modal,
+	Paper,
 	Select,
 	Stack,
 	Table,
@@ -30,7 +31,7 @@ import {
 	IconTerminal2,
 	IconTrash,
 } from '@tabler/icons-react';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client.js';
 import { useCloudflareAccounts } from '../api/cloudflare.js';
@@ -61,6 +62,17 @@ function statusColor(s: string): string {
 		default:
 			return 'gray';
 	}
+}
+
+function InfoLine({ label, children }: { label: string; children: ReactNode }) {
+	return (
+		<Group gap={6} wrap="nowrap" align="baseline">
+			<Text size="xs" c="dimmed" w={88} style={{ flexShrink: 0 }}>
+				{label}
+			</Text>
+			<Box style={{ minWidth: 0 }}>{children}</Box>
+		</Group>
+	);
 }
 
 export function TunnelsPage() {
@@ -197,7 +209,7 @@ export function TunnelsPage() {
 
 	return (
 		<Stack>
-			<Group justify="space-between">
+			<Group justify="space-between" wrap="wrap" gap="sm">
 				<Title order={2}>{t('tunnels.title')}</Title>
 				<Button leftSection={<IconCirclePlus size={18} />} onClick={modal.open}>
 					{t('tunnels.create')}
@@ -213,99 +225,222 @@ export function TunnelsPage() {
 						</Text>
 					)}
 					{tunnels.data && tunnels.data.tunnels.length > 0 && (
-						<Table verticalSpacing="sm">
-							<Table.Thead>
-								<Table.Tr>
-									<Table.Th>{t('tunnels.col_name')}</Table.Th>
-									<Table.Th>Provider</Table.Th>
-									<Table.Th>{t('tunnels.col_status')}</Table.Th>
-									<Table.Th>{t('tunnels.col_tunnel_id')}</Table.Th>
-									<Table.Th>{t('tunnels.col_last_change')}</Table.Th>
-									<Table.Th />
-								</Table.Tr>
-							</Table.Thead>
-							<Table.Tbody>
+						<>
+							<Box visibleFrom="sm">
+								<Table.ScrollContainer minWidth={900}>
+									<Table verticalSpacing="sm">
+										<Table.Thead>
+											<Table.Tr>
+												<Table.Th w={171}>{t('tunnels.col_name')}</Table.Th>
+												<Table.Th ta="center" w={113}>
+													Provider
+												</Table.Th>
+												<Table.Th ta="center" w={217}>
+													{t('tunnels.col_status')}
+												</Table.Th>
+												<Table.Th w={180}>{t('tunnels.col_tunnel_id')}</Table.Th>
+												<Table.Th w={273}>{t('tunnels.col_last_change')}</Table.Th>
+												<Table.Th />
+											</Table.Tr>
+										</Table.Thead>
+										<Table.Tbody>
+											{tunnels.data.tunnels.map((row) => (
+												<Table.Tr key={row.id}>
+													<Table.Td>
+														<Text fw={500}>{row.name}</Text>
+														{row.last_error && (
+															<Text size="xs" c="red" mt={2} style={{ maxWidth: 360 }}>
+																{row.last_error}
+															</Text>
+														)}
+													</Table.Td>
+													<Table.Td ta="center">
+														<Badge variant="light" color={row.provider === 'playit' ? 'orange' : 'blue'}>
+															{row.provider}
+														</Badge>
+													</Table.Td>
+													<Table.Td ta="center">
+														<Badge color={statusColor(row.live_status)}>{row.live_status}</Badge>
+													</Table.Td>
+													<Table.Td>
+														<Code>{row.tunnel_id.slice(0, 12)}…</Code>
+													</Table.Td>
+													<Table.Td>
+														<Text size="xs" c="dimmed">
+															{row.last_status_at?.replace('T', ' ').slice(0, 16) ?? '—'}
+														</Text>
+													</Table.Td>
+													<Table.Td>
+														<Group gap="xs" justify="flex-end" wrap="nowrap">
+															{row.recovery_needed && row.provider === 'cloudflared' && (
+																<ActionIcon
+																	variant="filled"
+																	color="orange"
+																	onClick={() => void onRecreate(row)}
+																	loading={recreateMutation.isPending}
+																	title="Re-create broken tunnel under same CF account"
+																>
+																	<IconLifebuoy size={16} />
+																</ActionIcon>
+															)}
+															{row.provider === 'cloudflared' && !row.recovery_needed && (
+																<ActionIcon
+																	variant="subtle"
+																	color="orange"
+																	onClick={() => void onForceSync(row)}
+																	loading={forceSyncMutation.isPending}
+																	title="Force-sync: tear down + restart + re-deploy hosts (recovery for 'running but 404')"
+																>
+																	<IconReload size={16} />
+																</ActionIcon>
+															)}
+															<ActionIcon
+																variant="subtle"
+																color="grape"
+																onClick={() => onShowConfig(row.id)}
+																title={t('tunnels.show_config')}
+															>
+																<IconFileText size={16} />
+															</ActionIcon>
+															<ActionIcon
+																variant="subtle"
+																color="cyan"
+																onClick={() => void onRedeployAll(row.id, row.name)}
+																loading={redeployAll.isPending}
+																title={t('tunnels.redeploy_all')}
+															>
+																<IconRefreshDot size={16} />
+															</ActionIcon>
+															<ActionIcon
+																variant="subtle"
+																onClick={() => openLogs(row)}
+																title={t('tunnels.logs')}
+															>
+																<IconTerminal2 size={16} />
+															</ActionIcon>
+															<ActionIcon
+																variant="subtle"
+																color="yellow"
+																onClick={() => void restartMutation.mutate(row.id)}
+																title={t('tunnels.restart')}
+															>
+																<IconRefresh size={16} />
+															</ActionIcon>
+															<ActionIcon
+																variant="subtle"
+																color="red"
+																onClick={() => {
+																	if (confirm(t('tunnels.confirm_delete', { name: row.name }))) {
+																		void deleteMutation.mutate(row.id);
+																	}
+																}}
+																title={t('common.delete')}
+															>
+																<IconTrash size={16} />
+															</ActionIcon>
+														</Group>
+													</Table.Td>
+												</Table.Tr>
+											))}
+										</Table.Tbody>
+									</Table>
+								</Table.ScrollContainer>
+							</Box>
+							<Stack gap="xs" hiddenFrom="sm">
 								{tunnels.data.tunnels.map((row) => (
-									<Table.Tr key={row.id}>
-										<Table.Td>
-											<Text fw={500}>{row.name}</Text>
-											{row.last_error && (
-												<Text size="xs" c="red" mt={2} style={{ maxWidth: 360 }}>
-													{row.last_error}
+									<Paper key={row.id} withBorder radius="md" p="sm">
+										<Stack gap={6}>
+											<Group justify="space-between" wrap="nowrap" align="flex-start">
+												<Box style={{ minWidth: 0 }}>
+													<Text fw={600} style={{ wordBreak: 'break-word' }}>
+														{row.name}
+													</Text>
+													{row.last_error && (
+														<Text size="xs" c="red" mt={2} style={{ wordBreak: 'break-word' }}>
+															{row.last_error}
+														</Text>
+													)}
+												</Box>
+												<Badge color={statusColor(row.live_status)}>{row.live_status}</Badge>
+											</Group>
+											<InfoLine label="Provider">
+												<Badge variant="light" color={row.provider === 'playit' ? 'orange' : 'blue'}>
+													{row.provider}
+												</Badge>
+											</InfoLine>
+											<InfoLine label={t('tunnels.col_tunnel_id')}>
+												<Code>{row.tunnel_id.slice(0, 12)}…</Code>
+											</InfoLine>
+											<InfoLine label={t('tunnels.col_last_change')}>
+												<Text size="xs" c="dimmed">
+													{row.last_status_at?.replace('T', ' ').slice(0, 16) ?? '—'}
 												</Text>
-											)}
-										</Table.Td>
-										<Table.Td>
-											<Badge variant="light" color={row.provider === 'playit' ? 'orange' : 'blue'}>
-												{row.provider}
-											</Badge>
-										</Table.Td>
-										<Table.Td>
-											<Badge color={statusColor(row.live_status)}>{row.live_status}</Badge>
-										</Table.Td>
-										<Table.Td>
-											<Code>{row.tunnel_id.slice(0, 12)}…</Code>
-										</Table.Td>
-										<Table.Td>
-											<Text size="xs" c="dimmed">
-												{row.last_status_at?.replace('T', ' ').slice(0, 16) ?? '—'}
-											</Text>
-										</Table.Td>
-										<Table.Td>
+											</InfoLine>
 											<Group gap="xs" justify="flex-end">
 												{row.recovery_needed && row.provider === 'cloudflared' && (
 													<ActionIcon
 														variant="filled"
 														color="orange"
+														size="lg"
 														onClick={() => void onRecreate(row)}
 														loading={recreateMutation.isPending}
 														title="Re-create broken tunnel under same CF account"
 													>
-														<IconLifebuoy size={16} />
+														<IconLifebuoy size={18} />
 													</ActionIcon>
 												)}
 												{row.provider === 'cloudflared' && !row.recovery_needed && (
 													<ActionIcon
 														variant="subtle"
 														color="orange"
+														size="lg"
 														onClick={() => void onForceSync(row)}
 														loading={forceSyncMutation.isPending}
 														title="Force-sync: tear down + restart + re-deploy hosts (recovery for 'running but 404')"
 													>
-														<IconReload size={16} />
+														<IconReload size={18} />
 													</ActionIcon>
 												)}
 												<ActionIcon
 													variant="subtle"
 													color="grape"
+													size="lg"
 													onClick={() => onShowConfig(row.id)}
 													title={t('tunnels.show_config')}
 												>
-													<IconFileText size={16} />
+													<IconFileText size={18} />
 												</ActionIcon>
 												<ActionIcon
 													variant="subtle"
 													color="cyan"
+													size="lg"
 													onClick={() => void onRedeployAll(row.id, row.name)}
 													loading={redeployAll.isPending}
 													title={t('tunnels.redeploy_all')}
 												>
-													<IconRefreshDot size={16} />
+													<IconRefreshDot size={18} />
 												</ActionIcon>
-												<ActionIcon variant="subtle" onClick={() => openLogs(row)} title={t('tunnels.logs')}>
-													<IconTerminal2 size={16} />
+												<ActionIcon
+													variant="subtle"
+													size="lg"
+													onClick={() => openLogs(row)}
+													title={t('tunnels.logs')}
+												>
+													<IconTerminal2 size={18} />
 												</ActionIcon>
 												<ActionIcon
 													variant="subtle"
 													color="yellow"
+													size="lg"
 													onClick={() => void restartMutation.mutate(row.id)}
 													title={t('tunnels.restart')}
 												>
-													<IconRefresh size={16} />
+													<IconRefresh size={18} />
 												</ActionIcon>
 												<ActionIcon
 													variant="subtle"
 													color="red"
+													size="lg"
 													onClick={() => {
 														if (confirm(t('tunnels.confirm_delete', { name: row.name }))) {
 															void deleteMutation.mutate(row.id);
@@ -313,14 +448,14 @@ export function TunnelsPage() {
 													}}
 													title={t('common.delete')}
 												>
-													<IconTrash size={16} />
+													<IconTrash size={18} />
 												</ActionIcon>
 											</Group>
-										</Table.Td>
-									</Table.Tr>
+										</Stack>
+									</Paper>
 								))}
-							</Table.Tbody>
-						</Table>
+							</Stack>
+						</>
 					)}
 				</Stack>
 			</Card>

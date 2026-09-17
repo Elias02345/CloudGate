@@ -87,7 +87,7 @@ export function SettingsPage() {
 				<Stack>
 					<Title order={4}>{t('settings.profile_title')}</Title>
 					{me?.user && (
-						<Group justify="space-between">
+						<Group justify="space-between" wrap="wrap" gap="sm">
 							<Stack gap={0}>
 								<Text fw={500}>{me.user.name}</Text>
 								<Text size="sm" c="dimmed">
@@ -139,7 +139,7 @@ function HelpCard() {
 				<Text size="sm" c="dimmed">
 					{t('settings.help_body')}
 				</Text>
-				<Group gap="xs">
+				<Group gap="xs" wrap="wrap">
 					<Button variant="light" leftSection={<IconSparkles size={16} />} onClick={onReplayOnboarding}>
 						{t('settings.help_replay_onboarding')}
 					</Button>
@@ -225,7 +225,7 @@ function TwoFactorCard() {
 	return (
 		<Card withBorder data-tour="settings-2fa">
 			<Stack>
-				<Group justify="space-between">
+				<Group justify="space-between" wrap="wrap" gap="sm">
 					<Group>
 						<IconShieldCheck size={20} color={isEnabled ? '#51cf66' : '#868e96'} />
 						<Title order={4}>{t('settings.totp_title')}</Title>
@@ -375,7 +375,7 @@ function BackupCard() {
 	return (
 		<Card withBorder data-tour="settings-backup">
 			<Stack>
-				<Group justify="space-between">
+				<Group justify="space-between" wrap="wrap" gap="sm">
 					<Title order={4}>{t('settings.backup_title')}</Title>
 					<Button leftSection={<IconDownload size={16} />} variant="light" onClick={modal.open}>
 						{t('settings.backup_button')}
@@ -420,7 +420,7 @@ function SupportCard() {
 	return (
 		<Card withBorder>
 			<Stack>
-				<Group justify="space-between" align="center">
+				<Group justify="space-between" align="center" wrap="wrap" gap="sm">
 					<Group>
 						<IconHeartFilled size={20} color="#ff6620" />
 						<Title order={4}>{t('settings.support_title')}</Title>

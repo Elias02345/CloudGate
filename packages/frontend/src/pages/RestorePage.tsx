@@ -3,6 +3,7 @@ import {
 	Anchor,
 	Button,
 	Card,
+	Center,
 	FileInput,
 	Group,
 	PasswordInput,
@@ -44,8 +45,8 @@ export function RestorePage() {
 	};
 
 	return (
-		<Stack align="center" mt="xl">
-			<Card withBorder radius="md" w={520}>
+		<Center mih="calc(100dvh - 2 * var(--app-shell-header-offset, 56px) - 2 * var(--mantine-spacing-md))">
+			<Card withBorder radius="md" w="100%" maw={520}>
 				<Stack>
 					<Group>
 						<IconRestore size={24} color="#ff7030" />
@@ -107,6 +108,6 @@ export function RestorePage() {
 					)}
 				</Stack>
 			</Card>
-		</Stack>
+		</Center>
 	);
 }

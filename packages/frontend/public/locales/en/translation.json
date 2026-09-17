@@ -8,6 +8,7 @@
   },
   "header": {
     "user_menu": "User menu",
+    "toggle_nav": "Toggle navigation",
     "logout": "Sign out"
   },
   "nav": {
@@ -177,7 +178,7 @@
     "open_recovery": "Open Recovery UI →"
   },
   "login": {
-    "title": "Sign in",
+    "title": "Sign in to your CloudGate",
     "email": "Email",
     "password": "Password",
     "submit": "Sign in",

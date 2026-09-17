@@ -1,7 +1,7 @@
 /**
  * Floating chat drawer for the CloudGate AI assistant.
  *
- * - FAB bottom-right, only visible when settings.autonomy !== 'off'.
+ * - FAB bottom-left, only visible when settings.autonomy !== 'off'.
  * - Drawer hosts a conversation: user/assistant bubbles, Markdown rendering
  *   for assistant turns, inline action-confirmation cards in suggest_only
  *   mode.
@@ -64,11 +64,11 @@ export function AiChatFab() {
 
 	return (
 		<>
-			<Affix position={{ bottom: 24, right: 24 }}>
+			<Affix position={{ bottom: 32, left: 40 }}>
 				<Tooltip label={t('ai_chat.open')}>
 					<ActionIcon
 						size="xl"
-						radius="xl"
+						radius={18}
 						color="cyan"
 						variant="filled"
 						onClick={drawer.open}

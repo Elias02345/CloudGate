@@ -1,5 +1,18 @@
-import { Badge, Card, Code, Group, Pagination, Stack, Table, Text, Title } from '@mantine/core';
-import { useState } from 'react';
+import {
+	Badge,
+	Box,
+	Card,
+	Code,
+	Group,
+	Pagination,
+	Paper,
+	Popover,
+	Stack,
+	Table,
+	Text,
+	Title,
+} from '@mantine/core';
+import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/audit.js';
 
@@ -10,6 +23,17 @@ const ACTION_COLORS: Record<string, string> = {
 	'backup.exported': 'blue',
 	'update.installed': 'grape',
 };
+
+function InfoLine({ label, children }: { label: string; children: ReactNode }) {
+	return (
+		<Group gap={6} wrap="nowrap" align="baseline">
+			<Text size="xs" c="dimmed" w={88} style={{ flexShrink: 0 }}>
+				{label}
+			</Text>
+			<Box style={{ minWidth: 0 }}>{children}</Box>
+		</Group>
+	);
+}
 
 export function AuditLogPage() {
 	const { t } = useTranslation();
@@ -34,52 +58,130 @@ export function AuditLogPage() {
 						</Text>
 					)}
 					{data && data.data.length > 0 && (
-						<Table verticalSpacing="xs" striped>
-							<Table.Thead>
-								<Table.Tr>
-									<Table.Th>{t('audit.col_when')}</Table.Th>
-									<Table.Th>{t('audit.col_action')}</Table.Th>
-									<Table.Th>{t('audit.col_entity')}</Table.Th>
-									<Table.Th>{t('audit.col_ip')}</Table.Th>
-									<Table.Th>{t('audit.col_meta')}</Table.Th>
-								</Table.Tr>
-							</Table.Thead>
-							<Table.Tbody>
+						<>
+							<Box visibleFrom="sm">
+								<Table.ScrollContainer minWidth={900}>
+									<Table verticalSpacing="xs" striped>
+										<Table.Thead>
+											<Table.Tr>
+												<Table.Th w={160}>{t('audit.col_when')}</Table.Th>
+												<Table.Th ta="center" w={262}>
+													{t('audit.col_action')}
+												</Table.Th>
+												<Table.Th>{t('audit.col_entity')}</Table.Th>
+												<Table.Th w={135}>{t('audit.col_ip')}</Table.Th>
+												<Table.Th ta="center" w={150}>
+													{t('audit.col_meta')}
+												</Table.Th>
+											</Table.Tr>
+										</Table.Thead>
+										<Table.Tbody>
+											{data.data.map((row) => (
+												<Table.Tr key={row.id}>
+													<Table.Td>
+														<Text size="xs" ff="monospace">
+															{row.created_at.replace('T', ' ').slice(0, 19)}
+														</Text>
+													</Table.Td>
+													<Table.Td ta="center">
+														<Badge color={ACTION_COLORS[row.action] ?? 'gray'} variant="light">
+															{row.action}
+														</Badge>
+													</Table.Td>
+													<Table.Td>
+														<Text size="sm">
+															{row.entity_type ? `${row.entity_type}#${row.entity_id ?? '—'}` : '—'}
+														</Text>
+													</Table.Td>
+													<Table.Td>
+														<Text size="xs" ff="monospace" c="dimmed">
+															{row.ip ?? '—'}
+														</Text>
+													</Table.Td>
+													<Table.Td ta="center">
+														<Popover position="left" withArrow shadow="sm">
+															<Popover.Target>
+																<Code
+																	w={18}
+																	h={18}
+																	style={{
+																		display: 'inline-flex',
+																		alignItems: 'center',
+																		justifyContent: 'center',
+																		padding: 0,
+																		fontSize: 11,
+																		cursor: 'pointer',
+																	}}
+																>
+																	{'{}'}
+																</Code>
+															</Popover.Target>
+															<Popover.Dropdown>
+																<Code block maw={400} mah={300} style={{ overflow: 'auto' }}>
+																	{JSON.stringify(row.meta ?? {}, null, 2)}
+																</Code>
+															</Popover.Dropdown>
+														</Popover>
+													</Table.Td>
+												</Table.Tr>
+											))}
+										</Table.Tbody>
+									</Table>
+								</Table.ScrollContainer>
+							</Box>
+							<Stack gap="xs" hiddenFrom="sm">
 								{data.data.map((row) => (
-									<Table.Tr key={row.id}>
-										<Table.Td>
-											<Text size="xs" ff="monospace">
-												{row.created_at.replace('T', ' ').slice(0, 19)}
-											</Text>
-										</Table.Td>
-										<Table.Td>
-											<Badge color={ACTION_COLORS[row.action] ?? 'gray'} variant="light">
-												{row.action}
-											</Badge>
-										</Table.Td>
-										<Table.Td>
-											<Text size="sm">
-												{row.entity_type ? `${row.entity_type}#${row.entity_id ?? '—'}` : '—'}
-											</Text>
-										</Table.Td>
-										<Table.Td>
-											<Text size="xs" ff="monospace" c="dimmed">
-												{row.ip ?? '—'}
-											</Text>
-										</Table.Td>
-										<Table.Td>
-											{row.meta ? (
-												<Code style={{ fontSize: 11 }}>{JSON.stringify(row.meta)}</Code>
-											) : (
-												<Text size="xs" c="dimmed">
-													—
+									<Paper key={row.id} withBorder radius="md" p="sm">
+										<Stack gap={6}>
+											{/* wrap: long action names push the timestamp to the next line instead of being cut off */}
+											<Group justify="space-between" wrap="wrap" gap={6} align="center">
+												<Badge color={ACTION_COLORS[row.action] ?? 'gray'} variant="light" maw="100%">
+													{row.action}
+												</Badge>
+												<Text size="xs" c="dimmed" ff="monospace">
+													{row.created_at.replace('T', ' ').slice(0, 19)}
 												</Text>
-											)}
-										</Table.Td>
-									</Table.Tr>
+											</Group>
+											<InfoLine label={t('audit.col_entity')}>
+												<Text size="sm">
+													{row.entity_type ? `${row.entity_type}#${row.entity_id ?? '—'}` : '—'}
+												</Text>
+											</InfoLine>
+											<InfoLine label={t('audit.col_ip')}>
+												<Text size="xs" ff="monospace" c="dimmed">
+													{row.ip ?? '—'}
+												</Text>
+											</InfoLine>
+											<Group justify="flex-end">
+												<Popover position="bottom" withArrow shadow="sm">
+													<Popover.Target>
+														<Code
+															w={22}
+															h={22}
+															style={{
+																display: 'inline-flex',
+																alignItems: 'center',
+																justifyContent: 'center',
+																padding: 0,
+																fontSize: 12,
+																cursor: 'pointer',
+															}}
+														>
+															{'{}'}
+														</Code>
+													</Popover.Target>
+													<Popover.Dropdown>
+														<Code block maw={320} mah={300} style={{ overflow: 'auto' }}>
+															{JSON.stringify(row.meta ?? {}, null, 2)}
+														</Code>
+													</Popover.Dropdown>
+												</Popover>
+											</Group>
+										</Stack>
+									</Paper>
 								))}
-							</Table.Tbody>
-						</Table>
+							</Stack>
+						</>
 					)}
 					{data && totalPages > 1 && (
 						<Group justify="center">

@@ -9,6 +9,50 @@ _Nothing yet._
 
 ---
 
+## [0.2.7] — 2026-09-17
+
+### Changed — new design language
+
+The whole Web UI follows a new design (made in Penpot) built from floating
+surfaces:
+
+- Cards, the header, buttons, the active navigation entry and the AI button
+  cast a soft drop shadow. Inputs, checkboxes, switches and segmented controls
+  sit recessed with the same shadow inset. Badges, radios and alerts get a
+  faint one. Controls inside modals and drawers pick this up too.
+- The header has rounded bottom corners. On desktop the sidebar floats below
+  it and is only as tall as its content.
+- The AI assistant button moved to the bottom **left** and is a rounded square.
+  The chat drawer still opens from the right.
+- Tables (Hosts, Tunnels, API keys, Audit log, Cloudflare, Playit) centre
+  badge, code and switch columns. Hosts shows a shortened public endpoint
+  (`•••.cfargotunnel.com`); the copy button still copies the full value.
+- Audit log details open as formatted JSON in a popover instead of an inline
+  blob.
+- Login, restore and password-change cards are centred on the screen.
+  The login title now reads "Sign in to your CloudGate".
+
+### Added — mobile / responsive layout
+
+CloudGate is now usable on phones and tablets:
+
+- Below 768 px the sidebar becomes a full-screen menu behind a burger button
+  and closes after you pick a page.
+- Every table turns into a list of cards on phones, with all actions kept as
+  large touch targets. On wider screens tables scroll inside their card
+  instead of widening the page.
+- Forms, dashboard stats, the onboarding wizard (vertical stepper), the
+  donation page (QR above address) and the API docs (description below
+  method + path) reflow to a single column.
+- Long values such as the Cloudflare account ID are shortened with an ellipsis
+  on phones; the full value stays available on hover.
+- Page content keeps clear of the floating AI button.
+
+No migrations, no settings changes and no persisted paths touched — this is a
+frontend-only release.
+
+---
+
 ## [0.2.6] — 2026-08-12
 
 ### Fixed — Home Assistant answered "400: Bad Request" through every tunnel
