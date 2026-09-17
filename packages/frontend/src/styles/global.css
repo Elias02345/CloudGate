@@ -137,19 +137,26 @@ body {
 		box-shadow: var(--cg-shadow-surface);
 	}
 
-	/* Icons lean in slightly with their control */
+	/* Icons give a short playful wobble, so it's obvious they can be pressed */
 	.mantine-Button-root:not(:disabled, [data-disabled], [data-loading]):hover .tabler-icon,
 	.mantine-ActionIcon-root:not(:disabled, [data-disabled], [data-loading]):hover .tabler-icon,
-	.mantine-NavLink-root:hover .tabler-icon {
-		transform: scale(1.12);
+	.mantine-NavLink-root:hover .tabler-icon,
+	.cg-clickable:hover .tabler-icon {
+		animation: cg-icon-wobble 450ms ease;
+		transform: scale(1.18);
 	}
 
+	/* Switches: the track widens its ring and the knob leans towards the side it would move to */
 	.mantine-Switch-root:hover .mantine-Switch-track {
-		box-shadow: var(--cg-shadow-surface), 0 0 0 3px var(--cg-clickable-hover);
+		box-shadow: var(--cg-shadow-surface), 0 0 0 4px var(--cg-clickable-hover);
 	}
 
 	.mantine-Switch-root:hover .mantine-Switch-thumb {
-		transform: scale(1.1);
+		animation: cg-thumb-nudge 600ms ease-in-out infinite;
+	}
+
+	.mantine-Switch-root[data-checked]:hover .mantine-Switch-thumb {
+		animation-name: cg-thumb-nudge-back;
 	}
 
 	.cg-clickable:not([data-selected]):hover {
@@ -219,6 +226,31 @@ tr.cg-clickable > td:last-child {
 	border-radius: 0 var(--mantine-radius-md) var(--mantine-radius-md) 0;
 }
 
+@keyframes cg-icon-wobble {
+	30% {
+		transform: scale(1.18) rotate(-7deg);
+	}
+	65% {
+		transform: scale(1.18) rotate(5deg);
+	}
+	100% {
+		transform: scale(1.18) rotate(0);
+	}
+}
+
+/* The knob peeks towards the position it would take, then settles back */
+@keyframes cg-thumb-nudge {
+	50% {
+		transform: translateX(3px) scale(1.08);
+	}
+}
+
+@keyframes cg-thumb-nudge-back {
+	50% {
+		transform: translateX(-3px) scale(1.08);
+	}
+}
+
 /* Pointer-following tooltip (components/Tooltip.tsx) */
 .cg-tooltip {
 	position: fixed;
@@ -253,6 +285,7 @@ tr.cg-clickable > td:last-child {
 	.mantine-Switch-track {
 		transition: none;
 		transform: none !important;
+		animation: none !important;
 	}
 
 	.cg-tooltip {

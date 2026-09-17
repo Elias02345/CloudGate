@@ -28,16 +28,11 @@ import {
 } from '@mantine/core';
 import { useDisclosure, useMediaQuery } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import {
-	IconAlertTriangle,
-	IconMessageChatbot,
-	IconRobot,
-	IconSend,
-	IconSparkles,
-} from '@tabler/icons-react';
+import { IconAlertTriangle, IconSend, IconSparkles } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
+import { useNavigate } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 import {
 	useConfirmAction,
@@ -50,6 +45,9 @@ import {
 import { ApiError } from '../api/client.js';
 import { MOBILE_QUERY } from '../layout.js';
 import { Tooltip } from './Tooltip.js';
+import { Cloudy } from './cloudy/Cloudy.js';
+import { targetForTool } from './cloudy/targets.js';
+import { useCloudy } from './cloudy/useCloudy.js';
 
 /**
  * App-level mount point — renders the FAB conditionally on enabled state.
@@ -75,7 +73,8 @@ export function AiChatFab() {
 						onClick={drawer.open}
 						aria-label={t('ai_chat.open')}
 					>
-						<IconMessageChatbot size={26} />
+						{/* Cloudy is the assistant — his face is the button */}
+						<Cloudy size={30} pose="idle" />
 					</ActionIcon>
 				</Tooltip>
 			</Affix>
@@ -99,6 +98,8 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 	const confirmAction = useConfirmAction();
 	const deleteConv = useDeleteConversation();
 	const [pendingMessage, setPendingMessage] = useState('');
+	const cloudy = useCloudy();
+	const navigate = useNavigate();
 	const scrollRef = useRef<HTMLDivElement>(null);
 
 	// Auto-scroll on new messages. The message count is a trigger, not a value the body
@@ -110,6 +111,24 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 		}
 	}, [conversation.data?.messages.length]);
 
+	/**
+	 * Cloudy steps out of the chat and walks to whatever the assistant touched:
+	 * one stop per tool it used, working there, then a cheer and back home.
+	 */
+	const showWork = async (tools: string[]) => {
+		await cloudy.say(t('cloudy.on_my_way'), { ms: 900 });
+		for (const tool of tools) {
+			const target = targetForTool(tool);
+			if (!target) continue;
+			navigate(target.route);
+			await cloudy.walkTo(target.selector, { say: t('cloudy.working') });
+			await cloudy.setPose('work', { ms: 1400 });
+		}
+		await cloudy.setPose('cheer', { ms: 900 });
+		await cloudy.say(t('cloudy.done'), { ms: 1200 });
+		await cloudy.goHome();
+	};
+
 	const onSend = async () => {
 		const msg = pendingMessage.trim();
 		if (!msg) return;
@@ -120,6 +139,8 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 				...(conversationId ? { conversation_id: conversationId } : {}),
 			});
 			if (!conversationId) setConversationId(result.conversation_id);
+			const tools = [...new Set((result.tool_results ?? []).map((r) => r.name))];
+			if (tools.length > 0) void showWork(tools);
 		} catch (err) {
 			notifications.show({
 				color: 'red',
@@ -189,7 +210,7 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 					style={{ borderBottom: '1px solid var(--mantine-color-default-border)' }}
 				>
 					<Group gap="xs" wrap="nowrap">
-						<IconRobot size={20} style={{ color: 'var(--cg-accent-ai)', flexShrink: 0 }} />
+						<Cloudy size={22} pose="idle" />
 						<Text fw={600}>{t('ai_chat.title')}</Text>
 					</Group>
 					<Group gap="xs" wrap="nowrap">
@@ -266,7 +287,7 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 						{sendMessage.isPending && (
 							<Group gap="xs">
 								<Avatar size="sm" color="cyan" radius="xl">
-									<IconRobot size={16} />
+									<Cloudy size={18} pose="idle" />
 								</Avatar>
 								<Loader size="xs" type="dots" />
 							</Group>
@@ -377,7 +398,7 @@ function MessageBubble({ role, content, toolResults, onConfirm }: MessageBubbleP
 	return (
 		<Group align="flex-start" gap="xs" wrap="nowrap">
 			<Avatar size="sm" color="cyan" radius="xl">
-				<IconRobot size={14} />
+				<Cloudy size={16} pose="idle" />
 			</Avatar>
 			<Card withBorder p="xs" style={{ flex: 1, minWidth: 0 }}>
 				<div className="ai-markdown" style={{ overflowWrap: 'anywhere' }}>
