@@ -1,8 +1,10 @@
-import { Badge, Tooltip } from '@mantine/core';
+import { Badge } from '@mantine/core';
+
 import { IconArrowUp } from '@tabler/icons-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useUpdateStatus } from '../api/updates.js';
+import { Tooltip } from './Tooltip.js';
 
 /**
  * Pulsing badge in the header when an update is available.

@@ -100,8 +100,17 @@ body {
 		ease, color 150ms ease;
 }
 
-.cg-clickable {
+.cg-clickable,
+.mantine-Switch-root,
+.mantine-Switch-track,
+.mantine-Switch-input {
 	cursor: pointer;
+}
+
+.tabler-icon,
+.mantine-Switch-thumb,
+.mantine-Switch-track {
+	transition: transform 150ms ease, box-shadow 150ms ease;
 }
 
 @media (hover: hover) {
@@ -123,6 +132,24 @@ body {
 
 	.mantine-NavLink-root:not([data-active]):hover {
 		transform: translateX(2px);
+		outline: 1px solid var(--mantine-color-default-border);
+		outline-offset: -1px;
+		box-shadow: var(--cg-shadow-surface);
+	}
+
+	/* Icons lean in slightly with their control */
+	.mantine-Button-root:not(:disabled, [data-disabled], [data-loading]):hover .tabler-icon,
+	.mantine-ActionIcon-root:not(:disabled, [data-disabled], [data-loading]):hover .tabler-icon,
+	.mantine-NavLink-root:hover .tabler-icon {
+		transform: scale(1.12);
+	}
+
+	.mantine-Switch-root:hover .mantine-Switch-track {
+		box-shadow: var(--cg-shadow-surface), 0 0 0 3px var(--cg-clickable-hover);
+	}
+
+	.mantine-Switch-root:hover .mantine-Switch-thumb {
+		transform: scale(1.1);
 	}
 
 	.cg-clickable:not([data-selected]):hover {
@@ -150,21 +177,86 @@ body {
 	background-color: var(--mantine-primary-color-light);
 }
 
-.mantine-Paper-root.cg-clickable[data-selected] {
-	border-color: var(--mantine-primary-color-filled);
+.mantine-Paper-root.cg-clickable {
+	border-color: var(--cg-row-edge, var(--mantine-color-default-border));
 }
 
-tr.cg-clickable[data-selected] > td:first-child {
-	box-shadow: inset 3px 0 0 var(--mantine-primary-color-filled);
+.mantine-Paper-root.cg-clickable[data-selected] {
+	box-shadow: var(--cg-shadow-surface);
+}
+
+/*
+ * Rows are buttons, not just lines in a table: hovering and selecting draw a
+ * rounded outline around the row. A <tr> ignores border-radius, so its cells
+ * carry the edge — outer cells round their outer corners.
+ */
+.cg-clickable {
+	--cg-row-edge: transparent;
+}
+
+@media (hover: hover) {
+	.cg-clickable:hover {
+		--cg-row-edge: var(--mantine-color-default-border);
+	}
+}
+
+.cg-clickable[data-selected] {
+	--cg-row-edge: var(--mantine-primary-color-filled);
+}
+
+tr.cg-clickable > td {
+	border-top: 1px solid var(--cg-row-edge);
+	border-bottom: 1px solid var(--cg-row-edge);
+}
+
+tr.cg-clickable > td:first-child {
+	border-left: 1px solid var(--cg-row-edge);
+	border-radius: var(--mantine-radius-md) 0 0 var(--mantine-radius-md);
+}
+
+tr.cg-clickable > td:last-child {
+	border-right: 1px solid var(--cg-row-edge);
+	border-radius: 0 var(--mantine-radius-md) var(--mantine-radius-md) 0;
+}
+
+/* Pointer-following tooltip (components/Tooltip.tsx) */
+.cg-tooltip {
+	position: fixed;
+	z-index: 400;
+	max-width: min(320px, calc(100vw - 24px));
+	padding: 6px 10px;
+	border: 1px solid var(--mantine-color-default-border);
+	border-radius: var(--mantine-radius-md);
+	background: var(--mantine-color-body);
+	color: var(--mantine-color-text);
+	box-shadow: var(--cg-shadow-surface);
+	font-size: var(--mantine-font-size-xs);
+	line-height: 1.4;
+	pointer-events: none;
+	animation: cg-tooltip-in 120ms ease;
+}
+
+@keyframes cg-tooltip-in {
+	from {
+		opacity: 0;
+		transform: translateY(-2px);
+	}
 }
 
 @media (prefers-reduced-motion: reduce) {
 	.mantine-Button-root,
 	.mantine-ActionIcon-root,
 	.mantine-NavLink-root,
-	.cg-clickable {
+	.cg-clickable,
+	.tabler-icon,
+	.mantine-Switch-thumb,
+	.mantine-Switch-track {
 		transition: none;
 		transform: none !important;
+	}
+
+	.cg-tooltip {
+		animation: none;
 	}
 }
 
@@ -187,8 +279,11 @@ tr.cg-clickable[data-selected] > td:first-child {
 	background-color: var(--stepper-color);
 }
 
-/* Phones: keep page content clear of the floating AI chat button */
-@media (max-width: 47.99em) {
+/*
+ * Phone layout = below 768px, or below 1200px on touch-only devices (see src/layout.ts).
+ * Phones: keep page content clear of the floating AI chat button.
+ */
+@media (max-width: 47.99em), (max-width: 74.99em) and (hover: none) and (pointer: coarse) {
 	.mantine-AppShell-main {
 		padding-bottom: calc(44px + 32px + var(--mantine-spacing-md));
 	}
@@ -200,7 +295,7 @@ tr.cg-clickable[data-selected] > td:first-child {
 	box-shadow: var(--cg-shadow-surface);
 }
 
-@media (min-width: 48em) {
+@media (min-width: 75em), (min-width: 48em) and (hover: hover), (min-width: 48em) and (pointer: fine) {
 	.mantine-AppShell-navbar {
 		top: calc(var(--app-shell-header-offset, 0rem) + 20px);
 		bottom: auto;

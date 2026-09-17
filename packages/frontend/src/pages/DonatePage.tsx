@@ -9,18 +9,19 @@
 import {
 	ActionIcon,
 	Anchor,
-	Badge,
 	Box,
 	Card,
-	CopyButton,
 	Flex,
 	Group,
+	Modal,
 	SimpleGrid,
 	Stack,
 	Text,
 	Title,
-	Tooltip,
+	UnstyledButton,
+	useComputedColorScheme,
 } from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
 import {
 	IconBrandPaypal,
 	IconCheck,
@@ -33,12 +34,15 @@ import {
 } from '@tabler/icons-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTranslation } from 'react-i18next';
+import { CopyButton } from '../components/CopyButton.js';
+import { Tooltip } from '../components/Tooltip.js';
 
 interface DonationOption {
 	key: string;
 	label: string;
 	icon: React.ReactNode;
-	color: string;
+	/** Icon colour, or a light/dark pair for brand colours that don't read on both schemes. */
+	color: string | { light: string; dark: string };
 	addressOrUrl: string;
 	displayAddress?: string;
 	qrPayload: string;
@@ -51,7 +55,8 @@ const OPTIONS: DonationOption[] = [
 		key: 'paypal',
 		label: 'PayPal',
 		icon: <IconBrandPaypal size={28} />,
-		color: '#003087',
+		// Brand blue #003087 is nearly invisible on the dark background; use PayPal's lighter blue there.
+		color: { dark: '#009cde', light: '#003087' },
 		addressOrUrl: 'https://www.paypal.me/EliasK09',
 		qrPayload: 'https://www.paypal.me/EliasK09',
 		externalLink: 'https://www.paypal.me/EliasK09',
@@ -132,13 +137,16 @@ export function DonatePage() {
 
 function DonationCard({ option }: { option: DonationOption }) {
 	const { t } = useTranslation();
+	const scheme = useComputedColorScheme('dark');
+	const [qrOpened, qrModal] = useDisclosure(false);
+	const iconColor = typeof option.color === 'string' ? option.color : option.color[scheme];
 
 	return (
 		<Card withBorder radius="md" padding="lg">
 			<Stack gap="sm">
 				<Group justify="space-between" wrap="wrap" gap="sm">
 					<Group gap="xs">
-						<Box style={{ color: option.color }}>{option.icon}</Box>
+						<Box style={{ color: iconColor }}>{option.icon}</Box>
 						<Text fw={600} size="lg">
 							{option.label}
 						</Text>
@@ -152,14 +160,18 @@ function DonationCard({ option }: { option: DonationOption }) {
 
 				{/* Phones: QR above the address so the address gets the full card width */}
 				<Flex direction={{ base: 'column', sm: 'row' }} align={{ base: 'center', sm: 'flex-start' }} gap="md">
-					{/* QR code */}
-					<Box
+					{/* QR code — click to enlarge */}
+					<UnstyledButton
+						onClick={qrModal.open}
+						title={t('donate.enlarge_qr', { label: option.label })}
+						aria-label={t('donate.enlarge_qr', { label: option.label })}
 						style={{
 							background: 'white',
 							padding: 8,
 							borderRadius: 'var(--mantine-radius-sm)',
 							lineHeight: 0,
 							flexShrink: 0,
+							cursor: 'pointer',
 						}}
 					>
 						<QRCodeSVG
@@ -170,7 +182,7 @@ function DonationCard({ option }: { option: DonationOption }) {
 							bgColor="#ffffff"
 							fgColor="#000000"
 						/>
-					</Box>
+					</UnstyledButton>
 
 					{/* Address + copy */}
 					<Stack gap={6} w={{ base: '100%', sm: 'auto' }} style={{ flex: 1, minWidth: 0 }}>
@@ -212,14 +224,60 @@ function DonationCard({ option }: { option: DonationOption }) {
 								{t(`donate.${option.hint}`)}
 							</Text>
 						)}
-						{option.externalLink && (
-							<Badge color="cg-orange" variant="light" size="sm" mt={4}>
-								{t('donate.one_click')}
-							</Badge>
-						)}
 					</Stack>
 				</Flex>
 			</Stack>
+
+			<Modal
+				opened={qrOpened}
+				onClose={qrModal.close}
+				centered
+				withCloseButton={false}
+				padding={0}
+				overlayProps={{ backgroundOpacity: 0.55, blur: 8 }}
+				styles={{ content: { background: 'transparent', boxShadow: 'none' }, body: { padding: 0 } }}
+			>
+				{/* Click anywhere in the overlay content to close */}
+				<UnstyledButton
+					onClick={qrModal.close}
+					style={{ display: 'block', width: '100%', cursor: 'pointer' }}
+					aria-label={t('donate.close_qr')}
+				>
+					<Stack align="center" gap="sm" py="xl">
+						<Box
+							style={{
+								background: 'white',
+								padding: 16,
+								borderRadius: 'var(--mantine-radius-lg)',
+								lineHeight: 0,
+							}}
+						>
+							<QRCodeSVG
+								value={option.qrPayload}
+								size={320}
+								style={{ width: 'min(320px, 70vw)', height: 'min(320px, 70vw)' }}
+								level="M"
+								marginSize={0}
+								bgColor="#ffffff"
+								fgColor="#000000"
+							/>
+						</Box>
+						<Text fw={600} c="white">
+							{option.label}
+						</Text>
+						<Text
+							size="sm"
+							ff="monospace"
+							c="white"
+							ta="center"
+							maw="min(320px, 70vw)"
+							style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}
+						>
+							{option.addressOrUrl}
+						</Text>
+					</Stack>
+				</UnstyledButton>
+			</Modal>
 		</Card>
 	);
 }

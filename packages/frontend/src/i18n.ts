@@ -14,6 +14,9 @@ void i18n
 		defaultNS: 'translation',
 		backend: {
 			loadPath: '/locales/{{lng}}/{{ns}}.json',
+			// nginx caches /locales for an hour: without a version key an update's new JS
+			// meets the previous release's translations and renders raw keys
+			queryStringParams: { v: __APP_VERSION__ },
 		},
 		interpolation: { escapeValue: false },
 		detection: {

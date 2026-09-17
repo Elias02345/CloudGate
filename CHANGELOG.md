@@ -9,6 +9,60 @@ _Nothing yet._
 
 ---
 
+## [0.2.9] — 2026-09-17
+
+### Fixed — copy buttons did nothing on LAN installs
+
+Every "copy" button (donation addresses, public endpoints, API keys, the Home
+Assistant remedy snippet) silently failed when CloudGate is reached over plain
+`http://`, because browsers only expose the clipboard API in a secure context.
+They now fall back to the classic copy path and work everywhere.
+
+### Fixed — translations after an update
+
+Right after an update the UI could show raw keys such as
+`tour.next_progress` instead of a label: the browser still had the previous
+release's cached translation files. Translations are now requested per version.
+
+### Added — tablets and foldables get the phone layout
+
+Devices without a mouse keep the phone layout up to 1200px wide, so unfolded
+foldables and tablets no longer get a cramped desktop layout with controls that
+need hover. Mouse and trackpad devices are unchanged (switch at 768px).
+
+### Changed — interaction feedback
+
+- Sidebar entries show an outlined, raised state on hover; icons inside buttons,
+  links and switches scale slightly, so clickable things announce themselves.
+- Switches show the pointer cursor and react to hover.
+- Selectable rows (Cloudflare and Playit accounts) read as buttons: a rounded
+  outline on hover, and the selected one is an orange-tinted rounded surface.
+  The orange bar on the left edge is gone.
+- Tooltips follow the mouse at an offset so the cursor never covers the text,
+  and use the app's surfaces, radius and shadow. The deliberate delay before
+  they appear is unchanged.
+
+### Changed — AI assistant chat
+
+Now follows the new design language and works on phones: full-width sheet from
+the bottom with rounded top corners, distinct bubbles for your own messages,
+correct colours in the light theme, and long code blocks scroll inside the
+bubble instead of stretching the panel.
+
+### Changed — support page
+
+- QR codes open large on click, with the rest of the UI blurred behind them;
+  clicking again or Escape closes them.
+- The PayPal icon is readable in the dark theme.
+- Removed the redundant "one-click PayPal" badge.
+
+### Added — dashboard shortcuts
+
+The CloudGate version card opens the update page, and the deployment-error
+notice opens the hosts page.
+
+---
+
 ## [0.2.8] — 2026-09-17
 
 ### Fixed — light theme
