@@ -69,15 +69,42 @@ CloudGate exposed to the internet, update.**
   minutes. Nothing stopped a retry loop before, and Let's Encrypt limits are
   weekly — exhausting them locks a domain out of new *and* renewed
   certificates for days.
+- **The playit agent was downloaded and run without any check.** The download
+  pointed at "whatever is newest" and the checksum was a placeholder the code
+  treated as "skip verification", so whatever arrived was made executable and
+  started. It is now pinned to agent v1.0.10 and verified against a real
+  checksum before it is allowed to run — and on Windows, the build the vendor
+  signs. The macOS entry pointed at a file that does not exist upstream and
+  has been removed.
+- **Turning off two-factor authentication now needs a code from your
+  authenticator**, not just your password. Switching it on always required
+  one; switching it off did not, so anyone with your password and an open
+  session could quietly remove it.
+- **The recovery interface refuses requests a browser reports as coming from
+  another site.** Its confirmation phrases are public — they are in the
+  source — so they stop accidents, not attacks. Access from a terminal is
+  unaffected.
 - API key generation had a slight bias in its character distribution, and a
   failure inside the authentication middleware could hang a request instead of
   returning an error. Both corrected.
 
 ### Fixed
 
+- **Hard reset in the recovery interface could not work, and said otherwise.**
+  It tried to move `/data` to a folder next to it, which sits outside the
+  storage volume — an impossible move that failed on the first file, and on
+  any setup where it did go through, the "archived" keys and database were
+  discarded the next time the container was recreated, while the screen
+  promised they were safe. Everything is now archived inside `/data` itself,
+  and a partial failure is reported instead of silently leaving half a
+  directory behind.
 - The container health check's recovery fallback never worked: it asked for a
   path that only existed in normal mode, so in recovery mode — the one case it
   was written for — it always failed.
+- A single malformed environment variable made CloudGate ignore **all** of
+  them and start on defaults, so a custom data directory could be silently
+  dropped. Only the invalid variable falls back now.
+- Restoring a database backup no longer accepts a file that is not a database.
 
 ---
 

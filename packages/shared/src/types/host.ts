@@ -46,6 +46,17 @@ export type ProviderEdgeEndpoint = z.infer<typeof ProviderEdgeEndpointSchema>;
 
 const HostnameRegex = /^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/;
 
+/**
+ * A hostname with no dot in it: `localhost`, `jellyfin`, `my-nas`.
+ *
+ * `HostnameRegex` above requires at least one dot because it validates the
+ * public hostnames CloudGate serves. An *origin* is usually the opposite —
+ * a Docker service name, a container alias, or plain `localhost` — so
+ * demanding a dot there would reject the most common homelab setup there is.
+ * The characters are what matter for safety, not the dot.
+ */
+const SingleLabelHostRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9_-]{0,61}[a-zA-Z0-9])?$/;
+
 /** Dotted-quad IPv4 literal, each octet 0-255. */
 const Ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
 
@@ -64,7 +75,12 @@ const Ipv6Regex =
  * the directive and inject config.
  */
 export function isValidForwardHost(value: string): boolean {
-	return HostnameRegex.test(value) || Ipv4Regex.test(value) || Ipv6Regex.test(value);
+	return (
+		HostnameRegex.test(value) ||
+		SingleLabelHostRegex.test(value) ||
+		Ipv4Regex.test(value) ||
+		Ipv6Regex.test(value)
+	);
 }
 
 /**

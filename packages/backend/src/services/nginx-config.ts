@@ -179,7 +179,11 @@ function sanitiseHeaderValue(value: string): string {
  * the port separator?) while `server [fe80::1]:8123;` is what nginx expects.
  */
 function sanitiseForwardHost(value: string): string {
-	const cleaned = value.replace(/[^A-Za-z0-9.:-]/g, '').slice(0, 253);
+	// `_` is kept deliberately: Docker container names allow it, nginx treats
+	// it as an ordinary token character, and stripping it would quietly turn a
+	// legacy `my_service` into `myservice` — a different, still-valid origin.
+	// Silent misrouting is worse than a visible error.
+	const cleaned = value.replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 253);
 	if (cleaned.startsWith('[') || !cleaned.includes(':')) return cleaned;
 	return `[${cleaned}]`;
 }

@@ -3,7 +3,7 @@
  *
  *   POST /totp/setup       — generates secret + returns provisioning URI/QR
  *   POST /totp/enable      — verifies a code + stores the secret + flips totp_enabled
- *   POST /totp/disable     — verifies password + clears secret + flips off
+ *   POST /totp/disable     — verifies password + a live code, clears secret
  *
  * Storage: totp_secret is stored encrypted-at-rest using the same encryption
  * key as Cloudflare tokens (services/crypto).
@@ -106,8 +106,18 @@ totpRouter.post('/enable', requireAuth, requirePasswordSet, async (req, res) => 
 // ---------------------------------------------------------------------------
 // POST /totp/disable
 // ---------------------------------------------------------------------------
+/**
+ * Turning 2FA off must cost at least as much as turning it on.
+ *
+ * Enabling requires the password plus a live code from the authenticator.
+ * Disabling used to require only the password, so anyone holding a session
+ * and the password — the exact pair 2FA exists to be insufficient — could
+ * strip the second factor and leave the account password-only from the next
+ * login onwards. The code proves the device is still in hand.
+ */
 const DisableSchema = z.object({
 	password: z.string().min(1),
+	code: z.string().min(6).max(10),
 });
 
 totpRouter.post('/disable', requireAuth, requirePasswordSet, async (req, res) => {
@@ -125,6 +135,17 @@ totpRouter.post('/disable', requireAuth, requirePasswordSet, async (req, res) =>
 		res.status(401).json({ error: 'Wrong password', code: 'AUTH_FAILED' });
 		return;
 	}
+
+	const secret = getStoredSecret(req.user.totp_secret);
+	if (!secret) {
+		res.status(400).json({ error: 'Two-factor authentication is not enabled', code: 'TOTP_NOT_ENABLED' });
+		return;
+	}
+	if (!authenticator.verify({ token: parsed.data.code, secret })) {
+		res.status(401).json({ error: 'Invalid TOTP code', code: 'TOTP_INVALID' });
+		return;
+	}
+
 	const knex = getDb();
 	await knex('users').where({ id: req.user.id }).update({
 		totp_secret: null,
@@ -134,6 +155,3 @@ totpRouter.post('/disable', requireAuth, requirePasswordSet, async (req, res) =>
 	record({ user_id: req.user.id, action: 'totp.disabled', ip: req.ip ?? null });
 	res.json({ ok: true });
 });
-
-// Touch the helper so tree-shake doesn't complain when nothing else imports it.
-void getStoredSecret;

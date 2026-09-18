@@ -158,7 +158,11 @@ async function main(): Promise<void> {
 	// "read-only" key that could call it would in fact be a full-secrets key.
 	app.use('/api', (req, res, next) => {
 		const isReadOnlyMethod = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
-		const isBackupEndpoint = req.path === '/backup' || req.path.startsWith('/backup/');
+		// Lowercased: Express matches mounts case-insensitively unless
+		// `case sensitive routing` is on, so `/api/Backup` reaches the backup
+		// router while a case-sensitive comparison here would wave it through.
+		const path = req.path.toLowerCase();
+		const isBackupEndpoint = path === '/backup' || path.startsWith('/backup/');
 		if (req.apiKey?.scope === 'read' && (!isReadOnlyMethod || isBackupEndpoint)) {
 			res.status(403).json({ error: 'API key has read-only scope', code: 'INSUFFICIENT_SCOPE' });
 			return;

@@ -22,8 +22,9 @@ export function useTotpEnable() {
 export function useTotpDisable() {
 	const qc = useQueryClient();
 	return useMutation({
-		mutationFn: (password: string) =>
-			api<{ ok: true }>('/totp/disable', { method: 'POST', body: { password } }),
+		// Turning 2FA off costs the same as turning it on: password + a live code.
+		mutationFn: (input: { password: string; code: string }) =>
+			api<{ ok: true }>('/totp/disable', { method: 'POST', body: input }),
 		onSuccess: () => qc.invalidateQueries({ queryKey: ['auth', 'me'] }),
 	});
 }

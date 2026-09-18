@@ -20,6 +20,30 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json());
 
+/**
+ * Cross-site guard for the destructive endpoints.
+ *
+ * This service has no login — it has to work when the backend, and therefore
+ * authentication, is broken. Its only gate is a confirmation phrase, and that
+ * phrase is a literal in a public repository, so it keeps an operator from
+ * fat-fingering a reset and stops nothing else. Today a `<form>` POST from an
+ * attacker's page fails only because express.json() ignores the content types
+ * a form can send — an accident, not a control.
+ *
+ * So: reject a request the browser itself labels cross-site. The header is
+ * absent for curl and other non-browser clients, which is deliberate —
+ * recovery over a shell has to keep working, and a non-browser client is not
+ * what CSRF is about.
+ */
+function blockCrossSite(req: express.Request, res: express.Response, next: express.NextFunction): void {
+	const site = req.header('sec-fetch-site');
+	if (site && site !== 'same-origin' && site !== 'none') {
+		res.status(403).json({ error: 'Cross-site request refused' });
+		return;
+	}
+	next();
+}
+
 app.get('/', (_req, res) => {
 	res.setHeader('Content-Type', 'text/html; charset=utf-8');
 	res.send(renderPage());
@@ -96,7 +120,7 @@ app.get('/api/backups', (_req, res) => {
 	res.json({ backups: entries });
 });
 
-app.post('/api/restore-db', async (req, res) => {
+app.post('/api/restore-db', blockCrossSite, async (req, res) => {
 	const body = req.body as { name?: string; confirm?: string };
 	if (!body?.name) {
 		res.status(400).json({ error: 'Missing "name"' });
@@ -107,6 +131,12 @@ app.post('/api/restore-db', async (req, res) => {
 		return;
 	}
 	const safe = body.name.replace(/[^a-zA-Z0-9._-]/g, '');
+	// The strip above already rules out traversal; this rules out copying some
+	// unrelated file in the backups directory over the live database.
+	if (!safe.endsWith('.sqlite')) {
+		res.status(400).json({ error: 'Backup name must end in .sqlite' });
+		return;
+	}
 	const src = join(DATA_DIR, 'db', 'backups', safe);
 	const dst = join(DATA_DIR, 'db', 'db.sqlite');
 	if (!existsSync(src)) {
@@ -128,7 +158,7 @@ app.post('/api/restore-db', async (req, res) => {
 
 // --- Soft reset: clear bootstrap markers, keep data ----------------------
 
-app.post('/api/soft-reset', async (req, res) => {
+app.post('/api/soft-reset', blockCrossSite, async (req, res) => {
 	const body = req.body as { confirm?: string };
 	if (body.confirm !== 'I-UNDERSTAND') {
 		res.status(400).json({ error: 'Confirmation phrase missing or wrong' });
@@ -147,9 +177,12 @@ app.post('/api/soft-reset', async (req, res) => {
 	res.json({ ok: true, message: 'Bootstrap markers cleared. Restart the container to re-bootstrap.' });
 });
 
-// --- Hard reset: move /data to /data.broken.<ts> -------------------------
+// --- Hard reset: move everything into /data/.broken-<ts> ------------------
 
-app.post('/api/hard-reset', (req, res) => {
+/** Previous hard resets live here; never fold one archive into the next. */
+const ARCHIVE_PREFIX = '.broken-';
+
+app.post('/api/hard-reset', blockCrossSite, (req, res) => {
 	const body = req.body as { confirm?: string };
 	// Stricter confirmation phrase to make accidents harder.
 	if (body.confirm !== 'YES-I-WANT-TO-LOSE-ALL-DATA') {
@@ -159,11 +192,33 @@ app.post('/api/hard-reset', (req, res) => {
 		return;
 	}
 	const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-	const archiveDir = `${DATA_DIR}.broken.${stamp}`;
+	// Inside /data, NOT beside it. /data is a Docker volume mount, so a sibling
+	// path like /data.broken.<ts> sits on the container's own layer: rename(2)
+	// refuses to cross that boundary (EXDEV), which made this endpoint fail on
+	// the first entry — and on any setup where it did succeed, the "archived"
+	// secrets and database were thrown away with the next container recreate,
+	// while the UI promised they were safe on the volume.
+	const archiveDir = join(DATA_DIR, `${ARCHIVE_PREFIX}${stamp}`);
 	try {
 		mkdirSync(archiveDir, { recursive: true });
+		const failed: { name: string; error: string }[] = [];
 		for (const name of readdirSync(DATA_DIR)) {
-			renameSync(join(DATA_DIR, name), join(archiveDir, name));
+			if (name.startsWith(ARCHIVE_PREFIX)) continue;
+			try {
+				renameSync(join(DATA_DIR, name), join(archiveDir, name));
+			} catch (err) {
+				// Report rather than abort: stopping halfway would leave /data
+				// split between the archive and itself with no way back.
+				failed.push({ name, error: (err as Error).message });
+			}
+		}
+		if (failed.length > 0) {
+			res.status(500).json({
+				error: 'Some entries could not be archived — /data is now partially reset.',
+				archived: archiveDir,
+				failed,
+			});
+			return;
 		}
 		res.json({
 			ok: true,
@@ -279,9 +334,9 @@ function renderPage(): string {
       <button class="secondary" onclick="doSoftReset()">Soft reset…</button>
 
       <p style="margin-top: 16px;">
-        <strong>Hard reset</strong> — move <code>/data</code> aside to
-        <code>/data.broken.&lt;ts&gt;</code>. Next start: completely fresh.
-        Old data is preserved on the volume (you can copy it out later).
+        <strong>Hard reset</strong> — move everything in <code>/data</code> into
+        <code>/data/.broken-&lt;ts&gt;</code>. Next start: completely fresh.
+        Old data stays on the volume (you can copy it out later).
       </p>
       <button class="danger" onclick="doHardReset()">Hard reset…</button>
     </div>

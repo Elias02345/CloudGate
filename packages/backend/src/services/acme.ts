@@ -137,9 +137,17 @@ export interface CertResult {
  * ponytail: in-memory, so a restart clears it. That is fine for the failure
  * mode this exists to stop (a retry loop or an impatient operator); a
  * restart-proof counter would need a settings/DB round trip per attempt.
+ * Entries past the cooldown are dropped on each call so the map cannot grow
+ * without bound over a long uptime.
  */
 const ISSUE_COOLDOWN_MS = 10 * 60 * 1000;
 const lastIssueAttempt = new Map<string, number>();
+
+function pruneIssueAttempts(now: number): void {
+	for (const [host, at] of lastIssueAttempt) {
+		if (now - at >= ISSUE_COOLDOWN_MS) lastIssueAttempt.delete(host);
+	}
+}
 
 export async function acquireCert(
 	hostname: string,
@@ -147,8 +155,10 @@ export async function acquireCert(
 ): Promise<CertResult> {
 	// Staging has its own, far looser quota — no reason to throttle it.
 	if (!options.staging) {
+		const now = Date.now();
+		pruneIssueAttempts(now);
 		const last = lastIssueAttempt.get(hostname);
-		const waitMs = last ? ISSUE_COOLDOWN_MS - (Date.now() - last) : 0;
+		const waitMs = last ? ISSUE_COOLDOWN_MS - (now - last) : 0;
 		if (waitMs > 0) {
 			throw new Error(
 				`Certificate for ${hostname} was already attempted less than ${Math.round(
@@ -156,7 +166,7 @@ export async function acquireCert(
 				)} minutes ago. Wait ${Math.ceil(waitMs / 60_000)} more minute(s) — Let's Encrypt rate limits are weekly, so retrying now risks locking the domain out of certificates entirely.`
 			);
 		}
-		lastIssueAttempt.set(hostname, Date.now());
+		lastIssueAttempt.set(hostname, now);
 	}
 
 	const zone = await findZoneForHostname(hostname);
