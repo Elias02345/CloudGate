@@ -275,14 +275,14 @@ export function PlayitPage() {
 					)}
 					<TextInput
 						label={t('playit.label_field')}
-						placeholder="homelab gaming"
+						placeholder={t('playit.label_placeholder')}
 						value={label}
 						onChange={(e) => setLabel(e.currentTarget.value)}
 						required
 					/>
 					<PasswordInput
 						label={t('playit.secret_field')}
-						placeholder="paste the secret string from playit.gg"
+						placeholder={t('playit.secret_placeholder')}
 						value={secretKey}
 						onChange={(e) => setSecretKey(e.currentTarget.value)}
 						required

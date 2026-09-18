@@ -201,9 +201,27 @@ if [[ "${swap_failed}" == "yes" ]]; then
   bail_with_rollback "could not move /app/* aside"
 fi
 
+# Land each directory in two steps: copy into a staging name ON /app, then
+# rename it into place.
+#
+# /data is a separate volume from /app, so moving straight out of the staging
+# directory is a cross-device operation — `mv` falls back to copy-then-delete
+# and the destination exists, half-written, for as long as the copy takes. A
+# container death in that window used to leave /app/<sub> present but
+# incomplete, which looks healthy to anything checking for existence (the
+# self-heal in bootstrap.sh did exactly that) while the intact <sub>.old sat
+# next to it, ignored.
+#
+# The final rename is within /app, so it is atomic: /app/<sub> is either the
+# old directory, or the complete new one, never a partial copy.
 for sub in backend frontend recovery-ui; do
   if [[ -d "${EXTRACTED_ROOT}/${sub}" ]]; then
-    mv "${EXTRACTED_ROOT}/${sub}" "/app/${sub}" || bail_with_rollback "move ${sub} from staging failed"
+    rm -rf "/app/${sub}.incoming" 2>/dev/null || true
+    cp -a "${EXTRACTED_ROOT}/${sub}" "/app/${sub}.incoming" \
+      || bail_with_rollback "copy ${sub} from staging failed"
+    mv "/app/${sub}.incoming" "/app/${sub}" \
+      || bail_with_rollback "move ${sub} into place failed"
+    rm -rf "${EXTRACTED_ROOT}/${sub}" 2>/dev/null || true
   fi
 done
 [[ -f "${EXTRACTED_ROOT}/.version" ]] && cp "${EXTRACTED_ROOT}/.version" /app/.version

@@ -9,6 +9,42 @@ _Nothing yet._
 
 ---
 
+## [0.3.6] — 2026-09-18
+
+### Fixed
+
+- **Bulk import could not create Minecraft or raw TCP/UDP hosts.** The import
+  never carried a protocol, so every row was checked as if it were an HTTP
+  host and refused by any playit tunnel — which carries neither. Rows can now
+  say `protocol` (`tcp`, `udp`, `http`, `https`), and it defaults to `http` as
+  before.
+
+  The 0.3.4 notes claimed this was already fixed. It was not: the underlying
+  ownership lookup was corrected, but the import still had no way to say what
+  kind of host it was creating, so the outcome for a playit tunnel was the
+  same rejection for a different reason. Apologies for the wrong entry.
+
+- **An update interrupted while unpacking could leave a half-written
+  installation that looked intact.** The new version is copied from the data
+  volume onto the application volume, which cannot be done in one atomic step,
+  so a power cut partway through left a directory that existed but was
+  incomplete — and the recovery added in 0.3.4 only looked for a *missing*
+  one. The copy now lands under a temporary name and is put in place in a
+  single step that cannot be interrupted halfway, and any leftover partial
+  copy is discarded on the next start.
+
+- Two input fields on the Playit page still showed English placeholder text.
+
+### Verified
+
+The self-update path was exercised end to end for the first time against a
+real release: 0.3.4 → 0.3.5 in a container, including the mandatory checksum,
+the snapshot of both the application and the database, the migration step, and
+the health check. Malformed version strings — including a path-traversal
+attempt — are refused before anything is downloaded.
+
+---
+
 ## [0.3.5] — 2026-09-18
 
 ### Fixed

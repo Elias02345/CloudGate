@@ -3,7 +3,12 @@
  *
  *   POST /api/hosts/bulk-import
  *      { hosts: [{hostname, forward_host, forward_port, forward_scheme?,
- *                  mode?, tunnel_id?, cf_zone_id?, no_tls_verify?}, ...] }
+ *                  protocol?, mode?, tunnel_id?, cf_zone_id?,
+ *                  no_tls_verify?}, ...] }
+ *
+ * `protocol` defaults to 'http'. Set it to 'tcp'/'udp' for playit tunnels —
+ * omitting it there means the row is checked as an HTTP host and rejected,
+ * since playit carries neither.
  *
  * Each row is validated independently — bad rows are reported back, good
  * rows are inserted + queued for deploy. The row schema is kept small and
@@ -14,7 +19,7 @@
  * single-host route would. A weaker schema here is a second front door.
  */
 
-import { PathPrefixRegex, isValidForwardHost } from '@cloudgate/shared';
+import { HostProtocolSchema, PathPrefixRegex, isValidForwardHost } from '@cloudgate/shared';
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/db.js';
@@ -32,6 +37,11 @@ const HOSTNAME_RX = /^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9
 const RowSchema = z.object({
 	mode: z.enum(['cloudflare_tunnel', 'local_nginx']).default('cloudflare_tunnel'),
 	hostname: z.string().regex(HOSTNAME_RX),
+	// Without this the shared placement check saw no protocol, defaulted to
+	// 'http', and refused every playit tunnel — which only carries tcp/udp.
+	// Bulk import was therefore cloudflared-only in practice, whatever the
+	// caller intended.
+	protocol: HostProtocolSchema.default('http'),
 	forward_scheme: z.enum(['http', 'https']).default('http'),
 	// Same validators as the single-host route. Both values land raw in an
 	// nginx directive and a cloudflared service URL, so bulk import must not
@@ -102,6 +112,7 @@ hostsBulkRouter.post('/bulk-import', requireAuth, requirePasswordSet, async (req
 				tunnel_id: row.tunnel_id ?? null,
 				cf_zone_id: row.cf_zone_id ?? null,
 				mode: row.mode,
+				protocol: row.protocol,
 				hostname: row.hostname.toLowerCase(),
 				forward_scheme: row.forward_scheme,
 				forward_host: row.forward_host,
