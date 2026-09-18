@@ -144,6 +144,13 @@ app.post('/api/restore-db', blockCrossSite, async (req, res) => {
 		return;
 	}
 	try {
+		// Remove the live database before copying instead of writing over it.
+		// This service runs unprivileged while the backend runs as root, so the
+		// file it is replacing is typically root-owned: opening it for writing
+		// would fail, while unlinking it only needs write permission on the
+		// directory, which /data's ownership gives us. The replacement is then
+		// created fresh, owned by this service.
+		if (existsSync(dst)) await unlink(dst);
 		await copyFile(src, dst);
 		// Remove WAL/SHM files — they'll be regenerated against the restored DB
 		for (const aux of ['db.sqlite-wal', 'db.sqlite-shm']) {

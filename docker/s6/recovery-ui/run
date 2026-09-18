@@ -2,6 +2,38 @@
 # Recovery UI — runs on port 8001 always.
 # nginx fronts it on :80 only when bootstrap failed (see nginx/run).
 # Cheap to keep running; useful entry point even on a healthy system.
+#
+# Runs UNPRIVILEGED. This service has no authentication of its own — it must
+# work when the backend is broken — and it can move /data aside or restore a
+# database over the live one. It touches nothing but /data, so unlike the
+# backend (which reloads nginx and drives the updater) it can give up root
+# without needing a broker for anything.
+#
+# bootstrap writes the resolved PUID/PGID to /data/.runtime-uidgid and chowns
+# /data to match. If that file is missing — bootstrap failed before writing it,
+# which is exactly when this UI matters most — fall back to running as root
+# rather than refusing to start. An unreachable recovery UI is worse than a
+# privileged one.
 
-cd /app/recovery-ui
-exec env RECOVERY_PORT=8001 node dist/index.js
+cd /app/recovery-ui || exit 1
+
+# This service has no dependency on the bootstrap oneshot — on purpose, since
+# it is what the operator needs precisely when bootstrap fails. So it starts in
+# parallel with it and the marker may not exist yet. Wait briefly: bootstrap
+# writes it in its first steps, long before the slow work.
+uidgid=""
+i=0
+while [ "$i" -lt 30 ]; do
+    uidgid=$(cat /data/.runtime-uidgid 2>/dev/null)
+    [ -n "$uidgid" ] && break
+    i=$((i + 1))
+    sleep 1
+done
+
+if [ -z "$uidgid" ]; then
+    echo "[recovery-ui] no /data/.runtime-uidgid after 30s — starting as root so recovery stays reachable"
+    exec env RECOVERY_PORT=8001 node dist/index.js
+fi
+
+echo "[recovery-ui] dropping to ${uidgid}"
+exec env RECOVERY_PORT=8001 s6-setuidgid "$uidgid" node dist/index.js
