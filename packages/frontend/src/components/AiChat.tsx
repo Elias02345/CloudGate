@@ -116,6 +116,8 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 	 * one stop per tool it used, working there, then a cheer and back home.
 	 */
 	const showWork = async (tools: string[]) => {
+		// Out of the way: the whole point is watching him do it
+		onClose();
 		await cloudy.say(t('cloudy.on_my_way'), { ms: 900 });
 		for (const tool of tools) {
 			const target = targetForTool(tool);

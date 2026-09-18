@@ -22,7 +22,24 @@ export type CloudyPose =
 	/** Little jump of joy when a task finished. */
 	| 'cheer'
 	/** Eyes closed, gentle drift — when nothing is going on. */
-	| 'sleep';
+	| 'sleep'
+	/** Smitten: eyes turn to hearts, hands to the cheeks — the support page. */
+	| 'love'
+	/** One hand to the chin, slow sway, eyes up — while he considers something. */
+	| 'think'
+	/** Arms out, a small "no idea" lift of the shoulders. */
+	| 'shrug'
+	/** Head tilt with a question mark popping up — something went wrong. */
+	| 'confused'
+	/** Happy little dance: hips sway, arms alternate up. */
+	| 'dance'
+	/** Sitting down, legs dangling — used when he perches on top of something. */
+	| 'sit'
+	/** Big yawn, arms stretched, right before he falls asleep. */
+	| 'yawn';
+
+/** Symbols he can hold up on his sign; the stage picks one per situation. */
+export type CloudySign = 'heart' | 'star' | 'check' | 'question' | 'alert' | 'sparkle';
 
 export interface CloudyProps {
 	pose?: CloudyPose;
@@ -30,8 +47,8 @@ export interface CloudyProps {
 	facing?: 'left' | 'right';
 	/** Rendered height in px (width follows). Default 64. */
 	size?: number;
-	/** Small sign held up with one arm — an emoji or tiny node (e.g. a heart). */
-	sign?: ReactNode;
+	/** Small sign held up with one arm: a named symbol, or any small node. */
+	sign?: CloudySign | ReactNode;
 	className?: string;
 	/** Title for assistive tech; omit for a purely decorative appearance. */
 	label?: string;
