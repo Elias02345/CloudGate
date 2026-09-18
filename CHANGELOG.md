@@ -9,6 +9,42 @@ _Nothing yet._
 
 ---
 
+## [0.3.1] — 2026-09-18
+
+### Added — Cloudy lives in the app now
+
+- **He is always there.** Instead of appearing only for a task, Cloudy stands
+  at his spot and, when nothing is going on, strolls somewhere else every half
+  minute or so for a small emote. He stays out of the way: never while you are
+  in the chat, a dialog or the guided tour, never on top of a control, and not
+  at all when the tab is in the background or "reduce motion" is on. After a
+  few quiet minutes he falls asleep and wakes on your next mouse move.
+- **Seven new emotes:** smitten (heart eyes, on the support page), thinking,
+  shrugging, confused, dancing, sitting and yawning.
+- **Signs with symbols.** He holds up a drawn heart, star, check, question,
+  warning or sparkle — the heart on the support page, a sparkle on the update
+  page, a warning when something just failed.
+- **He sits on the enlarged QR code** on the support page and goes back to his
+  spot when you close it.
+- **Watching him work.** When you give him a task the chat closes, so you can
+  see him walk to the pages and controls the task touches.
+
+### Fixed — Cloudy's placement
+
+- He could stand partly outside the window after a resize or a reflow; his
+  position is now kept inside the window at all times, and his resting spot
+  follows the chat button instead of a fixed corner.
+- During the guided tour he could end up behind the step's tooltip; he now
+  picks a side that leaves both the highlighted element and the tooltip free.
+
+### Changed — cards and controls react to the mouse
+
+Cards lift slightly on hover; cards you can click lift further, get an accent
+edge and animate their icon. Buttons, icon buttons and switches were already
+animated in 0.3.0 and keep that behaviour.
+
+---
+
 ## [0.3.0] — 2026-09-17
 
 ### Added — meet Cloudy
