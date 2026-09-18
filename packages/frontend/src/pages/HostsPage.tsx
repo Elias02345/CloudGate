@@ -45,6 +45,7 @@ import {
 	useVerifyDns,
 } from '../api/hosts.js';
 import { BulkImportModal } from '../components/BulkImportModal.js';
+import { useConfirm } from '../components/ConfirmProvider.js';
 import { CopyButton } from '../components/CopyButton.js';
 import { EditHostModal } from '../components/EditHostModal.js';
 import { EmptyState } from '../components/EmptyState.js';
@@ -109,6 +110,7 @@ function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 
 export function HostsPage() {
 	const { t } = useTranslation();
+	const confirm = useConfirm();
 	const navigate = useNavigate();
 	const hosts = useHosts();
 	const toggleMutation = useToggleHost();
@@ -166,7 +168,13 @@ export function HostsPage() {
 	};
 
 	const onIssue = async (hostname: string) => {
-		if (!confirm(t('hosts.confirm_issue_cert', { hostname }))) return;
+		if (
+			!(await confirm({
+				title: t('hosts.issue_cert_title'),
+				message: t('hosts.confirm_issue_cert', { hostname }),
+			}))
+		)
+			return;
 		try {
 			const r = await issueCert.mutateAsync({ hostname });
 			notifications.show({
@@ -365,10 +373,17 @@ export function HostsPage() {
 															<ActionIcon
 																variant="subtle"
 																color="red"
-																onClick={() => {
-																	if (confirm(t('hosts.confirm_delete', { hostname: h.hostname }))) {
-																		void deleteMutation.mutate(h.id);
-																	}
+																onClick={async () => {
+																	if (
+																		!(await confirm({
+																			title: t('hosts.delete_title'),
+																			message: t('hosts.confirm_delete', { hostname: h.hostname }),
+																			confirmLabel: t('common.delete'),
+																			danger: true,
+																		}))
+																	)
+																		return;
+																	void deleteMutation.mutate(h.id);
 																}}
 															>
 																<IconTrash size={16} />
@@ -509,10 +524,17 @@ export function HostsPage() {
 													variant="subtle"
 													color="red"
 													size="lg"
-													onClick={() => {
-														if (confirm(t('hosts.confirm_delete', { hostname: h.hostname }))) {
-															void deleteMutation.mutate(h.id);
-														}
+													onClick={async () => {
+														if (
+															!(await confirm({
+																title: t('hosts.delete_title'),
+																message: t('hosts.confirm_delete', { hostname: h.hostname }),
+																confirmLabel: t('common.delete'),
+																danger: true,
+															}))
+														)
+															return;
+														void deleteMutation.mutate(h.id);
 													}}
 												>
 													<IconTrash size={18} />

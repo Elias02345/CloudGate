@@ -29,6 +29,7 @@ import {
 	useSyncZones,
 	useZones,
 } from '../api/cloudflare.js';
+import { useConfirm } from '../components/ConfirmProvider.js';
 import { EmptyState } from '../components/EmptyState.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
 
@@ -45,6 +46,7 @@ function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 
 export function CloudflarePage() {
 	const { t } = useTranslation();
+	const confirm = useConfirm();
 	const accounts = useCloudflareAccounts();
 	const [selectedId, setSelectedId] = useState<number | null>(null);
 	const [modalOpened, modal] = useDisclosure(false);
@@ -159,12 +161,19 @@ export function CloudflarePage() {
 															<ActionIcon
 																variant="subtle"
 																color="red"
-																onClick={(e) => {
+																onClick={async (e) => {
 																	e.stopPropagation();
-																	if (confirm(t('cloudflare.confirm_delete', { label: a.label }))) {
-																		void deleteMutation.mutate(a.id);
-																		if (selectedId === a.id) setSelectedId(null);
-																	}
+																	if (
+																		!(await confirm({
+																			title: t('cloudflare.delete_title'),
+																			message: t('cloudflare.confirm_delete', { label: a.label }),
+																			confirmLabel: t('common.delete'),
+																			danger: true,
+																		}))
+																	)
+																		return;
+																	void deleteMutation.mutate(a.id);
+																	if (selectedId === a.id) setSelectedId(null);
 																}}
 															>
 																<IconTrash size={16} />
@@ -210,12 +219,19 @@ export function CloudflarePage() {
 													variant="subtle"
 													color="red"
 													size="lg"
-													onClick={(e) => {
+													onClick={async (e) => {
 														e.stopPropagation();
-														if (confirm(t('cloudflare.confirm_delete', { label: a.label }))) {
-															void deleteMutation.mutate(a.id);
-															if (selectedId === a.id) setSelectedId(null);
-														}
+														if (
+															!(await confirm({
+																title: t('cloudflare.delete_title'),
+																message: t('cloudflare.confirm_delete', { label: a.label }),
+																confirmLabel: t('common.delete'),
+																danger: true,
+															}))
+														)
+															return;
+														void deleteMutation.mutate(a.id);
+														if (selectedId === a.id) setSelectedId(null);
 													}}
 												>
 													<IconTrash size={18} />

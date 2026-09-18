@@ -29,6 +29,7 @@ import {
 	usePlayitAccounts,
 	usePlayitQuota,
 } from '../api/playit.js';
+import { useConfirm } from '../components/ConfirmProvider.js';
 import { EmptyState } from '../components/EmptyState.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
 
@@ -45,6 +46,7 @@ function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 
 export function PlayitPage() {
 	const { t } = useTranslation();
+	const confirm = useConfirm();
 	const accounts = usePlayitAccounts();
 	const [selectedId, setSelectedId] = useState<number | null>(null);
 	const [modalOpened, modal] = useDisclosure(false);
@@ -144,12 +146,18 @@ export function PlayitPage() {
 															<ActionIcon
 																variant="subtle"
 																color="red"
-																onClick={(e) => {
+																onClick={async (e) => {
 																	e.stopPropagation();
-																	if (confirm(t('playit.confirm_delete', { label: a.label }))) {
-																		void deleteMutation.mutate(a.id);
-																		if (selectedId === a.id) setSelectedId(null);
-																	}
+																	if (
+																		!(await confirm({
+																			title: t('playit.unlink_title'),
+																			message: t('playit.confirm_delete', { label: a.label }),
+																			danger: true,
+																		}))
+																	)
+																		return;
+																	void deleteMutation.mutate(a.id);
+																	if (selectedId === a.id) setSelectedId(null);
 																}}
 															>
 																<IconTrash size={16} />
@@ -192,12 +200,18 @@ export function PlayitPage() {
 													variant="subtle"
 													color="red"
 													size="lg"
-													onClick={(e) => {
+													onClick={async (e) => {
 														e.stopPropagation();
-														if (confirm(t('playit.confirm_delete', { label: a.label }))) {
-															void deleteMutation.mutate(a.id);
-															if (selectedId === a.id) setSelectedId(null);
-														}
+														if (
+															!(await confirm({
+																title: t('playit.unlink_title'),
+																message: t('playit.confirm_delete', { label: a.label }),
+																danger: true,
+															}))
+														)
+															return;
+														void deleteMutation.mutate(a.id);
+														if (selectedId === a.id) setSelectedId(null);
 													}}
 												>
 													<IconTrash size={18} />

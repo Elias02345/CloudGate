@@ -7,6 +7,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { App } from './App.js';
+import { ConfirmProvider } from './components/ConfirmProvider.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { theme } from './theme.js';
 import './i18n.js';
@@ -31,9 +32,11 @@ createRoot(rootEl).render(
 			<QueryClientProvider client={queryClient}>
 				<MantineProvider theme={theme} defaultColorScheme="dark">
 					<Notifications position="top-right" />
-					<BrowserRouter>
-						<App />
-					</BrowserRouter>
+					<ConfirmProvider>
+						<BrowserRouter>
+							<App />
+						</BrowserRouter>
+					</ConfirmProvider>
 				</MantineProvider>
 			</QueryClientProvider>
 		</ErrorBoundary>
