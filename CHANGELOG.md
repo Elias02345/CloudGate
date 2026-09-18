@@ -9,6 +9,46 @@ _Nothing yet._
 
 ---
 
+## [0.3.4] — 2026-09-18
+
+### Security
+
+- **Live updates no longer put your session token in the URL.** The event
+  stream is the one connection a browser cannot send a header on, so its
+  credential travelled as a query parameter — and nginx writes the full
+  address of every request to its log. It now uses a ticket that is fetched
+  separately, lasts a minute, and is accepted nowhere else.
+- **Creating a host through the assistant or a bulk import is now checked the
+  same way as through the form.** Both skipped the checks that the tunnel is
+  yours, that it can carry the protocol you picked, and that the hostname
+  belongs to the chosen zone. Bulk import also rejected playit tunnels
+  outright, no matter who owned them.
+- The Cloudflare tunnel configuration is written with the same strict
+  character rules the nginx configuration already used.
+
+### Fixed
+
+- **An update interrupted at the wrong moment left an installation that could
+  not start.** While the new version is swapped in, the old one is briefly
+  moved aside; a power cut or a killed container in that window left nothing
+  in place and nothing to notice. The old version is now put back on the next
+  start.
+- **Finishing the first-time setup left you on the form you had just
+  completed.** The page moved on before the app had caught up that the
+  password was set, and got sent straight back.
+- Two tests that guard against a process-supervisor race failed at random
+  under load because they measured time instead of waiting for what they
+  actually needed.
+
+### Changed
+
+- The example Compose file pins an exact version rather than `latest`, and
+  forbids the container from gaining privileges it did not start with.
+  CloudGate updates itself and walks migrations in order; pulling a floating
+  tag can skip past that.
+
+---
+
 ## [0.3.3] — 2026-09-18
 
 ### Security

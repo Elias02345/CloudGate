@@ -73,9 +73,13 @@ export function useChangePassword() {
 			});
 			if (data.access_token) setStoredToken(data.access_token);
 		},
-		onSuccess: () => {
-			qc.invalidateQueries({ queryKey: ['auth', 'me'] });
-		},
+		// Returned, not fired and forgotten: react-query awaits a promise from
+		// onSuccess, so `mutateAsync` resolves only once /auth/me has actually
+		// been refetched. Without that wait, the caller navigates away while
+		// the cache still says must_change_password, ProtectedRoute bounces it
+		// straight back to /password, and the user is stranded on the form they
+		// just completed.
+		onSuccess: () => qc.invalidateQueries({ queryKey: ['auth', 'me'] }),
 	});
 }
 

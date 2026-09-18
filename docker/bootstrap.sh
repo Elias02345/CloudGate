@@ -108,10 +108,37 @@ finalize() {
 }
 
 # -----------------------------------------------------------------------------
+# Recover from an update that was killed mid-swap.
+#
+# apply-update.sh replaces /app with a move-aside pattern: every /app/<sub> is
+# renamed to <sub>.old, then the new one is moved in. Its own failures roll
+# back, but a container death in between — an OOM kill, a host power cut, a
+# `docker kill` — leaves no process to roll anything back. /app/<sub> is then
+# simply gone while <sub>.old holds the last good copy.
+#
+# Nothing used to notice. The backend service would fail to start against a
+# missing directory, and since .bootstrap-outcome still said "ok" from the
+# previous boot, the recovery UI never took over either: an unusable install
+# with no route back. CLAUDE.md §8 sets exactly this bar — a half-finished
+# update must not leave the system stuck — so put it back on the way up.
+# -----------------------------------------------------------------------------
+heal_interrupted_update() {
+  for sub in backend frontend recovery-ui; do
+    if [ ! -d "/app/${sub}" ] && [ -d "/app/${sub}.old" ]; then
+      log "Interrupted update detected: restoring /app/${sub} from ${sub}.old"
+      mv "/app/${sub}.old" "/app/${sub}" \
+        || err "Could not restore /app/${sub} — recovery UI should take over"
+    fi
+  done
+}
+
+# -----------------------------------------------------------------------------
 # Main
 # -----------------------------------------------------------------------------
 main() {
   log "Starting CloudGate bootstrap (version $(cat /app/.version 2>/dev/null || echo unknown))"
+
+  heal_interrupted_update
 
   if ! ensure_data_dir; then
     finalize "fail-data-dir"
