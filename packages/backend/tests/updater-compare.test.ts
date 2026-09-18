@@ -12,7 +12,11 @@ import { describe, expect, it } from 'vitest';
 // to assert the contract. If updater.ts changes its comparison rules, this
 // test should be updated alongside.
 function compareVersions(a: string, b: string): number {
-	const norm = (s: string) => s.replace(/^v/, '').split(/[.+-]/).map((p) => Number.parseInt(p, 10));
+	const norm = (s: string) =>
+		s
+			.replace(/^v/, '')
+			.split(/[.+-]/)
+			.map((p) => Number.parseInt(p, 10));
 	const [aMaj, aMin, aPat] = norm(a);
 	const [bMaj, bMin, bPat] = norm(b);
 	const score = (x: number | undefined) => (Number.isFinite(x) ? (x as number) : 0);

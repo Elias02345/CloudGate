@@ -12,8 +12,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { create as createTar } from 'tar';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const MAGIC = Buffer.from('CGBACKUP', 'utf8');
 
@@ -70,7 +70,9 @@ describe('restore', () => {
 	it('rejects wrong passphrase with CGBK_DECRYPT_FAILED', async () => {
 		const cgbk = await buildBackup(srcDir, 'correct-passphrase');
 		const { restoreFromBuffer } = await import('../src/services/restore.js');
-		await expect(restoreFromBuffer(cgbk, 'wrong-passphrase')).rejects.toMatchObject({ code: 'CGBK_DECRYPT_FAILED' });
+		await expect(restoreFromBuffer(cgbk, 'wrong-passphrase')).rejects.toMatchObject({
+			code: 'CGBK_DECRYPT_FAILED',
+		});
 	});
 
 	it('rejects file without CGBACKUP magic header', async () => {

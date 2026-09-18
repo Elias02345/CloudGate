@@ -5,12 +5,12 @@
  * so the real /data/secrets/encryption.key isn't touched.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { randomBytes } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 let tmpDir: string;
 

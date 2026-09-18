@@ -12,10 +12,10 @@
  * the same code paths.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, mkdtempSync, rmSync, statSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 let tmpDir: string;
 
