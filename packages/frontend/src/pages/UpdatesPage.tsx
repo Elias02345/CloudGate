@@ -23,6 +23,7 @@ import {
 	useUpdateSettings,
 	useUpdateStatus,
 } from '../api/updates.js';
+import { useConfirm } from '../components/ConfirmProvider.js';
 import { UpdateProgressModal, shouldShowModalForStatus } from '../components/UpdateProgressModal.js';
 
 function stateColor(s: UpdateStatus['state']): string {
@@ -46,6 +47,7 @@ function stateColor(s: UpdateStatus['state']): string {
 
 export function UpdatesPage() {
 	const { t } = useTranslation();
+	const confirm = useConfirm();
 	// Poll every 2s while the modal is open so the install progress stays fresh
 	const [modalOpen, setModalOpen] = useState(false);
 	const [modalTarget, setModalTarget] = useState<string | null>(null);
@@ -73,7 +75,13 @@ export function UpdatesPage() {
 
 	const onInstall = async () => {
 		if (!data?.latest_version) return;
-		if (!confirm(t('updates.confirm_install', { version: data.latest_version }))) return;
+		if (
+			!(await confirm({
+				title: t('updates.confirm_install_title'),
+				message: t('updates.confirm_install', { version: data.latest_version }),
+			}))
+		)
+			return;
 		// Open the progress modal *before* the install RPC returns — the RPC
 		// resolves quickly (it spawns a detached child) and we want the SSE
 		// subscription up before backend events start firing.
