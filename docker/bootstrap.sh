@@ -35,18 +35,26 @@ err() {
 # a specific UID/GID so the host can read/write it cleanly. Optional.
 # -----------------------------------------------------------------------------
 apply_uid_mapping() {
-  if [ -z "$PUID" ] && [ -z "$PGID" ]; then
-    return 0
-  fi
   if ! command -v chown >/dev/null 2>&1; then
-    log "chown not available — skipping PUID/PGID"
+    log "chown not available — skipping /data ownership setup"
     return 0
   fi
-  if [ -n "$PUID" ]; then
-    log "Setting /data owner to UID=$PUID"
-    chown -R "$PUID:${PGID:-$PUID}" "$DATA_DIR" 2>/dev/null \
-      || log "WARN: chown -R $PUID:$PGID failed (continuing, may break later writes)"
-  fi
+
+  # The recovery UI runs unprivileged (see docker/s6/recovery-ui/run), so /data
+  # has to belong to that account. Default 1000:1000 matches the cloudgate user
+  # baked into the image; PUID/PGID override it for operators who bind-mount a
+  # host directory and need it owned by a specific id.
+  RUNTIME_UID="${PUID:-1000}"
+  RUNTIME_GID="${PGID:-${PUID:-1000}}"
+
+  log "Setting /data owner to ${RUNTIME_UID}:${RUNTIME_GID}"
+  chown -R "${RUNTIME_UID}:${RUNTIME_GID}" "$DATA_DIR" 2>/dev/null \
+    || log "WARN: chown -R ${RUNTIME_UID}:${RUNTIME_GID} failed (continuing, may break later writes)"
+
+  # Hand the resolved ids to the service scripts. They run before any Node
+  # code and have no other way to learn what PUID/PGID resolved to.
+  printf '%s:%s\n' "${RUNTIME_UID}" "${RUNTIME_GID}" > "${DATA_DIR}/.runtime-uidgid" 2>/dev/null \
+    || log "WARN: could not write .runtime-uidgid — recovery UI will fall back to root"
 }
 
 # -----------------------------------------------------------------------------
@@ -110,12 +118,24 @@ main() {
     return 1
   fi
 
+  # Early: publishes .runtime-uidgid, which the recovery UI waits for before
+  # deciding whether it can drop privileges.
   apply_uid_mapping
 
   if ! run_node_bootstrap; then
+    # Still re-apply ownership: the node step may have created /data/db and
+    # /data/secrets as root before failing, and the recovery UI — which is
+    # exactly what runs now — needs to be able to work with them.
+    apply_uid_mapping
     finalize "fail-node-bootstrap"
     return 1
   fi
+
+  # The node bootstrap creates /data/db, /data/secrets and friends as root,
+  # after the first chown has already run. Without this second pass those
+  # directories stay root-owned and the unprivileged recovery UI cannot
+  # restore a database or archive /data.
+  apply_uid_mapping
 
   finalize "ok"
   return 0
