@@ -9,6 +9,36 @@ _Nothing yet._
 
 ---
 
+## [0.3.7] — 2026-09-18
+
+### Security — please read if you update from inside CloudGate
+
+**Updating through the CloudGate interface cannot deliver every fix, and one
+of the missing ones matters.**
+
+An update downloads a release archive that contains the application only. The
+web server configuration, the service scripts and the update script itself are
+part of the container image, and an update from the interface does not — and
+cannot — replace them. It never could; this was simply never stated.
+
+The consequence: **0.3.2 removed a path (`/__recovery/`) that exposed the
+recovery interface, which has no login of its own, to anyone who could reach
+your CloudGate.** That fix is in the web server configuration. If your
+installation has only ever updated through the interface, it is running the
+corrected application behind the uncorrected configuration — and is still
+exposed, while the version number says otherwise.
+
+**To actually close it, pull a new container image and recreate the
+container** — for Compose, `docker compose pull && docker compose up -d`.
+
+CloudGate now checks for this on every start. If your image is affected, it
+writes an error to the log and marks the container image as failed under
+Settings → subsystem checks, with the command to run. The same applies, less
+urgently, to the unprivileged recovery service (0.3.3) and the interrupted-
+update recovery (0.3.4 and 0.3.6): those also arrive only with a new image.
+
+---
+
 ## [0.3.6] — 2026-09-18
 
 ### Fixed

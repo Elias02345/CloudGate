@@ -6,10 +6,10 @@
  * returns the right edge endpoint shape for TCP (SRV) and UDP (host_port).
  */
 
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 let tmpDir: string;
 
@@ -190,7 +190,7 @@ describe('PlayitProvider.addHost', () => {
 				forward_host: '192.168.1.50',
 				forward_port: 80,
 				forward_scheme: 'http',
-			}),
+			})
 		).rejects.toThrow(/does not support protocol 'http'/);
 	});
 });
