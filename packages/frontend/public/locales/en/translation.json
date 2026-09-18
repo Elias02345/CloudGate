@@ -523,7 +523,9 @@
     "secret_field": "Agent secret",
     "validate_and_link": "Validate and link",
     "linked_title": "Playit account linked",
-    "linked_message": "{{label}} is ready for game-server tunnels."
+    "linked_message": "{{label}} is ready for game-server tunnels.",
+    "label_placeholder": "homelab gaming",
+    "secret_placeholder": "paste the secret string from playit.gg"
   },
   "tunnels": {
     "title": "Cloudflare tunnels",

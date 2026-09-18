@@ -124,6 +124,16 @@ finalize() {
 # -----------------------------------------------------------------------------
 heal_interrupted_update() {
   for sub in backend frontend recovery-ui; do
+    # A half-finished copy from staging, cleaned up so it cannot be mistaken
+    # for the real thing. apply-update.sh assembles under `.incoming` and only
+    # renames into place once the copy is complete, so anything left here is
+    # by definition unfinished.
+    if [ -d "/app/${sub}.incoming" ]; then
+      log "Interrupted update detected: discarding partial /app/${sub}.incoming"
+      rm -rf "/app/${sub}.incoming" 2>/dev/null \
+        || err "Could not remove /app/${sub}.incoming"
+    fi
+
     if [ ! -d "/app/${sub}" ] && [ -d "/app/${sub}.old" ]; then
       log "Interrupted update detected: restoring /app/${sub} from ${sub}.old"
       mv "/app/${sub}.old" "/app/${sub}" \
