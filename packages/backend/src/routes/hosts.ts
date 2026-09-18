@@ -27,6 +27,7 @@ import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { verifyDns } from '../services/dns-verify.js';
 import { publish } from '../services/events.js';
 import { deployHost, undeployHost } from '../services/host-deploy.js';
+import { checkHostPlacement } from '../services/host-placement.js';
 import { probeUpstream } from '../services/upstream-probe.js';
 
 const log = childLogger('routes:hosts');
@@ -141,80 +142,12 @@ hostsRouter.post(
 		const input = parsed.data;
 		const knex = getDb();
 
-		// Validate the tunnel/zone exists + belongs to the user
-		if (input.mode === 'cloudflare_tunnel') {
-			if (!input.tunnel_id) {
-				res.status(400).json({ error: 'cloudflare_tunnel mode requires tunnel_id', code: 'BAD_REQUEST' });
-				return;
-			}
-			// Look up the tunnel — must be owned by the user via cloudflare_accounts
-			// (cloudflared provider) or playit_accounts (playit provider).
-			const tunnel = await knex<{ id: number; provider: string }>('tunnels')
-				.leftJoin('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
-				.leftJoin('playit_accounts', 'playit_accounts.id', 'tunnels.playit_account_id')
-				.where('tunnels.id', input.tunnel_id)
-				.andWhere((b) => {
-					b.where('cloudflare_accounts.user_id', req.user?.id).orWhere(
-						'playit_accounts.user_id',
-						req.user?.id
-					);
-				})
-				.select('tunnels.id', 'tunnels.provider')
-				.first();
-			if (!tunnel) {
-				res.status(400).json({ error: 'Tunnel not found or not yours', code: 'BAD_REQUEST' });
-				return;
-			}
-
-			// Validate protocol matches the provider's capabilities.
-			const protocol = input.protocol ?? 'http';
-			const providerName = tunnel.provider ?? 'cloudflared';
-			const supportsByProvider: Record<string, string[]> = {
-				cloudflared: ['http', 'https'],
-				playit: ['tcp', 'udp'],
-			};
-			if (!supportsByProvider[providerName]?.includes(protocol)) {
-				res.status(400).json({
-					error: `Tunnel uses provider '${providerName}' which does not support protocol '${protocol}'.`,
-					code: 'PROTOCOL_PROVIDER_MISMATCH',
-				});
-				return;
-			}
-
-			// path_prefix is only meaningful for HTTP routing.
-			if (protocol !== 'http' && protocol !== 'https' && input.path_prefix && input.path_prefix !== '/') {
-				res.status(400).json({
-					error: `path_prefix is only valid for http/https protocols (got '${protocol}').`,
-					code: 'PATH_PREFIX_NOT_ALLOWED',
-				});
-				return;
-			}
-
-			// Zone is required for cloudflared (CNAME) and Java MC (SRV record),
-			// but optional for Bedrock UDP (host_port — no DNS record).
-			const needsZone = providerName === 'cloudflared' || (providerName === 'playit' && protocol === 'tcp');
-			if (needsZone && !input.cf_zone_id) {
-				res.status(400).json({
-					error: `Protocol '${protocol}' on provider '${providerName}' requires a cf_zone_id for the DNS record.`,
-					code: 'ZONE_REQUIRED',
-				});
-				return;
-			}
-
-			if (input.cf_zone_id) {
-				const zone = await knex<{ name: string }>('cf_zones').where({ id: input.cf_zone_id }).first();
-				if (!zone) {
-					res.status(400).json({ error: 'Zone not found', code: 'BAD_REQUEST' });
-					return;
-				}
-				if (!input.hostname.endsWith(zone.name)) {
-					res.status(400).json({
-						error: `Hostname must end with the chosen zone (${zone.name})`,
-						code: 'HOSTNAME_ZONE_MISMATCH',
-					});
-					return;
-				}
-			}
+		// Ownership, provider/protocol fit and zone match — shared with the AI
+		// assistant's create_host so neither path is the softer way in.
+		const problem = await checkHostPlacement(input, req.user.id);
+		if (problem) {
+			res.status(400).json(problem);
+			return;
 		}
 
 		const now = new Date().toISOString();
