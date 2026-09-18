@@ -5,12 +5,14 @@
 	/* Limbs need to read on the dark page background AND on the light body they cross — a mid tone does both */
 	--cg-cloudy-limb: #9fb0c4;
 	--cg-cloudy-accent: var(--mantine-primary-color-filled);
+	--cg-cloudy-heart: #e0526b;
 }
 
 :root[data-mantine-color-scheme="light"] {
 	--cg-cloudy-body: #dce6f0;
 	--cg-cloudy-ink: #232b36;
 	--cg-cloudy-limb: #5d6b7d;
+	--cg-cloudy-heart: #d1435c;
 }
 
 .cg-cloudy {
@@ -61,6 +63,7 @@
 
 .cg-cloudy__eye {
 	fill: var(--cg-cloudy-ink, #2b3440);
+	opacity: 1;
 }
 
 .cg-cloudy__eye-lid {
@@ -70,17 +73,75 @@
 	transform: scaleY(0);
 }
 
+/* love-only: heart eyes replace the plain circles */
+.cg-cloudy__eye-heart {
+	fill: var(--cg-cloudy-heart);
+	opacity: 0;
+}
+
+.cg-cloudy[data-pose="love"] .cg-cloudy__eye {
+	opacity: 0;
+}
+.cg-cloudy[data-pose="love"] .cg-cloudy__eye-heart {
+	opacity: 1;
+}
+
 .cg-cloudy__mouth {
 	fill: none;
 	stroke: var(--cg-cloudy-ink, #2b3440);
 	stroke-width: 2.5;
 	stroke-linecap: round;
+	opacity: 1;
+}
+
+/* yawn-only: open mouth swaps in for the plain curve */
+.cg-cloudy__mouth-yawn {
+	fill: var(--cg-cloudy-ink, #2b3440);
+	opacity: 0;
+	transform-box: fill-box;
+	transform-origin: 50% 0%; /* jaw drops from the top lip */
+	transform: scaleY(0);
 }
 
 .cg-cloudy__z {
 	fill: var(--cg-cloudy-accent, var(--mantine-primary-color-filled));
 	font-size: 13px;
 	font-family: inherit;
+	opacity: 0;
+	transform-box: fill-box;
+}
+
+/* think-only: trailing dots above the head */
+.cg-cloudy__think-dot {
+	fill: var(--cg-cloudy-accent, var(--mantine-primary-color-filled));
+	opacity: 0;
+	transform-box: fill-box;
+}
+.cg-cloudy[data-pose="think"] .cg-cloudy__think-dot {
+	opacity: 0.6;
+}
+
+/* confused-only: question mark */
+.cg-cloudy__confused-q {
+	fill: none;
+	stroke: var(--cg-cloudy-ink, #2b3440);
+	stroke-width: 2.2;
+	stroke-linecap: round;
+	opacity: 0;
+	transform-box: fill-box;
+	transform-origin: 50% 100%;
+}
+.cg-cloudy__confused-q circle {
+	fill: var(--cg-cloudy-ink, #2b3440);
+	stroke: none;
+}
+.cg-cloudy[data-pose="confused"] .cg-cloudy__confused-q {
+	opacity: 1;
+}
+
+/* love-only: small hearts drifting up beside the head */
+.cg-cloudy__heart-float {
+	fill: var(--cg-cloudy-heart);
 	opacity: 0;
 	transform-box: fill-box;
 }
@@ -94,6 +155,48 @@
 	fill: var(--cg-cloudy-body, #e8eef5);
 	stroke: var(--cg-cloudy-ink, #2b3440);
 	stroke-width: 2.5;
+}
+
+/* named sign symbols — colour set per-name below, inherited by their child path/circle/line */
+.cg-cloudy__sign-icon {
+	transform-box: fill-box;
+}
+.cg-cloudy__sign-icon--heart {
+	fill: var(--cg-cloudy-heart);
+}
+.cg-cloudy__sign-icon--star,
+.cg-cloudy__sign-icon--sparkle {
+	fill: var(--cg-cloudy-accent, var(--mantine-primary-color-filled));
+}
+.cg-cloudy__sign-icon--check {
+	fill: none;
+	stroke: var(--cg-cloudy-accent, var(--mantine-primary-color-filled));
+	stroke-width: 3;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+.cg-cloudy__sign-icon--question path {
+	fill: none;
+	stroke: var(--cg-cloudy-ink, #2b3440);
+	stroke-width: 2.4;
+	stroke-linecap: round;
+}
+.cg-cloudy__sign-icon--question circle {
+	fill: var(--cg-cloudy-ink, #2b3440);
+}
+.cg-cloudy__sign-icon--alert path {
+	fill: var(--cg-cloudy-body, #e8eef5);
+	stroke: var(--cg-cloudy-ink, #2b3440);
+	stroke-width: 2.2;
+	stroke-linejoin: round;
+}
+.cg-cloudy__sign-icon--alert line {
+	stroke: var(--cg-cloudy-ink, #2b3440);
+	stroke-width: 2.4;
+	stroke-linecap: round;
+}
+.cg-cloudy__sign-icon--alert circle {
+	fill: var(--cg-cloudy-ink, #2b3440);
 }
 
 /* --- facing --------------------------------------------------------------
@@ -115,10 +218,12 @@
  */
 @media (prefers-reduced-motion: no-preference) {
 	.cg-cloudy[data-pose="idle"] .cg-cloudy__body {
-		animation: cg-cloudy-breathe 3.2s ease-in-out infinite;
+		/* three gentle breaths, then a little flourish hop before the cycle repeats */
+		animation: cg-cloudy-breathe 9.6s ease-in-out infinite;
 	}
 	.cg-cloudy[data-pose="idle"] .cg-cloudy__eye-lid {
-		animation: cg-cloudy-blink 5s ease-in-out infinite;
+		/* one blink per cycle, timed to land with the hop */
+		animation: cg-cloudy-blink 9.6s ease-in-out infinite;
 	}
 	.cg-cloudy[data-pose="idle"] .cg-cloudy__arm-left,
 	.cg-cloudy[data-pose="idle"] .cg-cloudy__arm-right {
@@ -131,22 +236,34 @@
 
 @keyframes cg-cloudy-breathe {
 	0%,
+	33%,
+	66%,
+	88%,
 	100% {
 		transform: translateY(0);
 	}
-	50% {
+	16.5%,
+	49.5%,
+	82.5% {
 		transform: translateY(-2px);
+	}
+	92% {
+		transform: translateY(-8px); /* the flourish hop */
+	}
+	96% {
+		transform: translateY(0);
 	}
 }
 
 @keyframes cg-cloudy-blink {
 	0%,
-	92%,
+	90%,
+	96%,
 	100% {
 		transform: scaleY(0);
 	}
-	95% {
-		transform: scaleY(1);
+	93% {
+		transform: scaleY(1); /* blinks right as the hop lands */
 	}
 }
 
@@ -192,10 +309,10 @@
 @keyframes cg-cloudy-walk-bob {
 	0%,
 	100% {
-		transform: rotate(-3deg) translateY(0);
+		transform: rotate(-5deg) translateY(0); /* lean deepens as he steps down... */
 	}
 	50% {
-		transform: rotate(-3deg) translateY(-3px);
+		transform: rotate(-1deg) translateY(-3px); /* ...and eases up on the bounce — a little head lean */
 	}
 }
 
@@ -450,6 +567,382 @@
 	100% {
 		opacity: 0;
 		transform: translate(4px, -14px);
+	}
+}
+
+/* --- love ------------------------------------------------------------
+ * Hands to the cheeks (heart eyes + arm positions are static rules above),
+ * a gentle full-body pulse, and small hearts drifting up beside the head.
+ */
+.cg-cloudy[data-pose="love"] .cg-cloudy__arm-left {
+	transform: rotate(70deg);
+}
+.cg-cloudy[data-pose="love"] .cg-cloudy__arm-right {
+	transform: rotate(-70deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="love"] .cg-cloudy__body {
+		animation: cg-cloudy-love-pulse 1.4s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="love"] .cg-cloudy__heart-float--a {
+		animation: cg-cloudy-heart-drift 2.4s ease-in infinite;
+	}
+	.cg-cloudy[data-pose="love"] .cg-cloudy__heart-float--b {
+		animation: cg-cloudy-heart-drift 2.4s ease-in infinite;
+		animation-delay: -1.2s; /* the two hearts cascade instead of pulsing together */
+	}
+}
+
+@keyframes cg-cloudy-love-pulse {
+	0%,
+	100% {
+		transform: scale(1);
+	}
+	50% {
+		transform: scale(1.05);
+	}
+}
+
+@keyframes cg-cloudy-heart-drift {
+	0% {
+		opacity: 0;
+		transform: translate(0, 0) scale(0.8);
+	}
+	20% {
+		opacity: 1;
+	}
+	70% {
+		opacity: 0.8;
+	}
+	100% {
+		opacity: 0;
+		transform: translate(3px, -16px) scale(1.1);
+	}
+}
+
+/* --- think -------------------------------------------------------------
+ * Hand at the chin, slow sway, eyes up, a little trail of dots above him.
+ */
+.cg-cloudy[data-pose="think"] .cg-cloudy__body {
+	transform: rotate(3deg);
+}
+.cg-cloudy[data-pose="think"] .cg-cloudy__arm-right {
+	transform: rotate(-100deg);
+}
+.cg-cloudy[data-pose="think"] .cg-cloudy__eyes {
+	transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="think"] .cg-cloudy__body {
+		animation: cg-cloudy-think-sway 4.5s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="think"] .cg-cloudy__think-dot--1 {
+		animation: cg-cloudy-think-dot 1.8s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="think"] .cg-cloudy__think-dot--2 {
+		animation: cg-cloudy-think-dot 1.8s ease-in-out infinite;
+		animation-delay: -0.3s;
+	}
+	.cg-cloudy[data-pose="think"] .cg-cloudy__think-dot--3 {
+		animation: cg-cloudy-think-dot 1.8s ease-in-out infinite;
+		animation-delay: -0.6s;
+	}
+}
+
+@keyframes cg-cloudy-think-sway {
+	0%,
+	100% {
+		transform: rotate(1deg);
+	}
+	50% {
+		transform: rotate(5deg);
+	}
+}
+
+@keyframes cg-cloudy-think-dot {
+	0%,
+	60%,
+	100% {
+		opacity: 0.35;
+		transform: translateY(0);
+	}
+	30% {
+		opacity: 1;
+		transform: translateY(-2px);
+	}
+}
+
+/* --- shrug ---------------------------------------------------------------
+ * Arms out to the sides with a small repeated shoulder lift. The rig's arm
+ * reach (31px from a shoulder 24px off the edge) caps how far "out" can go
+ * before the hand leaves the viewBox — 45deg is close to that limit.
+ */
+.cg-cloudy[data-pose="shrug"] .cg-cloudy__arm-left {
+	transform: rotate(-38deg);
+}
+.cg-cloudy[data-pose="shrug"] .cg-cloudy__arm-right {
+	transform: rotate(38deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="shrug"] .cg-cloudy__body {
+		animation: cg-cloudy-shrug-body 1s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="shrug"] .cg-cloudy__arm-left {
+		animation: cg-cloudy-shrug-arm-left 1s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="shrug"] .cg-cloudy__arm-right {
+		animation: cg-cloudy-shrug-arm-right 1s ease-in-out infinite;
+	}
+}
+
+@keyframes cg-cloudy-shrug-body {
+	0%,
+	100% {
+		transform: translateY(0);
+	}
+	40% {
+		transform: translateY(-2px);
+	}
+}
+
+@keyframes cg-cloudy-shrug-arm-left {
+	0%,
+	100% {
+		transform: rotate(-38deg);
+	}
+	40% {
+		transform: rotate(-45deg);
+	}
+}
+
+@keyframes cg-cloudy-shrug-arm-right {
+	0%,
+	100% {
+		transform: rotate(38deg);
+	}
+	40% {
+		transform: rotate(45deg);
+	}
+}
+
+/* --- confused --------------------------------------------------------
+ * Head tilt plus a question mark popping in above him, on a loop.
+ */
+.cg-cloudy[data-pose="confused"] .cg-cloudy__body {
+	transform: rotate(6deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="confused"] .cg-cloudy__body {
+		animation: cg-cloudy-confused-body 2.4s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="confused"] .cg-cloudy__confused-q {
+		animation: cg-cloudy-confused-q 2s ease-in-out infinite;
+	}
+}
+
+@keyframes cg-cloudy-confused-body {
+	0%,
+	100% {
+		transform: rotate(4deg);
+	}
+	50% {
+		transform: rotate(8deg);
+	}
+}
+
+@keyframes cg-cloudy-confused-q {
+	0%,
+	100% {
+		transform: translateY(0) scale(1);
+	}
+	15% {
+		transform: translateY(-3px) scale(1.15);
+	}
+	30% {
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* --- dance -------------------------------------------------------------
+ * Hips sway side to side, arms alternate up, a squash-and-stretch on the beat.
+ */
+.cg-cloudy[data-pose="dance"] .cg-cloudy__body {
+	transform: translateX(-3px) rotate(-4deg) scale(1.03, 0.97);
+}
+.cg-cloudy[data-pose="dance"] .cg-cloudy__arm-left {
+	transform: rotate(160deg);
+}
+.cg-cloudy[data-pose="dance"] .cg-cloudy__arm-right {
+	transform: rotate(-10deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="dance"] .cg-cloudy__body {
+		animation: cg-cloudy-dance-body 0.9s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="dance"] .cg-cloudy__arm-left {
+		animation: cg-cloudy-dance-arm-left 0.9s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="dance"] .cg-cloudy__arm-right {
+		animation: cg-cloudy-dance-arm-right 0.9s ease-in-out infinite;
+	}
+}
+
+@keyframes cg-cloudy-dance-body {
+	0%,
+	100% {
+		transform: translateX(-3px) rotate(-4deg) scale(1.03, 0.97);
+	}
+	50% {
+		transform: translateX(3px) rotate(4deg) scale(1.03, 0.97);
+	}
+}
+
+@keyframes cg-cloudy-dance-arm-left {
+	0%,
+	100% {
+		transform: rotate(160deg);
+	}
+	50% {
+		transform: rotate(10deg);
+	}
+}
+
+@keyframes cg-cloudy-dance-arm-right {
+	0%,
+	100% {
+		transform: rotate(-10deg);
+	}
+	50% {
+		transform: rotate(-160deg);
+	}
+}
+
+/* --- sit -----------------------------------------------------------------
+ * Legs bend forward (rotated from the hip toward the front) so he reads as
+ * perched on the edge of whatever the stage places him on, feet dangling.
+ */
+.cg-cloudy[data-pose="sit"] .cg-cloudy__leg-left,
+.cg-cloudy[data-pose="sit"] .cg-cloudy__leg-right {
+	transform: rotate(80deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="sit"] .cg-cloudy__leg-left {
+		animation: cg-cloudy-sit-swing 2.4s ease-in-out infinite;
+	}
+	.cg-cloudy[data-pose="sit"] .cg-cloudy__leg-right {
+		animation: cg-cloudy-sit-swing 2.4s ease-in-out infinite;
+		animation-delay: -0.6s; /* just enough offset to feel like loose dangling, not marching */
+	}
+}
+
+@keyframes cg-cloudy-sit-swing {
+	0%,
+	100% {
+		transform: rotate(75deg);
+	}
+	50% {
+		transform: rotate(85deg);
+	}
+}
+
+/* --- yawn ------------------------------------------------------------
+ * Open mouth, arms stretched up, eyes squeezed shut; one-shot intro that
+ * settles into (and matches) the static resting look above.
+ */
+.cg-cloudy[data-pose="yawn"] .cg-cloudy__mouth {
+	opacity: 0;
+}
+.cg-cloudy[data-pose="yawn"] .cg-cloudy__mouth-yawn {
+	opacity: 1;
+	transform: scaleY(1);
+}
+.cg-cloudy[data-pose="yawn"] .cg-cloudy__eye-lid {
+	transform: scaleY(1);
+}
+.cg-cloudy[data-pose="yawn"] .cg-cloudy__arm-left {
+	transform: rotate(165deg);
+}
+.cg-cloudy[data-pose="yawn"] .cg-cloudy__arm-right {
+	transform: rotate(-165deg);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-cloudy[data-pose="yawn"] .cg-cloudy__mouth {
+		animation: cg-cloudy-yawn-mouth-hide 1.1s ease-out 1 forwards;
+	}
+	.cg-cloudy[data-pose="yawn"] .cg-cloudy__mouth-yawn {
+		animation: cg-cloudy-yawn-mouth 1.1s ease-out 1 forwards;
+	}
+	.cg-cloudy[data-pose="yawn"] .cg-cloudy__eye-lid {
+		animation: cg-cloudy-yawn-eyes 1.1s ease-out 1 forwards;
+	}
+	.cg-cloudy[data-pose="yawn"] .cg-cloudy__arm-left {
+		animation: cg-cloudy-yawn-arm-left 1.1s ease-out 1 forwards;
+	}
+	.cg-cloudy[data-pose="yawn"] .cg-cloudy__arm-right {
+		animation: cg-cloudy-yawn-arm-right 1.1s ease-out 1 forwards;
+	}
+}
+
+@keyframes cg-cloudy-yawn-mouth-hide {
+	0% {
+		opacity: 1;
+	}
+	40%,
+	100% {
+		opacity: 0;
+	}
+}
+
+@keyframes cg-cloudy-yawn-mouth {
+	0% {
+		opacity: 0;
+		transform: scaleY(0);
+	}
+	60%,
+	100% {
+		opacity: 1;
+		transform: scaleY(1);
+	}
+}
+
+@keyframes cg-cloudy-yawn-eyes {
+	0% {
+		transform: scaleY(0);
+	}
+	60%,
+	100% {
+		transform: scaleY(1);
+	}
+}
+
+@keyframes cg-cloudy-yawn-arm-left {
+	0% {
+		transform: rotate(15deg);
+	}
+	60% {
+		transform: rotate(178deg);
+	}
+	100% {
+		transform: rotate(165deg);
+	}
+}
+
+@keyframes cg-cloudy-yawn-arm-right {
+	0% {
+		transform: rotate(-15deg);
+	}
+	60% {
+		transform: rotate(-178deg);
+	}
+	100% {
+		transform: rotate(-165deg);
 	}
 }
 

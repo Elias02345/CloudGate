@@ -95,6 +95,8 @@ body {
 .mantine-NavLink-root,
 .mantine-Chip-label,
 .mantine-SegmentedControl-control,
+.mantine-Card-root,
+.mantine-Alert-root,
 .cg-clickable {
 	transition: transform 120ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms
 		ease, color 150ms ease;
@@ -161,6 +163,27 @@ body {
 
 	.cg-clickable:not([data-selected]):hover {
 		background-color: var(--cg-clickable-hover);
+	}
+
+	/* Cards float a touch closer on hover; anything clickable lifts further and brightens its edge */
+	.mantine-Card-root:hover {
+		transform: translateY(-1px);
+		box-shadow: 5px 6px 8px 0 rgba(0, 0, 0, 0.24);
+	}
+
+	a:hover > .mantine-Card-root,
+	button:hover > .mantine-Card-root,
+	.cg-clickable:hover > .mantine-Card-root,
+	.mantine-Card-root.cg-clickable:hover {
+		transform: translateY(-3px);
+		border-color: var(--mantine-primary-color-filled);
+		box-shadow: 6px 8px 14px 0 rgba(0, 0, 0, 0.3);
+	}
+
+	a:hover > .mantine-Card-root .tabler-icon,
+	.mantine-Card-root.cg-clickable:hover .tabler-icon {
+		animation: cg-icon-wobble 450ms ease;
+		transform: scale(1.18);
 	}
 }
 
@@ -279,6 +302,7 @@ tr.cg-clickable > td:last-child {
 	.mantine-Button-root,
 	.mantine-ActionIcon-root,
 	.mantine-NavLink-root,
+	.mantine-Card-root,
 	.cg-clickable,
 	.tabler-icon,
 	.mantine-Switch-thumb,
