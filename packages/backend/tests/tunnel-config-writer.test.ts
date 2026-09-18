@@ -5,10 +5,10 @@
  * cloudflared — just verifies the file content + that writes are atomic.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 let tmpDir: string;
 

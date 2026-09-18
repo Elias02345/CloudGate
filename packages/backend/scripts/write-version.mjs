@@ -4,7 +4,7 @@
  * Reads from the package.json — single source of truth for the release version.
  * Called from `pnpm build` after tsc compiles.
  */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 

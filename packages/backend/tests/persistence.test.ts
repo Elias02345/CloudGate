@@ -9,10 +9,10 @@
  * into M5 update integration tests where they're naturally exercised.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { statSync, mkdtempSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 let tmpDir: string;
 
@@ -46,11 +46,7 @@ describe('persistence contract — file outputs', () => {
 
 	// Playit dirs come from bootstrap's ensureDataDirs. They live in /data/playit/
 	// per CLAUDE.md §1 — never overwritten during updates.
-	const playitDirs = [
-		['playit'],
-		['playit', 'bin'],
-		['playit', 'logs'],
-	] as const;
+	const playitDirs = [['playit'], ['playit', 'bin'], ['playit', 'logs']] as const;
 
 	it.each(playitDirs)('playit data dir exists: %s', (...parts) => {
 		const path = join(tmpDir, ...parts);
@@ -60,7 +56,10 @@ describe('persistence contract — file outputs', () => {
 
 	it('secret files have mode 0600 on POSIX', () => {
 		if (process.platform === 'win32') return;
-		for (const f of [['secrets', 'encryption.key'], ['secrets', 'jwt.key']] as const) {
+		for (const f of [
+			['secrets', 'encryption.key'],
+			['secrets', 'jwt.key'],
+		] as const) {
 			const stat = statSync(join(tmpDir, ...f));
 			// eslint-disable-next-line no-bitwise
 			const mode = stat.mode & 0o777;

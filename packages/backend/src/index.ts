@@ -43,6 +43,7 @@ import { tunnelsRouter } from './routes/tunnels.js';
 import { updatesRouter } from './routes/updates.js';
 import { initRenewalCron } from './services/acme.js';
 import { verifyKeyOrSeed } from './services/crypto.js';
+import { checkImageDrift } from './services/image-drift.js';
 import { init as initTunnelManager } from './services/tunnel-manager.js';
 import { init as initUpdater } from './services/updater.js';
 
@@ -211,6 +212,10 @@ async function main(): Promise<void> {
 
 	const server = app.listen(cfg.PORT, cfg.BIND_ADDRESS, () => {
 		log.info({ port: cfg.PORT, bind: cfg.BIND_ADDRESS }, 'HTTP server listening');
+		// Logs at error level if the image predates a fix the updater cannot
+		// ship. Called here rather than only from /api/health/deep so it lands
+		// in the log of an installation nobody is looking at.
+		checkImageDrift();
 	});
 
 	// Graceful shutdown

@@ -4,6 +4,7 @@ import { VERSION, dataPath } from '../config.js';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { requireAuth } from '../middleware/auth.js';
+import { checkImageDrift } from '../services/image-drift.js';
 
 const log = childLogger('routes:health');
 export const healthRouter: RouterType = Router();
@@ -113,6 +114,14 @@ healthRouter.get('/deep', requireAuth, async (_req, res) => {
 	} catch (err) {
 		checks.cloudflared = { ok: false, detail: (err as Error).message };
 	}
+
+	// Fixes a self-update cannot deliver — see services/image-drift.ts.
+	// Reported as a failing check so it shows up red in onboarding step 5 and
+	// in `cg /api/health/deep`, which is where an operator would look.
+	const drift = checkImageDrift();
+	checks.container_image = drift.stale
+		? { ok: false, detail: drift.problems.join(' ') }
+		: { ok: true, detail: 'up to date with the running application version' };
 
 	// Disk space on /data
 	try {
