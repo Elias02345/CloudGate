@@ -29,6 +29,8 @@ import {
 	useSyncZones,
 	useZones,
 } from '../api/cloudflare.js';
+import { EmptyState } from '../components/EmptyState.js';
+import { ListSkeleton } from '../components/ListSkeleton.js';
 
 function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 	return (
@@ -99,11 +101,17 @@ export function CloudflarePage() {
 						</Anchor>
 					</Text>
 
-					{accounts.isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
+					{accounts.isLoading && <ListSkeleton rows={3} />}
 					{accounts.data?.accounts.length === 0 && (
-						<Text c="dimmed" ta="center" py="md">
-							{t('cloudflare.empty')}
-						</Text>
+						<EmptyState
+							icon={<IconCloudPlus size={40} stroke={1.5} />}
+							title={t('cloudflare.empty')}
+							action={
+								<Button variant="light" leftSection={<IconCloudPlus size={16} />} onClick={modal.open}>
+									{t('cloudflare.add_account')}
+								</Button>
+							}
+						/>
 					)}
 
 					{accounts.data && accounts.data.accounts.length > 0 && (

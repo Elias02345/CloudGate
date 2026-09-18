@@ -86,7 +86,37 @@ ENV variables follow the same rule: every new ENV must be optional with a safe d
 
 ## 5. The Self-Updater (`updater.ts`)
 
-Every release tarball contains `update-manifest.json`:
+### What the updater actually does today
+
+Read this before the manifest section below, which describes a design that is
+**not built yet**.
+
+- The release tarball is downloaded from the GitHub release for the pinned tag.
+- Its **SHA256 is mandatory**: a missing or mismatching checksum aborts the
+  install. (`services/updater.ts`)
+- Its GPG signature is verified **only if present**. Releases are not signed
+  yet — `GPG_PRIVATE_KEY` is not set in CI — so today this warns and continues.
+  Enforcing it needs that secret plus the public key shipped at
+  `/app/keys/release.pub`.
+- The target version must match a strict SemVer pattern, checked in the API,
+  in the updater, and again in `docker/apply-update.sh`.
+- `apply-update.sh` snapshots `/app`, swaps it, migrates, health-checks, and
+  rolls back on failure. If the container dies mid-swap, `docker/bootstrap.sh`
+  restores the previous version on the next start.
+
+There is **no upgrade gating**: nothing enforces `min_upgrade_from`, nothing
+reads `breaking_changes`, and an installation can jump from any version to any
+newer one. Migrations are forward-only and idempotent, which is what makes
+that survivable — it is not because a gate is checking.
+
+### Planned: `update-manifest.json`
+
+> **Not implemented.** No such file is produced by `release.yml`, shipped in a
+> tarball, or read by any code. It is recorded here as the intended design.
+> Do not write code that assumes it exists, and do not describe it to users as
+> if it does.
+
+The intended shape:
 
 ```json
 {

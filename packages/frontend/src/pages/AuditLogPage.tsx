@@ -13,9 +13,12 @@ import {
 	Text,
 	Title,
 } from '@mantine/core';
+import { IconClipboardList } from '@tabler/icons-react';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/audit.js';
+import { EmptyState } from '../components/EmptyState.js';
+import { ListSkeleton } from '../components/ListSkeleton.js';
 
 const ACTION_COLORS: Record<string, string> = {
 	'auth.login': 'green',
@@ -87,11 +90,9 @@ export function AuditLogPage() {
 
 			<Card withBorder data-tour="audit-filters">
 				<Stack>
-					{isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
+					{isLoading && <ListSkeleton rows={6} />}
 					{data && data.data.length === 0 && (
-						<Text c="dimmed" ta="center" py="md">
-							{t('audit.empty')}
-						</Text>
+						<EmptyState icon={<IconClipboardList size={40} stroke={1.5} />} title={t('audit.empty')} />
 					)}
 					{data && data.data.length > 0 && (
 						<>

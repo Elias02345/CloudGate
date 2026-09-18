@@ -23,7 +23,7 @@ Please read CLAUDE.md and docs/UPDATE_RULES.md before submitting.
 - [ ] **Migrations are idempotent and reversible.** New columns are nullable or have defaults. `down()` is implemented and works.
 - [ ] **No existing migration was edited.** Any schema change is a NEW migration file.
 - [ ] **Settings defaults unchanged** (or, if changed, explicitly documented in `CHANGELOG.md` with migration logic).
-- [ ] **`update-manifest.json` updated** if my change introduces a required migration or a breaking change.
+- [ ] **Breaking changes documented in `CHANGELOG.md`** under a `## Breaking Changes` heading, if any. (There is no upgrade gating in the updater — see `CLAUDE.md` §5 — so the changelog is what a user actually gets to read before updating.)
 - [ ] **No required ENV variable introduced.** Every new env var has a safe auto-generated default in `bootstrap.ts`.
 
 ## Testing

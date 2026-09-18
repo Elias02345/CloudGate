@@ -47,6 +47,8 @@ import {
 import { BulkImportModal } from '../components/BulkImportModal.js';
 import { CopyButton } from '../components/CopyButton.js';
 import { EditHostModal } from '../components/EditHostModal.js';
+import { EmptyState } from '../components/EmptyState.js';
+import { ListSkeleton } from '../components/ListSkeleton.js';
 import { Tooltip } from '../components/Tooltip.js';
 
 function protocolBadge(protocol: string): { icon: ReactElement; label: string; color: string } {
@@ -194,11 +196,21 @@ export function HostsPage() {
 
 			<Card withBorder data-tour="hosts-mode-switch">
 				<Stack>
-					{hosts.isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
+					{hosts.isLoading && <ListSkeleton rows={4} />}
 					{hosts.data?.hosts.length === 0 && (
-						<Text c="dimmed" ta="center" py="md">
-							{t('hosts.empty')}
-						</Text>
+						<EmptyState
+							icon={<IconWorld size={40} stroke={1.5} />}
+							title={t('hosts.empty')}
+							action={
+								<Button
+									variant="light"
+									leftSection={<IconCirclePlus size={16} />}
+									onClick={() => navigate('/hosts/new')}
+								>
+									{t('hosts.add')}
+								</Button>
+							}
+						/>
 					)}
 					{hosts.data && hosts.data.hosts.length > 0 && (
 						<Box visibleFrom="sm">
