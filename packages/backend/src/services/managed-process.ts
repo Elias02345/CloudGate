@@ -44,6 +44,24 @@ export interface ManagedProcessOptions {
 }
 
 /**
+ * Flags whose VALUE is a credential. The playit agent takes its account
+ * secret as `--secret <key>`, and this class logs the argv of every spawn —
+ * including each crash-respawn — so without this the secret would be written
+ * to /data/logs/cloudgate.log, which UPDATE_RULES.md declares append-only and
+ * which is exactly the file users attach to bug reports.
+ *
+ * Note this only keeps the secret out of the LOG. It is still visible in
+ * `ps`/`/proc/<pid>/cmdline` to anything running on the same host, which can
+ * only be fixed by passing it through the environment instead — and that
+ * depends on the agent build actually supporting PLAYIT_SECRET_KEY.
+ */
+const SECRET_FLAGS = new Set(['--secret', '--token', '--password', '--api-key']);
+
+function redactArgs(args: string[]): string[] {
+	return args.map((arg, i) => (i > 0 && SECRET_FLAGS.has(args[i - 1] ?? '') ? '<redacted>' : arg));
+}
+
+/**
  * Abstract — subclasses MUST override `buildArgs()` and SHOULD override
  * `checkHealth()`. Default health check returns `running` immediately after
  * the grace period — good enough for processes that don't expose a probe.
@@ -195,7 +213,7 @@ export abstract class ManagedProcess {
 		this.lastStartMs = Date.now();
 		this.setStatus('starting');
 		const args = this.buildArgs();
-		this.log.info({ bin: this.binPath, args, id: this.id }, 'Spawning managed process');
+		this.log.info({ bin: this.binPath, args: redactArgs(args), id: this.id }, 'Spawning managed process');
 		const proc = spawn(this.binPath, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 		this.child = proc;
 

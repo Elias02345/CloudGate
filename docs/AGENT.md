@@ -225,10 +225,15 @@ curl -fsSL -X POST \
 
 ```bash
 PASSPHRASE="my-very-strong-passphrase-123!"
-curl -fsSL \
+# Passphrase goes in the body, not the query string — a query-string
+# passphrase would land in nginx access logs. Requires a write-scope key:
+# the backup archive contains /data/secrets, so read-scope keys are refused.
+curl -fsSL -X POST \
   -H "Authorization: Bearer $CLOUDGATE_KEY" \
+  -H "Content-Type: application/json" \
+  -d "{\"passphrase\":\"$PASSPHRASE\"}" \
   -o "cloudgate-backup-$(date +%Y%m%d).cgbk" \
-  "$CLOUDGATE_URL/api/backup?passphrase=$(printf '%s' "$PASSPHRASE" | jq -sRr @uri)"
+  "$CLOUDGATE_URL/api/backup"
 
 # Verify by checking size + magic bytes
 ls -lh cloudgate-backup-*.cgbk
@@ -302,7 +307,7 @@ list. Highlights for agents:
 | `POST   /api/cloudflare/accounts/:id/sync` | Refresh cached zone list |
 | `GET    /api/cloudflare/accounts/:id/zones` | List cached zones |
 | `GET    /api/audit?action=...&user_id=...&limit=N` | Audit log |
-| `GET    /api/backup?passphrase=X` | Stream encrypted backup (.cgbk) |
+| `POST   /api/backup` (body: `{passphrase}`) | Stream encrypted backup (.cgbk); write-scope keys only |
 | `GET    /api/updates` | Updater state (current_version, latest, mode) |
 | `POST   /api/updates/check` | Force check now |
 | `POST   /api/acme/issue` | Issue Let's Encrypt cert for local_nginx host |

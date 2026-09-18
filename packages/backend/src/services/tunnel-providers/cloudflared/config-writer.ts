@@ -68,6 +68,40 @@ ingress:
 
 const engine = new Liquid({ trimTagLeft: true });
 
+/**
+ * hostname / path_prefix / forward_host render into config.yml as unquoted
+ * plain YAML scalars (see CONFIG_TEMPLATE). A raw newline in any of them
+ * injects a new YAML key or ingress list item — schema validation
+ * (packages/shared) now blocks that on the way in, but rows written before
+ * that fix still carry old data, so strip line breaks and control
+ * characters here too. Written as a char-code filter rather than a regex
+ * with literal control-character escapes (biome's noControlCharactersInRegex).
+ */
+function yamlPlainSafe(value: string): string {
+	return Array.from(value)
+		.filter((ch) => ch.charCodeAt(0) >= 0x20 && ch.charCodeAt(0) !== 0x7f)
+		.join('');
+}
+
+/**
+ * http_host_header / origin_server_name render inside double-quoted YAML
+ * scalars (`httpHostHeader: "{{ … }}"`). A `"` there breaks out of the
+ * quote, so escape backslashes/quotes on top of the plain-scalar guard.
+ */
+function yamlQuotedSafe(value: string): string {
+	return yamlPlainSafe(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+/**
+ * forward_host also feeds `service: scheme://host:port`. A bare IPv6
+ * literal there is ambiguous with the port separator, so bracket it —
+ * mirrors the same fix in nginx-config.ts for the nginx `upstream` block.
+ */
+function bracketIfIpv6(host: string): string {
+	if (host.startsWith('[') || !host.includes(':')) return host;
+	return `[${host}]`;
+}
+
 export interface RenderHost {
 	hostname: string;
 	path_prefix: string;
@@ -260,15 +294,15 @@ export async function buildContext(tunnelRow: {
 			!!adv.tls_timeout_seconds;
 
 		hosts.push({
-			hostname: r.hostname,
-			path_prefix: r.path_prefix,
+			hostname: yamlPlainSafe(r.hostname),
+			path_prefix: yamlPlainSafe(r.path_prefix),
 			forward_scheme: r.forward_scheme,
-			forward_host: r.forward_host,
+			forward_host: bracketIfIpv6(yamlPlainSafe(r.forward_host)),
 			forward_port: r.forward_port,
 			no_tls_verify: noTlsVerify,
 			has_origin_request: hasOriginRequest,
-			http_host_header: adv.http_host_header,
-			origin_server_name: adv.origin_server_name,
+			http_host_header: adv.http_host_header ? yamlQuotedSafe(adv.http_host_header) : undefined,
+			origin_server_name: adv.origin_server_name ? yamlQuotedSafe(adv.origin_server_name) : undefined,
 			no_happy_eyeballs: adv.no_happy_eyeballs,
 			http2_origin: adv.http2_origin,
 			disable_chunked_encoding: adv.disable_chunked_encoding,

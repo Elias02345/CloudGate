@@ -182,6 +182,7 @@ function TwoFactorCard() {
 	const disable = useTotpDisable();
 	const [code, setCode] = useState('');
 	const [disablePw, setDisablePw] = useState('');
+	const [disableCode, setDisableCode] = useState('');
 
 	const isEnabled = !!me?.user?.totp_enabled;
 
@@ -213,9 +214,10 @@ function TwoFactorCard() {
 
 	const onDisable = async () => {
 		try {
-			await disable.mutateAsync(disablePw);
+			await disable.mutateAsync({ password: disablePw, code: disableCode });
 			disableModal.close();
 			setDisablePw('');
+			setDisableCode('');
 			notifications.show({ color: 'green', message: t('settings.totp_disabled_message') });
 		} catch (err) {
 			notifications.show({ color: 'red', message: (err as Error).message });
@@ -283,7 +285,20 @@ function TwoFactorCard() {
 						onChange={(e) => setDisablePw(e.currentTarget.value)}
 						required
 					/>
-					<Button color="red" onClick={onDisable} loading={disable.isPending} disabled={!disablePw}>
+					<TextInput
+						label={t('settings.totp_code_field')}
+						placeholder="123456"
+						value={disableCode}
+						onChange={(e) => setDisableCode(e.currentTarget.value.replace(/\D/g, '').slice(0, 6))}
+						inputMode="numeric"
+						required
+					/>
+					<Button
+						color="red"
+						onClick={onDisable}
+						loading={disable.isPending}
+						disabled={!disablePw || disableCode.length !== 6}
+					>
 						{t('settings.totp_disable_confirm')}
 					</Button>
 				</Stack>
@@ -352,9 +367,16 @@ function BackupCard() {
 		setBusy(true);
 		try {
 			const token = getStoredToken();
-			const url = `/api/backup?passphrase=${encodeURIComponent(pass)}`;
-			// Trigger download via fetch + blob
-			const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+			// POST, passphrase in the body — a query-string passphrase would land
+			// in nginx access logs and the pino-http request log.
+			const res = await fetch('/api/backup', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					...(token ? { Authorization: `Bearer ${token}` } : {}),
+				},
+				body: JSON.stringify({ passphrase: pass }),
+			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const blob = await res.blob();
 			const a = document.createElement('a');

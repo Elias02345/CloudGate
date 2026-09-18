@@ -25,10 +25,13 @@ import { authLimiter } from '../middleware/rate-limit.js';
 import { record } from '../services/audit.js';
 import {
 	changePassword,
+	claimTotpStep,
 	findUserByEmail,
+	findUserById,
 	issueAccessToken,
 	publicUser,
 	recordLogin,
+	totpStepFor,
 	verifyPassword,
 } from '../services/auth.js';
 import { decryptJson } from '../services/crypto.js';
@@ -85,6 +88,13 @@ authRouter.post('/login', authLimiter, async (req, res) => {
 			const decrypted = decryptJson<EncryptedTotpSecret>(user.totp_secret);
 			if (!authenticator.verify({ token: parsed.data.totp_code, secret: decrypted.secret })) {
 				res.status(401).json({ error: 'Invalid TOTP code', code: 'TOTP_INVALID' });
+				return;
+			}
+			// One use per 30-second step: a code someone watched you type is
+			// otherwise still good for the rest of its window.
+			if (!(await claimTotpStep(user.id, totpStepFor()))) {
+				log.warn({ user_id: user.id }, 'TOTP code replayed — rejecting login');
+				res.status(401).json({ error: 'TOTP code already used', code: 'TOTP_REPLAY' });
 				return;
 			}
 		} catch (err) {
@@ -220,6 +230,17 @@ authRouter.post('/password', requireAuth, async (req, res) => {
 		}
 	}
 
+	// The password change revoked every token issued so far, this request's
+	// own included. Hand back a fresh one so the caller stays signed in while
+	// every other session — including a stolen one — is now dead. Re-read the
+	// row first: the first-login flow above may have changed the email.
+	const updated = (await findUserById(req.user.id)) ?? req.user;
+	const token = await issueAccessToken({
+		sub: String(updated.id),
+		email: updated.email,
+		is_admin: Boolean(updated.is_admin),
+	});
+
 	log.info({ user_id: req.user.id }, 'Password changed');
-	res.json({ ok: true });
+	res.json({ ok: true, access_token: token });
 });

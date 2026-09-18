@@ -3,6 +3,7 @@ import { Router, type Router as RouterType } from 'express';
 import { VERSION, dataPath } from '../config.js';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const log = childLogger('routes:health');
 export const healthRouter: RouterType = Router();
@@ -39,7 +40,12 @@ healthRouter.get('/', async (_req, res) => {
  * itself always returns 200 with the details — so dashboards can show *what*
  * is wrong.
  */
-healthRouter.get('/deep', async (_req, res) => {
+// Authenticated: unlike the light check above (which Docker's HEALTHCHECK
+// hits anonymously), this one reports the exact version, which secrets exist,
+// disk pressure and subsystem state — a free reconnaissance report for anyone
+// who can reach port 80. Its callers (onboarding step 5, the CLI agent recipes
+// in docs/AGENT.md) are all authenticated already.
+healthRouter.get('/deep', requireAuth, async (_req, res) => {
 	const checks: Record<string, { ok: boolean; detail?: string; ms?: number }> = {};
 
 	// DB ping

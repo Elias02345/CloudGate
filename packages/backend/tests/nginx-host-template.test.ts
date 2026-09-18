@@ -203,6 +203,52 @@ describe('nginx host template', () => {
 		});
 	});
 
+	describe('config-injection payloads (defence in depth for pre-existing rows)', () => {
+		// The schema at packages/shared/src/types/host.ts rejects these on the
+		// way in now, but writeHostConfig() re-renders rows that were already
+		// in the DB before that validation existed, so the render-time
+		// sanitiser in toTemplateHost() must independently neutralise them.
+
+		it('path_prefix cannot close the location block and open a file-serving one', async () => {
+			// The exact exploit from the security audit: this renders as
+			// syntactically valid nginx that turns the container root into a
+			// static file server, exposing /data/secrets and /data/db over HTTP.
+			const payload = '/ { root /; try_files $uri =404; } location /dummy';
+			const conf = await renderHostConfig({ ...baseHost, path_prefix: payload });
+			expect(conf).not.toContain('root /;');
+			expect(conf).not.toContain('try_files $uri =404;');
+			// Exactly one location block survives.
+			expect(conf.match(/location /g)?.length ?? 0).toBe(1);
+		});
+
+		it('path_prefix strips whitespace, braces, semicolons, quotes and backslashes', async () => {
+			const conf = await renderHostConfig({
+				...baseHost,
+				path_prefix: '/a b{c}d;e"f\'g\\h',
+			});
+			const locationLine = conf.split('\n').find((l) => l.trim().startsWith('location '));
+			expect(locationLine).toBeDefined();
+			expect(locationLine).toBe('    location /abcdefgh {');
+		});
+
+		it('forward_host cannot terminate the upstream directive', async () => {
+			const payload = '127.0.0.1; } server { listen 1234; #';
+			const conf = await renderHostConfig({ ...baseHost, forward_host: payload });
+			expect(conf).not.toMatch(/server 127\.0\.0\.1;\s*\}\s*server\s*\{/);
+			expect(conf.match(/^server \{/gm)?.length ?? 0).toBe(1);
+		});
+
+		it('brackets a bare IPv6 forward_host in the upstream server line', async () => {
+			const conf = await renderHostConfig({ ...baseHost, forward_host: 'fe80::1' });
+			expect(conf).toContain('server [fe80::1]:8123;');
+		});
+
+		it('leaves an already-bracketed IPv6 forward_host alone', async () => {
+			const conf = await renderHostConfig({ ...baseHost, forward_host: '[fe80::1]' });
+			expect(conf).toContain('server [fe80::1]:8123;');
+		});
+	});
+
 	describe('Host header override', () => {
 		it('defaults to $host', async () => {
 			const conf = await renderHostConfig(baseHost);

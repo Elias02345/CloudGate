@@ -17,7 +17,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import type { LlmAutonomy } from '@cloudgate/shared';
+import { CreateProxyHostRequestSchema, type LlmAutonomy } from '@cloudgate/shared';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { record } from './audit.js';
@@ -345,26 +345,38 @@ async function runImpl(
 
 		// --- WRITE ---
 		case 'create_host': {
+			// A prompt-injected model is just as untrusted as an HTTP caller —
+			// route it through the exact same schema the POST /hosts route
+			// uses instead of inserting raw args, or it can write the same
+			// nginx/cloudflared config-injection payload the schema exists to
+			// block. `mode` defaults here the way the tool's JSON schema
+			// advertises it (CreateProxyHostRequestSchema itself requires it).
+			const parsed = CreateProxyHostRequestSchema.safeParse({ mode: 'cloudflare_tunnel', ...args });
+			if (!parsed.success) {
+				throw new Error(`Invalid host: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
+			}
+			const input = parsed.data;
+
 			const now = new Date().toISOString();
 			const [id] = await knex('proxy_hosts').insert({
-				tunnel_id: args.tunnel_id ? Number(args.tunnel_id) : null,
-				cf_zone_id: args.cf_zone_id ? Number(args.cf_zone_id) : null,
-				mode: (args.mode as string) ?? 'cloudflare_tunnel',
-				hostname: String(args.hostname).toLowerCase(),
-				forward_scheme: (args.forward_scheme as string) ?? 'http',
-				forward_host: String(args.forward_host),
-				forward_port: Number(args.forward_port),
-				path_prefix: '/',
+				tunnel_id: input.tunnel_id ?? null,
+				cf_zone_id: input.cf_zone_id ?? null,
+				mode: input.mode,
+				hostname: input.hostname.toLowerCase(),
+				forward_scheme: input.forward_scheme,
+				forward_host: input.forward_host,
+				forward_port: input.forward_port,
+				path_prefix: input.path_prefix,
 				enabled: 1,
-				tls_options: '{}',
-				headers: '{}',
+				tls_options: JSON.stringify(input.tls_options),
+				headers: JSON.stringify(input.headers),
 				meta: '{}',
 				created_at: now,
 				updated_at: now,
 			});
 			const { deployHost } = await import('./host-deploy.js');
 			void deployHost(Number(id)).catch(() => null);
-			return { id: Number(id), hostname: args.hostname, status: 'deploying' };
+			return { id: Number(id), hostname: input.hostname, status: 'deploying' };
 		}
 		case 'toggle_host': {
 			const id = Number(args.id);
