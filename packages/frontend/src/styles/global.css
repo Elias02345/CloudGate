@@ -298,7 +298,55 @@ tr.cg-clickable > td:last-child {
 	}
 }
 
+/*
+ * Page enter. Short and small on purpose — this plays on every navigation, so
+ * it has to read as "the page arrived", never as a delay. No exit animation:
+ * the old page is gone the moment the route changes, and animating it out
+ * would only postpone the new one.
+ */
+@media (prefers-reduced-motion: no-preference) {
+	.cg-page {
+		animation: cg-page-in 180ms ease-out both;
+	}
+}
+
+@keyframes cg-page-in {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+	to {
+		opacity: 1;
+		transform: none;
+	}
+}
+
+/* Empty list state — the icon settles in once, then holds still. */
+.cg-empty-state__icon {
+	color: var(--mantine-color-dimmed);
+	opacity: 0.55;
+	line-height: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	.cg-empty-state__icon {
+		animation: cg-empty-rise 380ms ease-out both;
+	}
+}
+
+@keyframes cg-empty-rise {
+	from {
+		opacity: 0;
+		transform: translateY(6px) scale(0.94);
+	}
+	to {
+		opacity: 0.55;
+		transform: none;
+	}
+}
+
 @media (prefers-reduced-motion: reduce) {
+	.cg-empty-state__icon,
 	.mantine-Button-root,
 	.mantine-ActionIcon-root,
 	.mantine-NavLink-root,

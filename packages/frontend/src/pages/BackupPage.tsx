@@ -21,24 +21,23 @@ import {
 	IconLock,
 } from '@tabler/icons-react';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { runAdminRestore, runBackupExport } from '../api/restore.js';
 
 const BACKUP_CONTENTS = [
-	{ paths: ['db/db.sqlite'], desc: 'all hosts, tunnels, accounts, settings' },
-	{ paths: ['secrets/'], desc: 'encryption + JWT keys (required to decrypt the DB)' },
-	{ paths: ['cloudflared/'], desc: 'tunnel credentials so existing CF tunnels keep working' },
-	{ paths: ['nginx/custom/', 'nginx/certs/'], desc: "your snippets and Let's Encrypt certs" },
+	{ paths: ['db/db.sqlite'], descKey: 'backup.contents_db' },
+	{ paths: ['secrets/'], descKey: 'backup.contents_secrets' },
+	{ paths: ['cloudflared/'], descKey: 'backup.contents_cloudflared' },
+	{ paths: ['nginx/custom/', 'nginx/certs/'], descKey: 'backup.contents_nginx' },
 ];
 
 export function BackupPage() {
+	const { t } = useTranslation();
 	return (
 		<Stack maw={760}>
-			<Title order={2}>Backup &amp; Restore</Title>
+			<Title order={2}>{t('backup.title')}</Title>
 			<Text size="sm" c="dimmed">
-				One encrypted file contains everything CloudGate needs to come back from a wipe: the database, your
-				encryption keys, Cloudflare tunnel credentials, nginx custom snippets and certs. The file is encrypted
-				with a passphrase you choose — keep it somewhere safe.{' '}
-				<strong>Without the passphrase, the backup is unrecoverable.</strong>
+				{t('backup.intro')} <strong>{t('backup.intro_warning')}</strong>
 			</Text>
 
 			<ExportCard />
@@ -49,6 +48,7 @@ export function BackupPage() {
 }
 
 function ExportCard() {
+	const { t } = useTranslation();
 	const [pass, setPass] = useState('');
 	const [confirm, setConfirm] = useState('');
 	const [busy, setBusy] = useState(false);
@@ -87,13 +87,13 @@ function ExportCard() {
 			<Stack>
 				<Group gap="xs">
 					<IconCloudDownload size={20} color="#3b82f6" />
-					<Title order={4}>Export backup</Title>
+					<Title order={4}>{t('backup.export_title')}</Title>
 				</Group>
 				{/* Filename pattern on its own line: a code span mid-sentence wraps fine in a
 				    live browser, but exports as a separate, misaligned fragment in the Penpot
 				    mockup — a standalone line captures and reflows cleanly everywhere. */}
 				<Text size="sm" c="dimmed">
-					Downloads an encrypted backup file (AES-256-GCM, PBKDF2 200k iterations):
+					{t('backup.export_hint')}
 				</Text>
 				<Text size="sm" c="dimmed" ff="monospace">
 					cloudgate-backup-YYYY-MM-DD…cgbk
@@ -105,28 +105,28 @@ function ExportCard() {
 				)}
 				{last && (
 					<Alert color="green" icon={<IconCheck size={18} />}>
-						Downloaded <code>{last}</code>. Store it somewhere off this machine.
+						{t('backup.export_success_prefix')} <code>{last}</code>. {t('backup.export_success_suffix')}
 					</Alert>
 				)}
 				<PasswordInput
-					label="Passphrase"
-					description="Minimum 8 characters. Pick something strong — there's no recovery without it."
+					label={t('backup.passphrase_field')}
+					description={t('backup.passphrase_hint')}
 					value={pass}
 					onChange={(e) => setPass(e.currentTarget.value)}
-					error={tooShort ? 'Passphrase must be at least 8 characters' : undefined}
+					error={tooShort ? t('backup.passphrase_too_short') : undefined}
 					leftSection={<IconLock size={16} />}
 					required
 				/>
 				<PasswordInput
-					label="Confirm passphrase"
+					label={t('backup.passphrase_confirm_field')}
 					value={confirm}
 					onChange={(e) => setConfirm(e.currentTarget.value)}
-					error={mismatch ? 'Passphrases do not match' : undefined}
+					error={mismatch ? t('backup.passphrase_mismatch') : undefined}
 					required
 				/>
 				<Box>
 					<Button onClick={onExport} loading={busy} disabled={!canExport}>
-						Download backup
+						{t('backup.export_button')}
 					</Button>
 				</Box>
 			</Stack>
@@ -135,6 +135,7 @@ function ExportCard() {
 }
 
 function ImportCard() {
+	const { t } = useTranslation();
 	const [file, setFile] = useState<File | null>(null);
 	const [pass, setPass] = useState('');
 	const [confirmOverwrite, setConfirmOverwrite] = useState(false);
@@ -163,12 +164,11 @@ function ImportCard() {
 			<Stack>
 				<Group gap="xs">
 					<IconCloudUpload size={20} color="#f59e0b" />
-					<Title order={4}>Import backup</Title>
+					<Title order={4}>{t('backup.import_title')}</Title>
 				</Group>
-				<Alert color="orange" icon={<IconAlertCircle size={18} />} title="This overwrites everything">
-					Restoring replaces the current database, secrets, Cloudflare tunnel credentials, and nginx
-					configuration. Any changes made since the backup was taken will be lost.{' '}
-					<strong>Restart the container after restore</strong> so the new data is picked up cleanly.
+				<Alert color="orange" icon={<IconAlertCircle size={18} />} title={t('backup.import_warning_title')}>
+					{t('backup.import_warning_body')} <strong>{t('backup.import_warning_restart')}</strong>{' '}
+					{t('backup.import_warning_suffix')}
 				</Alert>
 				{err && (
 					<Alert color="red" icon={<IconAlertCircle size={18} />}>
@@ -177,13 +177,13 @@ function ImportCard() {
 				)}
 				{done && (
 					<Alert color="green" icon={<IconCheck size={18} />}>
-						Restore complete — {done.files} files, {(done.bytes / 1024 / 1024).toFixed(1)} MB extracted.
-						Restart the container or use <Anchor href="/api/auth/logout">log out</Anchor> and back in to load
-						the restored state.
+						{t('backup.import_success', { files: done.files, mb: (done.bytes / 1024 / 1024).toFixed(1) })}{' '}
+						<Anchor href="/api/auth/logout">{t('backup.import_success_logout')}</Anchor>{' '}
+						{t('backup.import_success_suffix')}
 					</Alert>
 				)}
 				<FileInput
-					label="Backup file"
+					label={t('backup.file_field')}
 					placeholder="cloudgate-backup-…cgbk"
 					value={file}
 					onChange={setFile}
@@ -191,7 +191,7 @@ function ImportCard() {
 					required
 				/>
 				<PasswordInput
-					label="Passphrase (same one used at export)"
+					label={t('backup.import_passphrase_field')}
 					value={pass}
 					onChange={(e) => setPass(e.currentTarget.value)}
 					leftSection={<IconLock size={16} />}
@@ -202,24 +202,24 @@ function ImportCard() {
 					onChange={(e) => setConfirmOverwrite(e.currentTarget.checked)}
 					label={
 						<Text size="sm">
-							I understand this <strong>replaces the current install</strong> and a container restart is
-							required afterwards.
+							{t('backup.confirm_overwrite')} <strong>{t('backup.confirm_overwrite_bold')}</strong>{' '}
+							{t('backup.confirm_overwrite_suffix')}
 						</Text>
 					}
 				/>
 				<Box>
 					<Button color="orange" onClick={onImport} loading={busy} disabled={!canImport}>
-						Restore from backup
+						{t('backup.import_button')}
 					</Button>
 				</Box>
 				<Text size="xs" c="dimmed">
-					Backup contents:
+					{t('backup.contents_label')}
 				</Text>
 				{/* Manual bullet + flex text (see the onboarding page for why: Mantine's <List>
 				    doesn't hang-indent wrapped lines and drops its marker outside a live browser). */}
 				<Stack gap={6}>
 					{BACKUP_CONTENTS.map((item) => (
-						<Group key={item.desc} gap={8} wrap="nowrap" align="flex-start">
+						<Group key={item.descKey} gap={8} wrap="nowrap" align="flex-start">
 							<Text size="xs" c="dimmed">
 								•
 							</Text>
@@ -231,7 +231,7 @@ function ImportCard() {
 									</span>
 								))}
 								{' — '}
-								{item.desc}
+								{t(item.descKey)}
 							</Text>
 						</Group>
 					))}
