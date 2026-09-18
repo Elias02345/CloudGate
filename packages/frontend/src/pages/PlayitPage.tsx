@@ -29,6 +29,8 @@ import {
 	usePlayitAccounts,
 	usePlayitQuota,
 } from '../api/playit.js';
+import { EmptyState } from '../components/EmptyState.js';
+import { ListSkeleton } from '../components/ListSkeleton.js';
 
 function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 	return (
@@ -59,8 +61,8 @@ export function PlayitPage() {
 			notifications.show({
 				color: 'green',
 				icon: <IconCheck size={18} />,
-				title: 'Playit account linked',
-				message: `${result.account.label} is ready for game-server tunnels.`,
+				title: t('playit.linked_title'),
+				message: t('playit.linked_message', { label: result.account.label }),
 			});
 			setLabel('');
 			setSecretKey('');
@@ -80,27 +82,25 @@ export function PlayitPage() {
 	return (
 		<Stack>
 			<Group justify="space-between" wrap="wrap" gap="sm">
-				<Title order={2}>Playit.gg accounts</Title>
+				<Title order={2}>{t('playit.title')}</Title>
 				<Button leftSection={<IconPlugConnected size={18} />} onClick={modal.open}>
-					Link account
+					{t('playit.link_account')}
 				</Button>
 			</Group>
 
 			<Card withBorder>
 				<Stack>
 					<Text size="sm" c="dimmed">
-						Playit hosts your Minecraft + raw TCP/UDP tunnels. Sign up free at{' '}
+						{t('playit.hint')}{' '}
 						<Anchor href="https://playit.gg/account/agents" target="_blank">
 							playit.gg
 						</Anchor>{' '}
-						and paste the agent secret here. Free tier: 4 TCP + 4 UDP tunnels per account.
+						{t('playit.hint_suffix')}
 					</Text>
 
-					{accounts.isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
+					{accounts.isLoading && <ListSkeleton rows={3} />}
 					{accounts.data?.accounts.length === 0 && (
-						<Text c="dimmed" ta="center" py="md">
-							No Playit accounts linked yet. Add one to host Minecraft / TCP / UDP services.
-						</Text>
+						<EmptyState icon={<IconPlugConnected size={40} stroke={1.5} />} title={t('playit.empty')} />
 					)}
 
 					{accounts.data && accounts.data.accounts.length > 0 && (
@@ -110,11 +110,11 @@ export function PlayitPage() {
 									<Table>
 										<Table.Thead>
 											<Table.Tr>
-												<Table.Th w={127}>Label</Table.Th>
+												<Table.Th w={127}>{t('playit.col_label')}</Table.Th>
 												<Table.Th ta="center" w={363}>
-													Status
+													{t('playit.col_status')}
 												</Table.Th>
-												<Table.Th w={307}>Linked</Table.Th>
+												<Table.Th w={307}>{t('playit.col_linked')}</Table.Th>
 												<Table.Th />
 											</Table.Tr>
 										</Table.Thead>
@@ -146,7 +146,7 @@ export function PlayitPage() {
 																color="red"
 																onClick={(e) => {
 																	e.stopPropagation();
-																	if (confirm(`Unlink Playit account "${a.label}"?`)) {
+																	if (confirm(t('playit.confirm_delete', { label: a.label }))) {
 																		void deleteMutation.mutate(a.id);
 																		if (selectedId === a.id) setSelectedId(null);
 																	}
@@ -182,7 +182,7 @@ export function PlayitPage() {
 													{a.status}
 												</Badge>
 											</Group>
-											<InfoLine label="Linked">
+											<InfoLine label={t('playit.col_linked')}>
 												<Text size="xs" c="dimmed">
 													{a.created_at?.replace('T', ' ').slice(0, 16) ?? '—'}
 												</Text>
@@ -194,7 +194,7 @@ export function PlayitPage() {
 													size="lg"
 													onClick={(e) => {
 														e.stopPropagation();
-														if (confirm(`Unlink Playit account "${a.label}"?`)) {
+														if (confirm(t('playit.confirm_delete', { label: a.label }))) {
 															void deleteMutation.mutate(a.id);
 															if (selectedId === a.id) setSelectedId(null);
 														}
@@ -215,13 +215,13 @@ export function PlayitPage() {
 			{selectedId !== null && (
 				<Card withBorder>
 					<Stack>
-						<Title order={4}>Tunnel quota</Title>
+						<Title order={4}>{t('playit.quota_title')}</Title>
 						{quota.isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
 						{quota.data && (
 							<Stack gap="md">
 								<Box>
 									<Group justify="space-between" mb={4}>
-										<Text size="sm">TCP tunnels</Text>
+										<Text size="sm">{t('playit.tcp_tunnels')}</Text>
 										<Text size="sm" c="dimmed">
 											{quota.data.quota.tcp_used} / {quota.data.quota.tcp_limit}
 										</Text>
@@ -233,7 +233,7 @@ export function PlayitPage() {
 								</Box>
 								<Box>
 									<Group justify="space-between" mb={4}>
-										<Text size="sm">UDP tunnels</Text>
+										<Text size="sm">{t('playit.udp_tunnels')}</Text>
 										<Text size="sm" c="dimmed">
 											{quota.data.quota.udp_used} / {quota.data.quota.udp_limit}
 										</Text>
@@ -246,11 +246,11 @@ export function PlayitPage() {
 								{(quota.data.quota.tcp_used >= quota.data.quota.tcp_limit ||
 									quota.data.quota.udp_used >= quota.data.quota.udp_limit) && (
 									<Alert color="orange">
-										Free-tier cap reached. Upgrade at{' '}
+										{t('playit.quota_cap_reached')}{' '}
 										<Anchor href="https://playit.gg/account/billing" target="_blank">
 											playit.gg/account/billing
 										</Anchor>{' '}
-										to add more tunnels.
+										{t('playit.quota_cap_reached_suffix')}
 									</Alert>
 								)}
 							</Stack>
@@ -259,14 +259,14 @@ export function PlayitPage() {
 				</Card>
 			)}
 
-			<Modal opened={modalOpened} onClose={modal.close} title="Link a Playit.gg account" size="md">
+			<Modal opened={modalOpened} onClose={modal.close} title={t('playit.link_modal_title')} size="md">
 				<Stack>
 					<Text size="sm" c="dimmed">
-						Get an agent secret at{' '}
+						{t('playit.get_secret_hint')}{' '}
 						<Anchor href="https://playit.gg/account/agents" target="_blank">
 							playit.gg/account/agents
 						</Anchor>
-						. Click "New Agent" → copy the secret string.
+						{t('playit.get_secret_hint_suffix')}
 					</Text>
 					{addError && (
 						<Alert color="red" icon={<IconAlertCircle size={18} />}>
@@ -274,14 +274,14 @@ export function PlayitPage() {
 						</Alert>
 					)}
 					<TextInput
-						label="Label"
+						label={t('playit.label_field')}
 						placeholder="homelab gaming"
 						value={label}
 						onChange={(e) => setLabel(e.currentTarget.value)}
 						required
 					/>
 					<PasswordInput
-						label="Agent secret"
+						label={t('playit.secret_field')}
 						placeholder="paste the secret string from playit.gg"
 						value={secretKey}
 						onChange={(e) => setSecretKey(e.currentTarget.value)}
@@ -289,7 +289,7 @@ export function PlayitPage() {
 					/>
 					<Box>
 						<Button onClick={onAdd} loading={addMutation.isPending} disabled={!label || !secretKey}>
-							Validate and link
+							{t('playit.validate_and_link')}
 						</Button>
 					</Box>
 				</Stack>

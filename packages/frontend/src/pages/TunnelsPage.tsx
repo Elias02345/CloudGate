@@ -28,6 +28,7 @@ import {
 	IconRefresh,
 	IconRefreshDot,
 	IconReload,
+	IconRoute,
 	IconTerminal2,
 	IconTrash,
 } from '@tabler/icons-react';
@@ -48,6 +49,8 @@ import {
 	useTunnelLogs,
 	useTunnels,
 } from '../api/tunnels.js';
+import { EmptyState } from '../components/EmptyState.js';
+import { ListSkeleton } from '../components/ListSkeleton.js';
 
 function statusColor(s: string): string {
 	switch (s) {
@@ -218,11 +221,9 @@ export function TunnelsPage() {
 
 			<Card withBorder data-tour="tunnels-list">
 				<Stack>
-					{tunnels.isLoading && <Text c="dimmed">{t('common.loading')}</Text>}
+					{tunnels.isLoading && <ListSkeleton rows={4} />}
 					{tunnels.data?.tunnels.length === 0 && (
-						<Text c="dimmed" ta="center" py="md">
-							{t('tunnels.empty')}
-						</Text>
+						<EmptyState icon={<IconRoute size={40} stroke={1.5} />} title={t('tunnels.empty')} />
 					)}
 					{tunnels.data && tunnels.data.tunnels.length > 0 && (
 						<>

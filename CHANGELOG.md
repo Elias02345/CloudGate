@@ -9,6 +9,42 @@ _Nothing yet._
 
 ---
 
+## [0.3.5] — 2026-09-18
+
+### Fixed
+
+- **The example Compose file pointed at an image that does not exist.** Images
+  are published as `v0.3.5`, with the `v`; the pin added in 0.3.4 left it out,
+  so `docker compose pull` failed with "manifest unknown". If you copied that
+  file, this is the line to correct.
+- Three pages — Playit, Backup and the API documentation — were in English no
+  matter which language you had selected. They are translated now, and the two
+  language files are checked to hold exactly the same set of entries so a
+  missing one cannot quietly show a key name instead of text.
+
+### Changed
+
+- **Lists show placeholder rows while they load** instead of the word
+  "loading". A short line of text where a table is about to appear made a slow
+  page look like an empty one.
+- **Empty lists explain themselves** with a muted icon and, where there is an
+  obvious next step, the button for it right there — rather than one dimmed
+  sentence that read more like something had failed to load.
+- Pages fade in briefly when you navigate. Short enough not to be a wait, long
+  enough that the change registers. Off entirely when the system asks for
+  reduced motion, like the rest of the app's motion.
+
+### Documentation
+
+- `CLAUDE.md` described an `update-manifest.json` with upgrade gating
+  (`min_upgrade_from`, `breaking_changes`) as though it shipped. None of it
+  exists: no file is produced, none is read, and nothing stops an installation
+  from jumping between any two versions. The section now states what the
+  updater actually does and marks the rest as planned. The pull-request
+  checklist asked contributors to update that same non-existent file.
+
+---
+
 ## [0.3.4] — 2026-09-18
 
 ### Security

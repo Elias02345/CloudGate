@@ -208,7 +208,15 @@ export function App() {
 						</AppShell.Navbar>
 					)}
 
-					<AppShell.Main>
+					{/*
+					 * Keyed on the path so React remounts the wrapper on every
+					 * navigation, which restarts the enter animation. Without the
+					 * key the class is already applied and the animation never
+					 * replays. Kept to a short fade with a few pixels of travel:
+					 * this runs on every click in the sidebar, and anything
+					 * longer turns routine navigation into waiting.
+					 */}
+					<AppShell.Main key={location.pathname} className="cg-page">
 						<Routes>
 							<Route path="/login" element={<LoginPage />} />
 							<Route path="/restore" element={<RestorePage />} />

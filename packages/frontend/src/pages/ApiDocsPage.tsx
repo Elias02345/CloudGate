@@ -41,7 +41,7 @@ export function ApiDocsPage() {
 		return <Text c="dimmed">{t('common.loading')}</Text>;
 	}
 	if (spec.isError || !spec.data) {
-		return <Text c="red">Failed to load OpenAPI spec.</Text>;
+		return <Text c="red">{t('api_docs.load_failed')}</Text>;
 	}
 
 	// Group endpoints by tag
@@ -52,7 +52,7 @@ export function ApiDocsPage() {
 	for (const [path, methods] of Object.entries(spec.data.paths)) {
 		for (const [method, op] of Object.entries(methods)) {
 			if (typeof op !== 'object' || op === null || !('summary' in op || 'tags' in op)) continue;
-			const tag = (op as { tags?: string[] }).tags?.[0] ?? 'other';
+			const tag = (op as { tags?: string[] }).tags?.[0] ?? t('api_docs.other_tag');
 			if (!grouped.has(tag)) grouped.set(tag, []);
 			grouped
 				.get(tag)!
