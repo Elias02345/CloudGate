@@ -93,6 +93,35 @@ function yamlQuotedSafe(value: string): string {
 }
 
 /**
+ * hostname and forward_host get a whitelist, not just a control-character
+ * strip.
+ *
+ * Both land in unquoted YAML plain scalars (`- hostname: …`,
+ * `service: scheme://host:port`), where a stray `:` followed by a space, or a
+ * ` #`, changes how the parser reads the line. Dropping control characters
+ * alone blocks injecting a new entry but still lets a legacy row produce a
+ * config that parses into something else — or fails to parse at all, which
+ * takes every other host on the tunnel down with it.
+ *
+ * Same character set as nginx-config.ts's sanitiseForwardHost, deliberately:
+ * one rule for the one value, whichever renderer consumes it.
+ */
+function hostSafe(value: string): string {
+	return value.replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 253);
+}
+
+/**
+ * path_prefix renders into `path: ^{{ … }}.*$`. Whitespace is what makes it
+ * dangerous here: ` #` starts a YAML comment and swallows the rest of the
+ * line. Current input validation already forbids whitespace, but rows written
+ * before it do not, so strip the same set nginx-config.ts strips.
+ */
+function pathSafe(value: string): string {
+	const cleaned = value.replace(/[\s{};"'\\]/g, '');
+	return cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
+}
+
+/**
  * forward_host also feeds `service: scheme://host:port`. A bare IPv6
  * literal there is ambiguous with the port separator, so bracket it —
  * mirrors the same fix in nginx-config.ts for the nginx `upstream` block.
@@ -294,10 +323,10 @@ export async function buildContext(tunnelRow: {
 			!!adv.tls_timeout_seconds;
 
 		hosts.push({
-			hostname: yamlPlainSafe(r.hostname),
-			path_prefix: yamlPlainSafe(r.path_prefix),
+			hostname: hostSafe(r.hostname),
+			path_prefix: pathSafe(r.path_prefix),
 			forward_scheme: r.forward_scheme,
-			forward_host: bracketIfIpv6(yamlPlainSafe(r.forward_host)),
+			forward_host: bracketIfIpv6(hostSafe(r.forward_host)),
 			forward_port: r.forward_port,
 			no_tls_verify: noTlsVerify,
 			has_origin_request: hasOriginRequest,

@@ -21,6 +21,7 @@ import { CreateProxyHostRequestSchema, type LlmAutonomy } from '@cloudgate/share
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { record } from './audit.js';
+import { checkHostPlacement } from './host-placement.js';
 
 const log = childLogger('ai-tools');
 
@@ -356,6 +357,15 @@ async function runImpl(
 				throw new Error(`Invalid host: ${parsed.error.issues.map((i) => i.message).join('; ')}`);
 			}
 			const input = parsed.data;
+
+			// The schema checks the shape of each field; this checks whether
+			// the row makes sense at all — that the tunnel is the caller's,
+			// that its provider can carry the protocol, and that the hostname
+			// belongs to the zone. Skipping it here let the assistant create
+			// combinations the form refuses, which then failed opaquely at
+			// deploy time.
+			const problem = await checkHostPlacement(input, ctx.user_id);
+			if (problem) throw new Error(problem.error);
 
 			const now = new Date().toISOString();
 			const [id] = await knex('proxy_hosts').insert({

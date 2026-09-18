@@ -81,6 +81,43 @@ export async function issueAccessToken(
 		.sign(key);
 }
 
+/**
+ * Short-lived ticket for the SSE stream.
+ *
+ * `EventSource` cannot set headers, so its credential has to travel in the URL
+ * — and a URL is the one place a credential must not be: nginx writes the full
+ * request line to its access log on every page load, and so does any tunnel or
+ * edge in front of it. Handing the 8-hour session token to that stream meant
+ * anyone who could read a log line had a session.
+ *
+ * This ticket is minted on demand, lives a minute, and carries its own
+ * audience so it is refused everywhere except the event stream. Leaking one
+ * costs a minute of read-only event traffic instead of a day's access.
+ */
+const SSE_TICKET_TTL = '60s';
+const SSE_AUDIENCE = 'cloudgate-sse';
+
+export async function issueSseTicket(userId: number): Promise<string> {
+	const key = loadJwtKey();
+	return new SignJWT({ sub: String(userId) })
+		.setProtectedHeader({ alg: 'HS256' })
+		.setIssuedAt()
+		.setIssuer(ISSUER)
+		.setAudience(SSE_AUDIENCE)
+		.setExpirationTime(SSE_TICKET_TTL)
+		.sign(key);
+}
+
+export async function verifySseTicket(token: string): Promise<{ sub: string }> {
+	const key = loadJwtKey();
+	const { payload } = await jwtVerify(token, key, {
+		issuer: ISSUER,
+		audience: SSE_AUDIENCE,
+	});
+	if (typeof payload.sub !== 'string') throw new Error('SSE ticket has no subject');
+	return { sub: payload.sub };
+}
+
 export async function verifyAccessToken(token: string): Promise<JwtClaims> {
 	const key = loadJwtKey();
 	const { payload } = await jwtVerify(token, key, {

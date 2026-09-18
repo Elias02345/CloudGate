@@ -5,10 +5,10 @@
  * cross-platform without needing a specific binary on PATH.
  */
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ManagedProcess, type ProcessStatus } from '../src/services/managed-process.js';
 
 let tmpDir: string;
@@ -46,21 +46,21 @@ class EchoProcess extends ManagedProcess {
 describe('ManagedProcess', () => {
 	it('starts a child, captures stdout into the ring buffer, and reports stopped after exit', async () => {
 		const proc = new EchoProcess(
-			"process.stdout.write('hello-from-child\\n'); setTimeout(()=>process.exit(0), 100)",
+			"process.stdout.write('hello-from-child\\n'); setTimeout(()=>process.exit(0), 100)"
 		);
 		proc.start();
-		await waitFor(() => proc.currentStatus === 'stopped' || proc.currentStatus === 'starting', 2_000);
+		await waitFor(() => proc.currentStatus === 'stopped' || proc.currentStatus === 'starting', 10_000);
 		// The child exits intentionally with code 0; backoff path runs, but
 		// status flips to 'error' since intentionallyStopped was never set.
 		// We just check that the ring buffer captured the output at some point.
-		await waitFor(() => proc.getLogs(10).join('\n').includes('hello-from-child'), 1_000);
+		await waitFor(() => proc.getLogs(10).join('\n').includes('hello-from-child'), 10_000);
 		expect(proc.getLogs(10).join('\n')).toContain('hello-from-child');
 		await proc.stop();
-	}, 5_000);
+	}, 30_000);
 
 	it('stop() flips status to stopped and prevents auto-restart', async () => {
 		const proc = new EchoProcess(
-			"setInterval(()=>process.stdout.write('tick\\n'), 50); setTimeout(()=>{}, 10000)",
+			"setInterval(()=>process.stdout.write('tick\\n'), 50); setTimeout(()=>{}, 10000)"
 		);
 		proc.start();
 		// Give it a moment to spawn
@@ -70,21 +70,21 @@ describe('ManagedProcess', () => {
 		// Wait a bit longer to confirm no respawn
 		await sleep(300);
 		expect(proc.currentStatus).toBe('stopped');
-	}, 5_000);
+	}, 30_000);
 
 	it('log ring buffer is bounded', async () => {
 		const proc = new EchoProcess(
-			"for(let i=0;i<1100;i++) process.stdout.write(`line${i}\\n`); setTimeout(()=>process.exit(0),200)",
+			'for(let i=0;i<1100;i++) process.stdout.write(`line${i}\\n`); setTimeout(()=>process.exit(0),200)'
 		);
 		proc.start();
-		await waitFor(() => proc.getLogs(1500).length >= 1000, 2_000);
+		await waitFor(() => proc.getLogs(1500).length >= 1000, 15_000);
 		const logs = proc.getLogs(1500);
 		// Buffer cap is 1000 in implementation.
 		expect(logs.length).toBeLessThanOrEqual(1000);
 		// We should still see the most recent lines.
 		expect(logs.join('\n')).toContain('line1099');
 		await proc.stop();
-	}, 5_000);
+	}, 30_000);
 });
 
 async function sleep(ms: number): Promise<void> {

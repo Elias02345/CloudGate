@@ -22,6 +22,7 @@ import { childLogger } from '../logger.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { record } from '../services/audit.js';
 import { deployHost } from '../services/host-deploy.js';
+import { checkHostPlacement } from '../services/host-placement.js';
 
 const log = childLogger('routes:hosts-bulk');
 export const hostsBulkRouter: RouterType = Router();
@@ -90,23 +91,12 @@ hostsBulkRouter.post('/bulk-import', requireAuth, requirePasswordSet, async (req
 		}
 		const row = rowParse.data;
 		try {
-			if (row.mode === 'cloudflare_tunnel') {
-				if (!row.tunnel_id || !row.cf_zone_id) {
-					throw new Error('cloudflare_tunnel mode requires tunnel_id and cf_zone_id');
-				}
-				// Validate tunnel belongs to user
-				const tunnelOk = await knex('tunnels')
-					.join('cloudflare_accounts', 'cloudflare_accounts.id', 'tunnels.cloudflare_account_id')
-					.where({ 'tunnels.id': row.tunnel_id, 'cloudflare_accounts.user_id': req.user.id })
-					.first();
-				if (!tunnelOk) throw new Error(`tunnel #${row.tunnel_id} not found or not yours`);
-				// Validate hostname-zone match
-				const zone = await knex<{ name: string }>('cf_zones').where({ id: row.cf_zone_id }).first();
-				if (!zone) throw new Error(`zone #${row.cf_zone_id} not found`);
-				if (!row.hostname.endsWith(zone.name)) {
-					throw new Error(`hostname does not end with zone (${zone.name})`);
-				}
-			}
+			// Same placement rules as the form and the assistant. The version
+			// that used to live here only joined cloudflare_accounts, so a
+			// playit tunnel was "not yours" no matter who owned it, and no
+			// protocol/provider check ran at all.
+			const problem = await checkHostPlacement(row, req.user.id);
+			if (problem) throw new Error(problem.error);
 			const now = new Date().toISOString();
 			const [id] = await knex('proxy_hosts').insert({
 				tunnel_id: row.tunnel_id ?? null,

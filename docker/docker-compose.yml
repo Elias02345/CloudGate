@@ -6,9 +6,18 @@
 
 services:
   cloudgate:
-    image: ghcr.io/elias02345/cloudgate:latest
+    # Pinned, not :latest. CloudGate updates itself, and its updater enforces
+    # `min_upgrade_from` so a migration chain is walked in order. A compose
+    # `pull` on a floating tag jumps straight to the newest image and skips
+    # that gate, which can land a database on code that assumes an
+    # intermediate migration already ran. Bump this line per release.
+    image: ghcr.io/elias02345/cloudgate:0.3.4
     container_name: cloudgate
     restart: unless-stopped
+    # The container still starts services as root (it binds :80/:443 and
+    # reloads nginx), so at minimum forbid gaining *more* than it starts with.
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "80:80"
       - "443:443"
