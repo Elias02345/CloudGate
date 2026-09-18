@@ -52,10 +52,22 @@ export function getConfig(): Config {
 	if (cached) return cached;
 	const result = ConfigSchema.safeParse(process.env);
 	if (!result.success) {
-		// Even on parse failure we don't crash — fall through to safe defaults.
-		// (Schema has defaults for everything; .safeParse mostly fails on bad coercion.)
-		console.error('[config] Some env vars failed validation, using safe defaults:', result.error.flatten());
-		cached = ConfigSchema.parse({});
+		// Don't crash — a container that refuses to boot over one malformed
+		// variable is worse than one running on defaults. But don't throw the
+		// whole environment away either: the previous version fell back to
+		// `parse({})`, so a single bad value (a non-numeric port, say) silently
+		// discarded every *valid* setting alongside it. A custom
+		// CLOUDGATE_DATA_DIR would stop being honoured and the app would write
+		// to /data instead, looking perfectly healthy while doing it.
+		// Default only the keys that actually failed.
+		const invalid = new Set(result.error.issues.map((issue) => String(issue.path[0])));
+		const kept = Object.fromEntries(Object.entries(process.env).filter(([key]) => !invalid.has(key)));
+		console.error(
+			`[config] Ignoring invalid env vars and using their defaults: ${[...invalid].join(', ')}`,
+			result.error.flatten()
+		);
+		const retry = ConfigSchema.safeParse(kept);
+		cached = retry.success ? retry.data : ConfigSchema.parse({});
 		return cached;
 	}
 	cached = result.data;

@@ -26,6 +26,7 @@ import { record } from '../services/audit.js';
 import {
 	changePassword,
 	findUserByEmail,
+	findUserById,
 	issueAccessToken,
 	publicUser,
 	recordLogin,
@@ -220,6 +221,17 @@ authRouter.post('/password', requireAuth, async (req, res) => {
 		}
 	}
 
+	// The password change revoked every token issued so far, this request's
+	// own included. Hand back a fresh one so the caller stays signed in while
+	// every other session — including a stolen one — is now dead. Re-read the
+	// row first: the first-login flow above may have changed the email.
+	const updated = (await findUserById(req.user.id)) ?? req.user;
+	const token = await issueAccessToken({
+		sub: String(updated.id),
+		email: updated.email,
+		is_admin: Boolean(updated.is_admin),
+	});
+
 	log.info({ user_id: req.user.id }, 'Password changed');
-	res.json({ ok: true });
+	res.json({ ok: true, access_token: token });
 });

@@ -42,12 +42,21 @@ export interface CreateApiKeyResult {
 /** crypto-safe charset for the secret part (no ambiguous chars). */
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
 
+/**
+ * Rejection sampling, not `% ALPHABET.length`: 256 is not a multiple of 55,
+ * so plain modulo would make the first 36 characters ~1.8% likelier than the
+ * rest. Bytes at or above the largest usable multiple of 55 are discarded and
+ * redrawn, which costs a few extra bytes and makes the distribution uniform.
+ */
 function randomString(length: number): string {
+	const limit = Math.floor(256 / ALPHABET.length) * ALPHABET.length; // 220
 	const out: string[] = [];
-	const bytes = randomBytes(length);
-	for (let i = 0; i < length; i++) {
-		const idx = bytes[i] ?? 0;
-		out.push(ALPHABET[idx % ALPHABET.length] ?? 'a');
+	while (out.length < length) {
+		for (const byte of randomBytes(length)) {
+			if (byte >= limit) continue;
+			out.push(ALPHABET[byte % ALPHABET.length] as string);
+			if (out.length === length) break;
+		}
 	}
 	return out.join('');
 }

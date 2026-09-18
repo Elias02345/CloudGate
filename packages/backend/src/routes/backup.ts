@@ -1,11 +1,12 @@
 /**
  * Backup endpoint.
  *
- *   GET  /api/backup            — streams an encrypted .cgbk archive
- *   POST /api/backup            — same, accepts the passphrase in the body
- *                                  (used by the UI Download button — query-
- *                                  string passphrases would land in proxy
- *                                  access logs).
+ *   POST /api/backup            — streams an encrypted .cgbk archive,
+ *                                  passphrase in the body (used by the UI
+ *                                  Download button — a query-string
+ *                                  passphrase would land in nginx access
+ *                                  logs and the pino-http request log, so
+ *                                  there is deliberately no GET variant).
  *
  * Tar contents:
  *   db/db.sqlite          — all app state
@@ -129,20 +130,6 @@ async function handleBackup(req: Request, res: Response, passphrase: string): Pr
 		log.info({ user: req.user?.email, includes: includePaths }, 'Backup exported');
 	});
 }
-
-// GET form — passphrase in query (legacy / curl convenience). Passphrase
-// will appear in access logs — POST is preferred from the UI.
-backupRouter.get('/', requireAuth, requirePasswordSet, requireAdmin, async (req, res) => {
-	const parsed = BackupBodySchema.safeParse(req.query);
-	if (!parsed.success) {
-		res.status(400).json({
-			error: 'passphrase query parameter required (min 8 chars)',
-			code: 'BAD_REQUEST',
-		});
-		return;
-	}
-	await handleBackup(req, res, parsed.data.passphrase);
-});
 
 // POST form — passphrase in body. Used by the SPA so the secret doesn't
 // land in proxy / nginx access logs.

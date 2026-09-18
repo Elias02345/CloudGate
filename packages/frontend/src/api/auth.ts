@@ -64,7 +64,14 @@ export function useChangePassword() {
 	const qc = useQueryClient();
 	return useMutation({
 		mutationFn: async (input: ChangePasswordRequest): Promise<void> => {
-			await api<{ ok: true }>('/auth/password', { method: 'POST', body: input });
+			// Changing the password revokes every token, this tab's included.
+			// The response carries a replacement — store it or the next request
+			// is a 401.
+			const data = await api<{ ok: true; access_token?: string }>('/auth/password', {
+				method: 'POST',
+				body: input,
+			});
+			if (data.access_token) setStoredToken(data.access_token);
 		},
 		onSuccess: () => {
 			qc.invalidateQueries({ queryKey: ['auth', 'me'] });

@@ -266,13 +266,13 @@ async function seedAdminIfMissing(): Promise<void> {
 	].join('\n');
 	await writeFile(adminFile, content, { encoding: 'utf8', mode: 0o600 });
 
-	// Also log it loudly — once.
+	// Point the operator at the file — never the password itself. This log
+	// line lands in /data/logs/cloudgate.log AND the docker log driver,
+	// neither of which is an appropriate place for a plaintext credential.
 	log.warn(
 		{ email, password_file: adminFile },
-		'====== INITIAL ADMIN PASSWORD (shown once, also saved to /data/secrets/initial-admin.txt) ======'
+		'====== INITIAL ADMIN PASSWORD generated — see /data/secrets/initial-admin.txt ======'
 	);
-	log.warn(`Initial admin password: ${password}`);
-	log.warn('======================================================================================');
 }
 
 async function initGpgKeyring(): Promise<void> {

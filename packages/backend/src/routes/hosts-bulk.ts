@@ -6,11 +6,15 @@
  *                  mode?, tunnel_id?, cf_zone_id?, no_tls_verify?}, ...] }
  *
  * Each row is validated independently — bad rows are reported back, good
- * rows are inserted + queued for deploy. This is intentionally separate
- * from `hosts.ts` so the bulk path stays small and the single-host route
- * keeps its zod-only validation.
+ * rows are inserted + queued for deploy. The row schema is kept small and
+ * separate from `hosts.ts`, but it MUST share the field validators that
+ * protect the config renderers (`isValidForwardHost`, `PathPrefixRegex`):
+ * this route inserts straight into `proxy_hosts` and calls `deployHost()`,
+ * so anything it lets through reaches nginx and cloudflared exactly as the
+ * single-host route would. A weaker schema here is a second front door.
  */
 
+import { PathPrefixRegex, isValidForwardHost } from '@cloudgate/shared';
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/db.js';
@@ -28,9 +32,19 @@ const RowSchema = z.object({
 	mode: z.enum(['cloudflare_tunnel', 'local_nginx']).default('cloudflare_tunnel'),
 	hostname: z.string().regex(HOSTNAME_RX),
 	forward_scheme: z.enum(['http', 'https']).default('http'),
-	forward_host: z.string().min(1),
+	// Same validators as the single-host route. Both values land raw in an
+	// nginx directive and a cloudflared service URL, so bulk import must not
+	// be the softer way in — it reaches the exact same renderer.
+	forward_host: z.string().min(1).refine(isValidForwardHost, {
+		message: 'forward_host must be a hostname or an IP address',
+	}),
 	forward_port: z.coerce.number().int().min(1).max(65535),
-	path_prefix: z.string().default('/'),
+	path_prefix: z
+		.string()
+		.regex(PathPrefixRegex, {
+			message: 'path_prefix must start with / and contain no whitespace, braces, semicolons or quotes',
+		})
+		.default('/'),
 	tunnel_id: z.coerce.number().int().positive().optional(),
 	cf_zone_id: z.coerce.number().int().positive().optional(),
 	no_tls_verify: z.coerce.boolean().optional(),

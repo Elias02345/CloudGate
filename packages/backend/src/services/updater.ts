@@ -35,6 +35,13 @@ const POLL_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
 const STAGING_DIR_NAME = 'updates/staging';
 const LOCK_FILE = 'updates/.update.lock';
 
+// Kept in sync with routes/updates.ts#VERSION_RE and docker/apply-update.sh's
+// TARGET_VERSION check — changing one is a prompt to update the other two.
+// A service must not trust its caller: this value is untrusted even though
+// the route already validates it, because it reaches path/URL construction
+// and a shell script argument below.
+const VERSION_RE = /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
 // -------------------------------- state ------------------------------------
 
 export type InstallStep =
@@ -401,6 +408,12 @@ async function verifyGpgSignature(
 }
 
 export async function triggerInstall(targetVersion: string): Promise<void> {
+	// A service must not trust its caller — validate before targetVersion
+	// touches any path or URL, even though the route already checked it.
+	if (!VERSION_RE.test(targetVersion)) {
+		throw new Error(`Invalid target version: ${targetVersion}`);
+	}
+
 	const cfg = getConfig();
 
 	// Reset + announce we're starting
@@ -447,7 +460,11 @@ export async function triggerInstall(targetVersion: string): Promise<void> {
 		// Flush final 100% of download
 		setStep('download_archive', 1);
 
-		// Optional sidecar files — keep going if they 404
+		// SHA256 sidecar is MANDATORY — a missing or failed download is a hard
+		// install failure (falls into the catch below: state=failed, lock
+		// released), never a silent downgrade to "install unverified". An
+		// attacker able to suppress the sidecar response must not be able to
+		// get an unchecked archive applied.
 		setStep('download_sha', 0);
 		try {
 			await downloadFile(
@@ -455,16 +472,35 @@ export async function triggerInstall(targetVersion: string): Promise<void> {
 				sha,
 				cfg.CLOUDGATE_GITHUB_TOKEN
 			);
-		} catch {
-			log.warn({ targetVersion }, 'No sha256 file in release — proceeding without checksum');
+		} catch (err) {
+			throw new Error(`Failed to download SHA256 checksum — aborting install: ${(err as Error).message}`);
 		}
 		setStep('download_sha', 1);
 
+		// GPG signature is OPTIONAL for now: today's releases aren't signed
+		// (.github/workflows/release.yml only signs when GPG_PRIVATE_KEY is
+		// set, and it isn't — v0.3.1 ships only .tar.gz + .tar.gz.sha256).
+		// Requiring it here would brick updates for every existing install.
+		// Keep going if the sidecar 404s; verify it below only if present.
+		//
+		// ponytail: signature enforcement is the intended end state, not yet
+		// reachable. Two prerequisites first: (1) GPG_PRIVATE_KEY /
+		// GPG_PASSPHRASE repo secrets configured so releases are actually
+		// signed, and (2) the release public key shipped in the image at
+		// /app/keys/release.pub (docker/keys/ currently holds only .gitkeep).
+		// Once both are true, flip this to mandatory the same way SHA256 is
+		// mandatory above.
 		setStep('download_sig', 0);
 		try {
 			await downloadFile(`${baseUrl}/cloudgate-${targetVersion}.tar.gz.sig`, sig, cfg.CLOUDGATE_GITHUB_TOKEN);
 		} catch {
-			log.warn({ targetVersion }, 'No signature file in release — proceeding unsigned (warning)');
+			log.warn(
+				{ targetVersion },
+				'No GPG signature in release — proceeding with SHA256-only verification. ' +
+					'This confirms the archive matches what was published, but NOT who published it — ' +
+					'an attacker who compromises the release pipeline or GitHub release assets could still ' +
+					'publish a matching checksum. Signature verification is not yet enforced (see comment above).'
+			);
 		}
 		setStep('download_sig', 1);
 
@@ -472,20 +508,26 @@ export async function triggerInstall(targetVersion: string): Promise<void> {
 		setStateField('state', 'verifying');
 		publish('update.installing', { version: targetVersion, step: 'verify' });
 		setStep('verify_sha', 0);
-		if (existsSync(sha)) {
-			const expected = (await readFile(sha, 'utf8')).trim().split(/\s+/)[0];
-			const actual = await sha256Of(archive);
-			if (expected && actual !== expected) {
-				throw new Error(`SHA256 mismatch — expected ${expected}, got ${actual}`);
-			}
-			log.info('SHA256 verified');
+		if (!existsSync(sha)) {
+			throw new Error('SHA256 checksum file missing after download — aborting install');
 		}
+		const expected = (await readFile(sha, 'utf8')).trim().split(/\s+/)[0];
+		const actual = await sha256Of(archive);
+		if (!expected || actual !== expected) {
+			throw new Error(`SHA256 mismatch — expected ${expected ?? '(none)'}, got ${actual}`);
+		}
+		log.info('SHA256 verified');
 		setStep('verify_sha', 1);
 
+		// GPG stays best-effort: verify only if a signature was actually
+		// downloaded above. See the "intended end state" comment above.
 		setStep('verify_gpg', 0);
-		const gpg = await verifyGpgSignature(archive, sig);
-		if (existsSync(sig) && !gpg.verified) {
-			throw new Error(`GPG verification failed: ${gpg.reason ?? 'unknown'}`);
+		if (existsSync(sig)) {
+			const gpg = await verifyGpgSignature(archive, sig);
+			if (!gpg.verified) {
+				throw new Error(`GPG verification failed: ${gpg.reason ?? 'unknown'}`);
+			}
+			log.info('GPG signature verified');
 		}
 		setStep('verify_gpg', 1);
 

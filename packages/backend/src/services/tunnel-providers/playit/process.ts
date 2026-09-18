@@ -38,9 +38,13 @@ export class PlayitProcess extends ManagedProcess {
 	}
 
 	protected override buildArgs(): string[] {
-		// `--secret <KEY>` is the documented agent flag. Some builds prefer
-		// reading from the env var PLAYIT_SECRET_KEY (which we also export
-		// via spawn options if needed).
+		// `--secret <KEY>` is the documented agent flag. This puts the secret
+		// in argv, so it is readable via `ps` by anything on the same host —
+		// ManagedProcess redacts it from our own logs (see SECRET_FLAGS), but
+		// that is a log fix, not a fix for argv. Moving it to the environment
+		// requires confirming the pinned agent build honours
+		// PLAYIT_SECRET_KEY; an earlier comment here claimed we already did
+		// that, and we did not.
 		return ['--secret', this.secretKey, '--no-autoupdate'];
 	}
 
