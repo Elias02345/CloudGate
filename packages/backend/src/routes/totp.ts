@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { getDb } from '../db/db.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { record } from '../services/audit.js';
-import { verifyPassword } from '../services/auth.js';
+import { claimTotpStep, totpStepFor, verifyPassword } from '../services/auth.js';
 import { decryptJson, encryptJson } from '../services/crypto.js';
 
 export const totpRouter: RouterType = Router();
@@ -91,6 +91,12 @@ totpRouter.post('/enable', requireAuth, requirePasswordSet, async (req, res) => 
 		res.status(401).json({ error: 'Invalid TOTP code', code: 'TOTP_INVALID' });
 		return;
 	}
+	// Burn the step here too, so the code that switched 2FA on cannot be
+	// turned around and replayed at the login form moments later.
+	if (!(await claimTotpStep(req.user.id, totpStepFor()))) {
+		res.status(401).json({ error: 'TOTP code already used', code: 'TOTP_REPLAY' });
+		return;
+	}
 
 	const encrypted = encryptJson<EncryptedSecret>({ type: 'totp', secret });
 	const knex = getDb();
@@ -143,6 +149,10 @@ totpRouter.post('/disable', requireAuth, requirePasswordSet, async (req, res) =>
 	}
 	if (!authenticator.verify({ token: parsed.data.code, secret })) {
 		res.status(401).json({ error: 'Invalid TOTP code', code: 'TOTP_INVALID' });
+		return;
+	}
+	if (!(await claimTotpStep(req.user.id, totpStepFor()))) {
+		res.status(401).json({ error: 'TOTP code already used', code: 'TOTP_REPLAY' });
 		return;
 	}
 

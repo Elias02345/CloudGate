@@ -80,6 +80,18 @@ CloudGate exposed to the internet, update.**
   authenticator**, not just your password. Switching it on always required
   one; switching it off did not, so anyone with your password and an open
   session could quietly remove it.
+- **A two-factor code can only be used once.** It used to stay valid for the
+  rest of its 30-second window, so a code someone saw you type was still good
+  for a few seconds afterwards.
+- **The container image now verifies what it installs.** cloudflared is pinned
+  to an exact version and checked against a known checksum instead of being
+  pulled from "whatever is newest", s6-overlay's archives are checksummed, and
+  Node is installed from a signed package repository rather than by piping a
+  downloaded script into a root shell. Two builds of the same CloudGate
+  version now produce the same image.
+- **The release and CI workflows pin every external build step to an exact,
+  immutable revision**, so a moved tag cannot change what runs in a job that
+  is allowed to publish releases and images.
 - **The recovery interface refuses requests a browser reports as coming from
   another site.** Its confirmation phrases are public — they are in the
   source — so they stop accidents, not attacks. Access from a terminal is

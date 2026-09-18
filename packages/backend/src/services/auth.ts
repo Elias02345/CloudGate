@@ -106,6 +106,8 @@ export interface DbUser {
 	last_login_at: string | null;
 	/** Tokens issued before this instant are rejected. NULL = never revoked. */
 	tokens_valid_after: string | null;
+	/** Last TOTP step consumed, so a code cannot be used twice. NULL = none. */
+	totp_last_step: number | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -136,6 +138,32 @@ export async function findUserById(id: number): Promise<DbUser | null> {
 	const knex = getDb();
 	const row = await knex<DbUser>('users').where({ id }).first();
 	return row ?? null;
+}
+
+/** TOTP step number for a moment in time — otplib's default 30-second period. */
+export function totpStepFor(atMs: number = Date.now()): number {
+	return Math.floor(atMs / 30_000);
+}
+
+/**
+ * Claim a TOTP step for a user, rejecting a code that was already used.
+ *
+ * otplib accepts a code for its whole 30-second step, any number of times.
+ * RFC 6238 §5.2 says a verifier must accept each step only once: an observed
+ * code should not stay usable for the rest of its window.
+ *
+ * The check and the write are one conditional UPDATE on purpose. Reading the
+ * column and then writing it would let two requests carrying the same code
+ * both pass before either wrote — which is precisely the replay this is meant
+ * to stop. The row count tells us whether we won the claim.
+ */
+export async function claimTotpStep(userId: number, step: number): Promise<boolean> {
+	const knex = getDb();
+	const updated = await knex('users')
+		.where({ id: userId })
+		.where((b) => b.whereNull('totp_last_step').orWhere('totp_last_step', '<', step))
+		.update({ totp_last_step: step });
+	return updated > 0;
 }
 
 export async function recordLogin(userId: number): Promise<void> {
