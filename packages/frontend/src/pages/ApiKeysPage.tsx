@@ -38,6 +38,7 @@ import {
 	useRotateApiKey,
 } from '../api/api-keys.js';
 import { ApiError } from '../api/client.js';
+import { useConfirm } from '../components/ConfirmProvider.js';
 import { CopyButton } from '../components/CopyButton.js';
 import { EmptyState } from '../components/EmptyState.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
@@ -56,6 +57,7 @@ function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 
 export function ApiKeysPage() {
 	const { t } = useTranslation();
+	const confirm = useConfirm();
 	const keys = useApiKeys();
 	const create = useCreateApiKey();
 	const revoke = useRevokeApiKey();
@@ -88,7 +90,14 @@ export function ApiKeysPage() {
 	});
 
 	const onRevoke = async (k: ApiKey) => {
-		if (!confirm(t('api_keys.confirm_revoke', { name: k.name }))) return;
+		if (
+			!(await confirm({
+				title: t('api_keys.revoke_title'),
+				message: t('api_keys.confirm_revoke', { name: k.name }),
+				danger: true,
+			}))
+		)
+			return;
 		try {
 			await revoke.mutateAsync(k.id);
 			notifications.show({ color: 'green', message: t('api_keys.revoked') });
@@ -98,7 +107,14 @@ export function ApiKeysPage() {
 	};
 
 	const onRotate = async (k: ApiKey) => {
-		if (!confirm(t('api_keys.confirm_rotate', { name: k.name }))) return;
+		if (
+			!(await confirm({
+				title: t('api_keys.rotate_title'),
+				message: t('api_keys.confirm_rotate', { name: k.name }),
+				danger: true,
+			}))
+		)
+			return;
 		try {
 			const result = await rotate.mutateAsync(k.id);
 			setShownPlaintext(result.plaintext);

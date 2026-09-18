@@ -15,7 +15,7 @@ services:
     # NOTE the `v`: release.yml tags images with $GITHUB_REF_NAME, which is the
     # git tag itself (`v0.3.5`), not the bare version. A pin without it does
     # not exist and fails with "manifest unknown".
-    image: ghcr.io/elias02345/cloudgate:v0.3.7
+    image: ghcr.io/elias02345/cloudgate:v0.3.8
     container_name: cloudgate
     restart: unless-stopped
     # The container still starts services as root (it binds :80/:443 and

@@ -49,6 +49,7 @@ import {
 	useTunnelLogs,
 	useTunnels,
 } from '../api/tunnels.js';
+import { useConfirm } from '../components/ConfirmProvider.js';
 import { EmptyState } from '../components/EmptyState.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
 
@@ -80,6 +81,7 @@ function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 
 export function TunnelsPage() {
 	const { t } = useTranslation();
+	const confirm = useConfirm();
 	const tunnels = useTunnels();
 	const accounts = useCloudflareAccounts();
 	const playitAccounts = usePlayitAccounts();
@@ -90,9 +92,10 @@ export function TunnelsPage() {
 	const forceSyncMutation = useForceSyncTunnel();
 
 	const onForceSync = async (row: TunnelDto): Promise<void> => {
-		const ok = confirm(
-			`Force-sync tunnel "${row.name}"?\n\nTears down the cloudflared process completely, re-renders the config from the current DB state, restarts fresh, then re-deploys every host so DNS records refresh. Use this when the daemon shows "running" but your hostnames return "page not found".\n\nIdempotent — safe to retry.`
-		);
+		const ok = await confirm({
+			title: t('tunnels.force_sync_title'),
+			message: t('tunnels.confirm_force_sync', { name: row.name }),
+		});
 		if (!ok) return;
 		try {
 			const r = await forceSyncMutation.mutateAsync(row.id);
@@ -109,9 +112,11 @@ export function TunnelsPage() {
 	};
 
 	const onRecreate = async (row: TunnelDto): Promise<void> => {
-		const ok = confirm(
-			`Re-create CF tunnel "${row.name}"?\n\nThis deletes the broken tunnel from Cloudflare and creates a fresh one under the same account. Your hosts stay attached and DNS records will be updated to the new tunnel UUID on the next deploy.`
-		);
+		const ok = await confirm({
+			title: t('tunnels.recreate_title'),
+			message: t('tunnels.confirm_recreate', { name: row.name }),
+			danger: true,
+		});
 		if (!ok) return;
 		try {
 			const r = await recreateMutation.mutateAsync(row.id);
@@ -153,7 +158,13 @@ export function TunnelsPage() {
 	};
 
 	const onRedeployAll = async (id: number, name: string) => {
-		if (!confirm(t('tunnels.confirm_redeploy_all', { name }))) return;
+		if (
+			!(await confirm({
+				title: t('tunnels.redeploy_all_title'),
+				message: t('tunnels.confirm_redeploy_all', { name }),
+			}))
+		)
+			return;
 		try {
 			const r = await redeployAll.mutateAsync(id);
 			if (r.failed > 0) {
@@ -330,10 +341,17 @@ export function TunnelsPage() {
 															<ActionIcon
 																variant="subtle"
 																color="red"
-																onClick={() => {
-																	if (confirm(t('tunnels.confirm_delete', { name: row.name }))) {
-																		void deleteMutation.mutate(row.id);
-																	}
+																onClick={async () => {
+																	if (
+																		!(await confirm({
+																			title: t('tunnels.delete_title'),
+																			message: t('tunnels.confirm_delete', { name: row.name }),
+																			confirmLabel: t('common.delete'),
+																			danger: true,
+																		}))
+																	)
+																		return;
+																	void deleteMutation.mutate(row.id);
 																}}
 																title={t('common.delete')}
 															>
@@ -442,10 +460,17 @@ export function TunnelsPage() {
 													variant="subtle"
 													color="red"
 													size="lg"
-													onClick={() => {
-														if (confirm(t('tunnels.confirm_delete', { name: row.name }))) {
-															void deleteMutation.mutate(row.id);
-														}
+													onClick={async () => {
+														if (
+															!(await confirm({
+																title: t('tunnels.delete_title'),
+																message: t('tunnels.confirm_delete', { name: row.name }),
+																confirmLabel: t('common.delete'),
+																danger: true,
+															}))
+														)
+															return;
+														void deleteMutation.mutate(row.id);
 													}}
 													title={t('common.delete')}
 												>

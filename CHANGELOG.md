@@ -9,6 +9,24 @@ _Nothing yet._
 
 ---
 
+## [0.3.8] — 2026-09-18
+
+### Changed
+
+- **Confirmation prompts are part of CloudGate now, instead of the browser's
+  own.** Every "are you sure?" used to be the grey system box: it could not
+  follow the app's appearance, it ignored your language and always said
+  "OK"/"Cancel", and browsers suppress it after repeated use on one page —
+  which quietly turns a question into a yes. The new dialogs name the action
+  in their title, mark destructive ones in red, and treat Escape or a click
+  outside as "no".
+- Two prompts on the Tunnels page — re-synchronising and re-creating a tunnel
+  — were still English regardless of the selected language. They explain what
+  the operation actually does, which is the reason the prompt exists, so the
+  explanation was translated rather than shortened.
+
+---
+
 ## [0.3.7] — 2026-09-18
 
 ### Security — please read if you update from inside CloudGate

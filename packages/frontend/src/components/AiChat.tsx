@@ -44,6 +44,7 @@ import {
 } from '../api/ai.js';
 import { ApiError } from '../api/client.js';
 import { MOBILE_QUERY } from '../layout.js';
+import { useConfirm } from './ConfirmProvider.js';
 import { Tooltip } from './Tooltip.js';
 import { Cloudy } from './cloudy/Cloudy.js';
 import { targetForTool } from './cloudy/targets.js';
@@ -90,6 +91,7 @@ interface AiChatDrawerProps {
 
 function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 	const { t } = useTranslation();
+	const confirm = useConfirm();
 	const isMobile = useMediaQuery(MOBILE_QUERY) ?? false;
 	const [conversationId, setConversationId] = useState<string | null>(null);
 	const conversations = useConversations();
@@ -171,7 +173,15 @@ function AiChatDrawer({ opened, onClose }: AiChatDrawerProps) {
 
 	const onDeleteConversation = async () => {
 		if (!conversationId) return;
-		if (!confirm(t('ai_chat.confirm_delete'))) return;
+		if (
+			!(await confirm({
+				title: t('ai_chat.delete_title'),
+				message: t('ai_chat.confirm_delete'),
+				confirmLabel: t('common.delete'),
+				danger: true,
+			}))
+		)
+			return;
 		try {
 			await deleteConv.mutateAsync(conversationId);
 			setConversationId(null);

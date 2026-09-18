@@ -77,12 +77,20 @@ describe('ManagedProcess', () => {
 			'for(let i=0;i<1100;i++) process.stdout.write(`line${i}\\n`); setTimeout(()=>process.exit(0),200)'
 		);
 		proc.start();
-		await waitFor(() => proc.getLogs(1500).length >= 1000, 15_000);
+		// Wait for the LAST line, not for a count.
+		//
+		// The buffer caps at 1000, so `length >= 1000` goes true the moment the
+		// thousandth line lands — while lines 1000..1099 are still streaming in.
+		// Asserting on line1099 right after that is a race the test loses
+		// whenever the machine is busy enough to widen the gap, which is what
+		// made this fail at random under the full suite.
+		await waitFor(() => proc.getLogs(1500).join('\n').includes('line1099'), 15_000);
 		const logs = proc.getLogs(1500);
 		// Buffer cap is 1000 in implementation.
 		expect(logs.length).toBeLessThanOrEqual(1000);
-		// We should still see the most recent lines.
+		// The newest lines are the ones kept; the oldest are dropped.
 		expect(logs.join('\n')).toContain('line1099');
+		expect(logs.join('\n')).not.toContain('line0\n');
 		await proc.stop();
 	}, 30_000);
 });
