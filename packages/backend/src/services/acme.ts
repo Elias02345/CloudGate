@@ -122,10 +122,43 @@ export interface CertResult {
 	expires_at: string;
 }
 
+/**
+ * Minimum gap between two issuance attempts for the same hostname.
+ *
+ * Let's Encrypt production allows roughly 5 duplicate certificates per week.
+ * Nothing upstream of here throttles: the UI button can be clicked repeatedly
+ * and the 24h renewal job retries failing hosts forever with no backoff. Burn
+ * through the quota and the domain cannot get *any* certificate — including a
+ * renewal for a cert that is about to expire — for up to a week.
+ *
+ * The guard lives here rather than in the route so the renewal job is covered
+ * by the same limit.
+ *
+ * ponytail: in-memory, so a restart clears it. That is fine for the failure
+ * mode this exists to stop (a retry loop or an impatient operator); a
+ * restart-proof counter would need a settings/DB round trip per attempt.
+ */
+const ISSUE_COOLDOWN_MS = 10 * 60 * 1000;
+const lastIssueAttempt = new Map<string, number>();
+
 export async function acquireCert(
 	hostname: string,
 	options: { staging?: boolean; email?: string } = {}
 ): Promise<CertResult> {
+	// Staging has its own, far looser quota — no reason to throttle it.
+	if (!options.staging) {
+		const last = lastIssueAttempt.get(hostname);
+		const waitMs = last ? ISSUE_COOLDOWN_MS - (Date.now() - last) : 0;
+		if (waitMs > 0) {
+			throw new Error(
+				`Certificate for ${hostname} was already attempted less than ${Math.round(
+					ISSUE_COOLDOWN_MS / 60_000
+				)} minutes ago. Wait ${Math.ceil(waitMs / 60_000)} more minute(s) — Let's Encrypt rate limits are weekly, so retrying now risks locking the domain out of certificates entirely.`
+			);
+		}
+		lastIssueAttempt.set(hostname, Date.now());
+	}
+
 	const zone = await findZoneForHostname(hostname);
 	if (!zone) {
 		throw new Error(

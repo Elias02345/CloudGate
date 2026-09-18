@@ -46,6 +46,35 @@ export type ProviderEdgeEndpoint = z.infer<typeof ProviderEdgeEndpointSchema>;
 
 const HostnameRegex = /^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/;
 
+/** Dotted-quad IPv4 literal, each octet 0-255. */
+const Ipv4Regex = /^(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+
+/**
+ * Full or compressed IPv6 literal (no zone id, no IPv4-mapped form — a
+ * forward_host doesn't need those for a homelab/VPS origin).
+ */
+const Ipv6Regex =
+	/^(([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:))$/;
+
+/**
+ * forward_host lands raw in an nginx `upstream … { server … }` directive and
+ * a cloudflared `service:` URL (see nginx-config.ts / config-writer.ts) —
+ * nginx has no escaping for directive arguments, so only a hostname or an
+ * IP literal may pass. Anything else (spaces, `;`, `{`, `}`) can terminate
+ * the directive and inject config.
+ */
+export function isValidForwardHost(value: string): boolean {
+	return HostnameRegex.test(value) || Ipv4Regex.test(value) || Ipv6Regex.test(value);
+}
+
+/**
+ * path_prefix lands raw in `location {{ path_prefix }} {` — must start with
+ * `/` and stay within characters that can't terminate the directive or open
+ * a new block: no whitespace/newlines, braces, semicolons, quotes, or
+ * backslashes.
+ */
+export const PathPrefixRegex = /^\/[^\s{};"'\\]*$/;
+
 /**
  * Per-host originRequest tuning — surfaces the most common cloudflared
  * knobs real-world apps need. Stored as JSON in proxy_hosts.advanced_options.
@@ -113,9 +142,17 @@ export const ProxyHostSchema = z.object({
 	protocol: HostProtocolSchema.default('http'),
 	hostname: z.string().regex(HostnameRegex),
 	forward_scheme: ForwardSchemeSchema,
-	forward_host: z.string().min(1),
+	forward_host: z.string().min(1).refine(isValidForwardHost, {
+		message: 'forward_host must be a valid hostname, IPv4 address, or IPv6 address',
+	}),
 	forward_port: z.number().int().min(1).max(65535),
-	path_prefix: z.string().default('/'),
+	path_prefix: z
+		.string()
+		.regex(PathPrefixRegex, {
+			message:
+				'path_prefix must start with / and must not contain whitespace, braces, semicolons, quotes, or backslashes',
+		})
+		.default('/'),
 	enabled: z.boolean(),
 	dns_record_id: z.string().nullable(),
 	edge_endpoint: ProviderEdgeEndpointSchema.nullable().optional(),
@@ -142,9 +179,17 @@ export const CreateProxyHostRequestSchema = z.object({
 	// forward_scheme is HTTP-only; kept for back-compat. TCP/UDP hosts
 	// just ignore it (route validation enforces the constraint).
 	forward_scheme: ForwardSchemeSchema.default('http'),
-	forward_host: z.string().min(1),
+	forward_host: z.string().min(1).refine(isValidForwardHost, {
+		message: 'forward_host must be a valid hostname, IPv4 address, or IPv6 address',
+	}),
 	forward_port: z.coerce.number().int().min(1).max(65535),
-	path_prefix: z.string().default('/'),
+	path_prefix: z
+		.string()
+		.regex(PathPrefixRegex, {
+			message:
+				'path_prefix must start with / and must not contain whitespace, braces, semicolons, quotes, or backslashes',
+		})
+		.default('/'),
 	tunnel_id: z.number().int().positive().optional(),
 	cf_zone_id: z.number().int().positive().optional(),
 	tls_options: z

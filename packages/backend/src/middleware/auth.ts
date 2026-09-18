@@ -11,7 +11,13 @@
 
 import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import { childLogger } from '../logger.js';
-import { type DbUser, findUserById, publicUser, verifyAccessToken } from '../services/auth.js';
+import {
+	type DbUser,
+	findUserById,
+	isTokenRevoked,
+	publicUser,
+	verifyAccessToken,
+} from '../services/auth.js';
 import { looksLikeApiKey, tryApiKey } from './api-key.js';
 
 const log = childLogger('middleware:auth');
@@ -71,6 +77,12 @@ export const requireAuth: RequestHandler = async (req: Request, res: Response, n
 			res.status(401).json({ error: 'User no longer exists', code: 'UNAUTHENTICATED' });
 			return;
 		}
+		// A password change revokes every token minted before it. The user row
+		// is already loaded, so this costs no extra query.
+		if (isTokenRevoked(claims, user)) {
+			res.status(401).json({ error: 'Token revoked, please sign in again', code: 'UNAUTHENTICATED' });
+			return;
+		}
 		req.user = user;
 		next();
 	} catch (err) {
@@ -95,22 +107,27 @@ export const requireAdmin: RequestHandler = (req: Request, res: Response, next: 
  * Same as requireAuth but BLOCKS if the user must change their password.
  * Use this for routes that should only be reachable after password setup is done.
  */
-export const requirePasswordSet: RequestHandler = async (req, res, next) => {
-	const inner = requireAuth as RequestHandler;
-	inner(req, res, (err) => {
-		if (err) {
-			next(err);
-			return;
-		}
-		if (req.user?.must_change_password) {
-			res.status(403).json({
-				error: 'Password change required before accessing this resource',
-				code: 'PASSWORD_CHANGE_REQUIRED',
-			});
-			return;
-		}
-		next();
-	});
+export const requirePasswordSet: RequestHandler = (req, res, next) => {
+	// `requireAuth` is async. Invoking it by hand means Express never sees the
+	// promise, so a rejection (a dropped DB connection during findUserById,
+	// say) would surface as an unhandled rejection instead of a 500 — and the
+	// request would hang. Adopt the promise here and route it to `next`.
+	Promise.resolve(
+		(requireAuth as RequestHandler)(req, res, (err?: unknown) => {
+			if (err) {
+				next(err);
+				return;
+			}
+			if (req.user?.must_change_password) {
+				res.status(403).json({
+					error: 'Password change required before accessing this resource',
+					code: 'PASSWORD_CHANGE_REQUIRED',
+				});
+				return;
+			}
+			next();
+		})
+	).catch(next);
 };
 
 /** Re-export the public-user shape helper for routes that want to send it. */

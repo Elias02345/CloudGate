@@ -149,6 +149,12 @@ interface TemplateHost extends RenderHost {
 function toTemplateHost(host: RenderHost): TemplateHost {
 	return {
 		...host,
+		// Schema validation (packages/shared) rejects an unsafe forward_host /
+		// path_prefix on the way in, but rows written before that validation
+		// existed can still carry one — sanitise again here so a stale DB row
+		// can't inject nginx config.
+		forward_host: sanitiseForwardHost(host.forward_host),
+		path_prefix: sanitisePathPrefix(host.path_prefix),
 		forwarded_headers: host.forwarded_headers ?? 'standard',
 		// An explicit override is quoted so hostnames can't be read as nginx
 		// syntax; the default is the `$host` variable and must stay bare.
@@ -164,6 +170,29 @@ function toTemplateHost(host: RenderHost): TemplateHost {
  */
 function sanitiseHeaderValue(value: string): string {
 	return value.replace(/[^A-Za-z0-9._:\-[\]]/g, '').slice(0, 253);
+}
+
+/**
+ * forward_host reaches the `upstream cloudgate_host_{{ id }} { server … }`
+ * directive raw. Strip everything but hostname/IP characters, then bracket
+ * a bare IPv6 literal — `server fe80::1:8123;` is ambiguous (which colon is
+ * the port separator?) while `server [fe80::1]:8123;` is what nginx expects.
+ */
+function sanitiseForwardHost(value: string): string {
+	const cleaned = value.replace(/[^A-Za-z0-9.:-]/g, '').slice(0, 253);
+	if (cleaned.startsWith('[') || !cleaned.includes(':')) return cleaned;
+	return `[${cleaned}]`;
+}
+
+/**
+ * path_prefix reaches `location {{ path_prefix }} {` raw. Drop whitespace,
+ * braces, semicolons, quotes and backslashes — the characters that can
+ * terminate the directive or open a new block — and make sure a leading
+ * `/` survives the strip.
+ */
+function sanitisePathPrefix(value: string): string {
+	const cleaned = value.replace(/[\s{};"'\\]/g, '');
+	return cleaned.startsWith('/') ? cleaned : `/${cleaned}`;
 }
 
 /**

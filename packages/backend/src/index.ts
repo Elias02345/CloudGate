@@ -67,6 +67,13 @@ async function main(): Promise<void> {
 
 	const app = express();
 	app.disable('x-powered-by');
+	// nginx (docker/nginx/cloudgate.conf) is the only thing that ever talks
+	// to us directly — it's always 127.0.0.1. Trusting exactly one loopback
+	// hop makes req.ip resolve X-Forwarded-For/X-Real-IP from nginx instead
+	// of always reading 127.0.0.1, which both the login rate limiter and
+	// the audit log depend on. Must be set before the limiters/routes below.
+	// Never 'true' — that would trust an XFF header a client sent directly.
+	app.set('trust proxy', 'loopback');
 	// Mantine + emotion inject inline styles, so style-src needs 'unsafe-inline'.
 	// Script-src stays strict (no inline JS). connect-src 'self' covers /api + SSE.
 	app.use(
@@ -146,13 +153,13 @@ async function main(): Promise<void> {
 	app.use('/api', globalLimiter, apiKeyLimiter);
 
 	// Global write-scope guard: read-only API keys cannot perform non-GET ops.
+	// /api/backup is the one GET that must be blocked too — it streams
+	// /data/secrets (encryption + JWT keys) and every Cloudflare token, so a
+	// "read-only" key that could call it would in fact be a full-secrets key.
 	app.use('/api', (req, res, next) => {
-		if (
-			req.apiKey?.scope === 'read' &&
-			req.method !== 'GET' &&
-			req.method !== 'HEAD' &&
-			req.method !== 'OPTIONS'
-		) {
+		const isReadOnlyMethod = req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS';
+		const isBackupEndpoint = req.path === '/backup' || req.path.startsWith('/backup/');
+		if (req.apiKey?.scope === 'read' && (!isReadOnlyMethod || isBackupEndpoint)) {
 			res.status(403).json({ error: 'API key has read-only scope', code: 'INSUFFICIENT_SCOPE' });
 			return;
 		}

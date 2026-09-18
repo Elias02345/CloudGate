@@ -12,7 +12,12 @@
  *                          explain why it is unhappy (read-only)
  */
 
-import { CreateProxyHostRequestSchema, HostAdvancedOptionsSchema } from '@cloudgate/shared';
+import {
+	CreateProxyHostRequestSchema,
+	HostAdvancedOptionsSchema,
+	PathPrefixRegex,
+	isValidForwardHost,
+} from '@cloudgate/shared';
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/db.js';
@@ -311,9 +316,21 @@ const UpdateHostSchema = z.object({
 	tunnel_id: z.number().int().positive().optional(),
 	cf_zone_id: z.number().int().positive().optional(),
 	forward_scheme: z.enum(['http', 'https']).optional(),
-	forward_host: z.string().min(1).optional(),
+	forward_host: z
+		.string()
+		.min(1)
+		.refine(isValidForwardHost, {
+			message: 'forward_host must be a valid hostname, IPv4 address, or IPv6 address',
+		})
+		.optional(),
 	forward_port: z.number().int().min(1).max(65535).optional(),
-	path_prefix: z.string().min(1).optional(),
+	path_prefix: z
+		.string()
+		.regex(PathPrefixRegex, {
+			message:
+				'path_prefix must start with / and must not contain whitespace, braces, semicolons, quotes, or backslashes',
+		})
+		.optional(),
 	tls_options: z
 		.object({
 			no_tls_verify: z.boolean().optional(),

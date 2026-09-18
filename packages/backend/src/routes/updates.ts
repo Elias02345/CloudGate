@@ -30,14 +30,22 @@ updatesRouter.post('/check', requireAuth, requirePasswordSet, async (_req, res) 
 	res.json(getStatus());
 });
 
+// Strict SemVer-ish shape: optional leading "v", MAJOR.MINOR.PATCH, optional
+// "-prerelease" suffix. This value ends up in filesystem paths and shell args
+// (see services/updater.ts#triggerInstall and docker/apply-update.sh), so it
+// must never contain "/", "..", or other path metacharacters.
+// Kept in sync in THREE places — updates.ts, updater.ts, apply-update.sh —
+// changing one is a prompt to update the other two.
+const VERSION_RE = /^v?\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
 const InstallSchema = z.object({
-	version: z.string().min(1),
+	version: z.string().min(1).regex(VERSION_RE),
 });
 
 updatesRouter.post('/install', requireAuth, requirePasswordSet, requireAdmin, async (req, res) => {
 	const parsed = InstallSchema.safeParse(req.body);
 	if (!parsed.success) {
-		res.status(400).json({ error: 'Missing version', code: 'BAD_REQUEST' });
+		res.status(400).json({ error: 'Missing or invalid version', code: 'BAD_REQUEST' });
 		return;
 	}
 	try {

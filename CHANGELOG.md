@@ -9,6 +9,78 @@ _Nothing yet._
 
 ---
 
+## [0.3.2] — 2026-09-18
+
+A security release. Two independent audits went over the codebase; every
+finding below was reproduced in the code before it was fixed. **If you run
+CloudGate exposed to the internet, update.**
+
+### Security — please update
+
+- **The recovery interface was reachable from the internet.** In normal
+  operation nginx forwarded `/__recovery/` to the recovery service, which has
+  no login of its own. Anyone who could open your CloudGate could read the log
+  file containing the initial admin password, or wipe `/data` outright. The
+  route is gone from normal mode; recovery mode still serves it exactly as
+  before, so a broken install is still repairable.
+- **A host entry could inject configuration into nginx and cloudflared.**
+  `forward_host` and `path_prefix` were written into the generated config
+  unchecked, so a crafted value could add its own directives — including one
+  that serves the container's filesystem over HTTP, which would expose the
+  encryption key and the database. Both fields are now restricted to values
+  that cannot escape a directive, checked when saved, again when the config is
+  rendered (so existing entries are covered too), and on all three paths that
+  create hosts: the form, bulk import, and the assistant.
+- **The updater installed archives it had not verified.** A missing checksum
+  file downgraded the install to "run whatever was downloaded". The checksum is
+  now mandatory and a failure aborts the update. Signature checking stays
+  best-effort for now — releases are not signed yet, and requiring it today
+  would stop every existing installation from updating.
+- **The version to install was never validated** and reached a `rm -rf` in the
+  update script, where a crafted value could delete `/data/secrets` and leave
+  the install unrecoverable. It is now checked in the API, in the updater, and
+  in the script itself.
+- **Five failed logins locked out everybody.** CloudGate did not tell Express
+  it sits behind nginx, so every request looked like it came from `127.0.0.1`:
+  the login limiter counted all attempts against a single bucket, and the audit
+  log recorded `127.0.0.1` as the source of everything. Real client addresses
+  now arrive intact.
+- **Read-only API keys could download a full backup**, which contains the
+  encryption key, the JWT key and every Cloudflare token — making "read-only"
+  a full-secrets key. They are now refused.
+- **The backup passphrase travelled in the URL**, landing in nginx and
+  application logs. The download now sends it in the request body.
+- **The initial admin password was written to the log file** on first start,
+  where it stayed after the password was changed. It is only written to
+  `/data/secrets/initial-admin.txt` now, as documented.
+- **The playit account secret was written to the log file** on every agent
+  start and restart. It is redacted from log output now. (It is still visible
+  in the process list to anything running on the same machine — moving it out
+  of the command line needs a change we could not verify against the agent
+  yet.)
+- **Changing your password now ends every other session.** Previously a stolen
+  token stayed valid for up to eight hours after you changed your password —
+  exactly the situation a password change is meant to end. The tab you change
+  it in stays signed in.
+- **The detailed health endpoint now requires a login.** It reported the exact
+  version, which secrets exist and disk pressure to anyone who asked. The
+  simple health check stays open for Docker.
+- **Certificate requests are throttled** to one attempt per host every ten
+  minutes. Nothing stopped a retry loop before, and Let's Encrypt limits are
+  weekly — exhausting them locks a domain out of new *and* renewed
+  certificates for days.
+- API key generation had a slight bias in its character distribution, and a
+  failure inside the authentication middleware could hang a request instead of
+  returning an error. Both corrected.
+
+### Fixed
+
+- The container health check's recovery fallback never worked: it asked for a
+  path that only existed in normal mode, so in recovery mode — the one case it
+  was written for — it always failed.
+
+---
+
 ## [0.3.1] — 2026-09-18
 
 ### Added — Cloudy lives in the app now

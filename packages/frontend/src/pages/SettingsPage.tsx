@@ -352,9 +352,16 @@ function BackupCard() {
 		setBusy(true);
 		try {
 			const token = getStoredToken();
-			const url = `/api/backup?passphrase=${encodeURIComponent(pass)}`;
-			// Trigger download via fetch + blob
-			const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+			// POST, passphrase in the body — a query-string passphrase would land
+			// in nginx access logs and the pino-http request log.
+			const res = await fetch('/api/backup', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					...(token ? { Authorization: `Bearer ${token}` } : {}),
+				},
+				body: JSON.stringify({ passphrase: pass }),
+			});
 			if (!res.ok) throw new Error(`HTTP ${res.status}`);
 			const blob = await res.blob();
 			const a = document.createElement('a');

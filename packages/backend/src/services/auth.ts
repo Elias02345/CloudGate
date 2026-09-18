@@ -104,8 +104,26 @@ export interface DbUser {
 	totp_enabled: number;
 	must_change_password: number;
 	last_login_at: string | null;
+	/** Tokens issued before this instant are rejected. NULL = never revoked. */
+	tokens_valid_after: string | null;
 	created_at: string;
 	updated_at: string;
+}
+
+/**
+ * Has this token been revoked by a later password change?
+ *
+ * JWT `iat` has one-second resolution, so a token minted in the same second
+ * as the revocation survives. Closing that window would mean rejecting the
+ * fresh token handed out by the password-change request itself, which is the
+ * worse trade: it would log the user out of the session they are actively using.
+ */
+export function isTokenRevoked(claims: JwtClaims, user: DbUser): boolean {
+	if (!user.tokens_valid_after) return false;
+	const revokedAt = Date.parse(user.tokens_valid_after);
+	if (Number.isNaN(revokedAt)) return false;
+	if (typeof claims.iat !== 'number') return true; // no issue time — cannot prove it is current
+	return claims.iat < Math.floor(revokedAt / 1000);
 }
 
 export async function findUserByEmail(email: string): Promise<DbUser | null> {
@@ -130,10 +148,15 @@ export async function recordLogin(userId: number): Promise<void> {
 export async function changePassword(userId: number, newPlaintext: string): Promise<void> {
 	const knex = getDb();
 	const hash = await hashPassword(newPlaintext);
+	const now = new Date().toISOString();
 	await knex('users').where({ id: userId }).update({
 		password_hash: hash,
 		must_change_password: 0,
-		updated_at: new Date().toISOString(),
+		// Revoke every token issued so far. Someone changing their password
+		// after a suspected compromise expects exactly this; the caller hands
+		// the user a fresh token so their current session survives.
+		tokens_valid_after: now,
+		updated_at: now,
 	});
 }
 

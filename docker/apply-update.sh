@@ -31,6 +31,9 @@ readonly LOCK="/data/updates/.update.lock"
 
 readonly APP_SNAPSHOT_DIR="/data/updates/backups/app-${OLD_VERSION}-${TS}"
 readonly DB_SNAPSHOT="/data/db/backups/pre-update-${OLD_VERSION}-${TS}.sqlite"
+# TARGET_VERSION is validated in Pre-flight below, before this value is ever
+# passed to rm -rf / mkdir -p / tar — do not extract or delete STAGE_DIR
+# above that validation point.
 readonly STAGE_DIR="/data/updates/staging/new-${TARGET_VERSION}"
 
 # -----------------------------------------------------------------------------
@@ -114,6 +117,16 @@ mkdir -p /data/logs /data/updates/backups /data/updates/staging /data/db/backups
 
 [[ -z "${ARCHIVE}" ]] && bail "no archive path argument"
 [[ ! -r "${ARCHIVE}" ]] && bail "archive not readable: ${ARCHIVE}"
+
+# Strict SemVer-ish shape, same as routes/updates.ts#VERSION_RE and
+# services/updater.ts#VERSION_RE — keep all three definitions in sync, a
+# change to one is a prompt to update the other two. TARGET_VERSION feeds
+# STAGE_DIR below, which is later "rm -rf"'d and "mkdir -p"'d, so a
+# path-traversal value here (e.g. "x/../../../secrets") must never reach
+# that point. This script is also runnable by hand, so shell-level
+# validation matters even though the HTTP route already checks it.
+readonly VERSION_RE_SH='^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'
+[[ "${TARGET_VERSION}" =~ ${VERSION_RE_SH} ]] || bail "invalid target version: ${TARGET_VERSION}"
 
 log "=== Update starting: ${OLD_VERSION} → ${TARGET_VERSION} (archive=${ARCHIVE})"
 
