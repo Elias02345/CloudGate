@@ -163,6 +163,24 @@ RUN chmod +x /app/bin/bootstrap.sh /app/bin/apply-update.sh
 RUN mkdir -p /var/log/nginx /var/lib/nginx /run/nginx \
  && chown -R www-data:www-data /var/log/nginx /var/lib/nginx /run/nginx
 
+# Unprivileged account for the recovery UI.
+#
+# The recovery UI has no authentication of its own — it has to work when the
+# backend, and therefore auth, is broken — and it can move /data aside or
+# restore a database over the live one. That is the service where an
+# unexpected bug is least acceptable as root, and the only one that can drop
+# privileges cheaply: it touches nothing but /data.
+#
+# The backend deliberately stays root for now. It runs `nginx -s reload` after
+# rendering host configs, and apply-update.sh (which it spawns) swaps /app and
+# drives `s6-svc` — three privileged operations that each need a root-side
+# broker before it can give up root. That is its own change, with its own test.
+#
+# 1000:1000 matches the default PUID/PGID convention; bootstrap re-points the
+# runtime account at whatever PUID/PGID the operator actually set.
+RUN groupadd -g 1000 cloudgate \
+ && useradd -u 1000 -g 1000 -M -s /usr/sbin/nologin cloudgate
+
 # Data volume
 VOLUME ["/data"]
 

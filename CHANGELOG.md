@@ -9,6 +9,30 @@ _Nothing yet._
 
 ---
 
+## [0.3.3] — 2026-09-18
+
+### Security
+
+- **The recovery interface no longer runs as root.** It is the one service
+  with no login of its own — it has to work when everything else is broken —
+  and it can move `/data` aside or restore a database over the live one. It
+  now runs as an unprivileged account that can reach nothing but `/data`.
+  If you set `PUID`/`PGID`, it uses those; otherwise it uses `1000:1000`,
+  and `/data` is set to match on every start.
+
+  The main application still runs as root. It reloads nginx after deploying a
+  host and drives the self-updater, both of which need privileges that cannot
+  be given up without a larger rework. That is tracked separately rather than
+  rushed into a security release.
+
+### Fixed
+
+- `/data/db` and `/data/secrets` could end up owned by root even when
+  `PUID`/`PGID` were set, because ownership was applied before those
+  directories existed. It is now applied again once they do.
+
+---
+
 ## [0.3.2] — 2026-09-18
 
 A security release. Two independent audits went over the codebase; every
