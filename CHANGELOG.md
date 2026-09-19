@@ -9,6 +9,37 @@ _Nothing yet._
 
 ---
 
+## [0.3.13] — 2026-09-19
+
+### Fixed
+
+- **Deleting a Cloudflare account left its tunnels running.** The database
+  deletes a tunnel automatically when the account it belongs to goes away.
+  That sounds tidy and it skipped everything that actually matters: the
+  cloudflared process kept running with no record left to stop it from, the
+  tunnel stayed alive at Cloudflare, and every host routed through it was
+  quietly cut loose. The only code that stops a daemon and removes a tunnel
+  upstream lived in "delete this one tunnel", so deleting the account around
+  it went straight past.
+
+  Unlinking a Playit account had the same hole by the opposite route: nothing
+  cleaned up after it at all, and its tunnels were left pointing at an account
+  that no longer existed — which surfaced much later as a decryption error
+  with no obvious cause.
+
+  Both now tear their tunnels down properly first, through the same code the
+  single-tunnel delete uses.
+
+- **The confirmation did not say what it was about to do.** Deleting a
+  Cloudflare account offered "this removes the account and all cached zones",
+  while in fact taking every tunnel and breaking every host on them. Both
+  provider dialogs now say so plainly, in both languages.
+
+- After deleting an account or a tunnel, the tunnel and host lists refresh
+  straight away instead of showing the old rows until their next poll.
+
+---
+
 ## [0.3.12] — 2026-09-19
 
 ### Security

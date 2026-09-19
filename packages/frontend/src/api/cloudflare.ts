@@ -36,6 +36,12 @@ export function useDeleteCloudflareAccount() {
 		},
 		onSuccess: () => {
 			qc.invalidateQueries({ queryKey: ['cloudflare'] });
+			// Deleting an account tears down every tunnel on it, which leaves
+			// the hosts routed through them without one. Both lists poll on
+			// their own, but a list that still shows what you just deleted
+			// reads as the delete having failed.
+			qc.invalidateQueries({ queryKey: ['tunnels'] });
+			qc.invalidateQueries({ queryKey: ['hosts'] });
 		},
 	});
 }

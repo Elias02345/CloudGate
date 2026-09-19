@@ -29,7 +29,13 @@ export function useDeletePlayitAccount() {
 		mutationFn: async (id: number) => {
 			await api<void>(`/playit/accounts/${id}`, { method: 'DELETE' });
 		},
-		onSuccess: () => qc.invalidateQueries({ queryKey: ['playit'] }),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: ['playit'] });
+			// Unlinking removes the account's tunnels, which leaves the hosts
+			// routed through them without one.
+			qc.invalidateQueries({ queryKey: ['tunnels'] });
+			qc.invalidateQueries({ queryKey: ['hosts'] });
+		},
 	});
 }
 
