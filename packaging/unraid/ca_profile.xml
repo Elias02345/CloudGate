@@ -9,8 +9,10 @@
   </Profile>
   <Icon>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/icon-256.png</Icon>
   <WebPage>https://github.com/Elias02345/CloudGate</WebPage>
-  <!-- TODO-FOR-ELIAS: same placeholder as templates/cloudgate.xml's <Support> -->
-  <Forum>https://forums.unraid.net/topic/TODO-FOR-ELIAS-cloudgate-support-thread</Forum>
+  <!-- No Unraid forum support thread exists yet. Points at GitHub Issues in
+       the meantime; switch to the forum support thread once one exists
+       (see templates/cloudgate.xml's <Support> for the same placeholder). -->
+  <Forum>https://github.com/Elias02345/CloudGate/issues</Forum>
   <DonateLink>https://www.paypal.me/EliasK09</DonateLink>
   <DonateText>Support this project</DonateText>
 </CommunityApplications>

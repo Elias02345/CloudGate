@@ -35,12 +35,13 @@ Solves the CGNAT / no-port-forwarding problem for free using Cloudflare's Tunnel
 Not affiliated with Cloudflare.
   </Overview>
 
-  <!-- TODO-FOR-ELIAS: no Unraid forum support thread exists yet. Create one
-       under "Docker Containers" and replace this placeholder before
-       submitting to Community Applications; CA requires either Support or
-       Project, so Project alone is enough to submit without it, but a
-       support thread is expected in practice. -->
-  <Support>https://forums.unraid.net/topic/TODO-FOR-ELIAS-cloudgate-support-thread</Support>
+  <!-- No Unraid forum support thread exists yet. Points at GitHub Issues in
+       the meantime; switch to the forum support thread under "Docker
+       Containers" once one exists before submitting to Community
+       Applications. CA requires either Support or Project, so Project
+       alone is enough to submit without it, but a support thread is
+       expected in practice. -->
+  <Support>https://github.com/Elias02345/CloudGate/issues</Support>
   <Project>https://github.com/Elias02345/CloudGate</Project>
 
   <!-- CA rewrites this to the correct raw URL on registration regardless of

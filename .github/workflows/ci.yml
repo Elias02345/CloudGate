@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
-          # cache: pnpm  # will be enabled once we commit pnpm-lock.yaml
+          cache: pnpm
 
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
@@ -37,11 +37,9 @@ jobs:
 
       - name: Typecheck
         run: pnpm -r run typecheck
-        continue-on-error: true # pre-alpha — gradually tighten
 
       - name: Lint
         run: pnpm -r run lint
-        continue-on-error: true
 
       - name: Test
         run: pnpm -r run test
