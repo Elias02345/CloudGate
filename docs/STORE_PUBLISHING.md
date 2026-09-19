@@ -44,7 +44,7 @@ A stable tag `vX.Y.Z` on `main` runs `.github/workflows/release.yml`:
 
 For Umbrel and ZimaOS (in parallel; one failing does not stop the other), `scripts/stores/publish.sh`:
 
-1. Clones the store repo's default branch. If our fork has an open PR whose branch starts with `cloudgate`, it continues on that branch; otherwise it creates `cloudgate-vX.Y.Z`.
+1. Clones the store repo's default branch. If our fork has an open PR whose branch name contains `cloudgate` (e.g. the first listing PR `add-cloudgate`), it continues on that branch; otherwise it creates `cloudgate-vX.Y.Z`.
 2. **App already in the store:** takes the store's own copy of the files and rewrites only version, `image: …:vX.Y.Z@sha256:…` and release notes (`scripts/stores/render.mjs`). Whatever the store maintainers added (Umbrel's gallery, the submission link, review fixes) stays. **First submission:** copies our package folder.
 3. Runs the store's own validator (Umbrel `lint:apps --check-images`, ZimaOS `validate_compose.py`).
 4. No change → `already-current`. Otherwise:

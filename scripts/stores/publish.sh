@@ -88,12 +88,13 @@ EXISTING=""
 if [ -n "$GH_TOKEN" ]; then
   export GH_TOKEN
   OWNER="$(gh api user --jq .login)"
-  # An open PR from our fork whose head branch starts with "cloudgate" — a
-  # previous release still in review, or the first listing PR. New versions
+  # An open PR from our fork whose head branch contains "cloudgate" — a
+  # previous release still in review (cloudgate-vX.Y.Z), or the first
+  # listing PR (add-cloudgate). New versions
   # go on top of it instead of opening a second PR.
   EXISTING="$(gh pr list --repo "$UPSTREAM_REPO" --state open \
     --json number,headRefName,url,headRepositoryOwner --jq \
-    "[.[] | select(.headRepositoryOwner.login == \"${OWNER}\" and (.headRefName | startswith(\"cloudgate\")))] | .[0] // empty")"
+    "[.[] | select(.headRepositoryOwner.login == \"${OWNER}\" and (.headRefName | test(\"cloudgate\")))] | .[0] // empty")"
 fi
 
 WORKDIR="$(mktemp -d)"
