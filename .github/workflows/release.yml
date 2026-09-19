@@ -304,7 +304,20 @@ jobs:
             exit 1
           fi
 
-  # NOTE: a future publish-stores.yml wires in here as a job with `needs: promote`.
+  # Opens/updates the per-release PR against Umbrel and ZimaOS. Failing
+  # stores must not fail or roll back the release — everything above this
+  # job has already happened and is done regardless of what happens here.
+  stores:
+    name: Publish to app stores
+    # preflight is added only so this job can read needs.preflight.outputs.tag
+    # below — it's already an implicit ancestor of image/promote, so this
+    # doesn't change scheduling.
+    needs: [preflight, image, promote]
+    uses: ./.github/workflows/publish-stores.yml
+    with:
+      tag: ${{ needs.preflight.outputs.tag }}
+      digest: ${{ needs.image.outputs.digest }}
+    secrets: inherit
 
   summary:
     name: Release summary
