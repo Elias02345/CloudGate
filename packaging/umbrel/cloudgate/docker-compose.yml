@@ -12,7 +12,7 @@ services:
       # it is not broken by it, so there is no reason to bypass Umbrel auth.
 
   web:
-    image: ghcr.io/elias02345/cloudgate:v0.3.13@sha256:87749f4d4e2f0b6d33002f568304a2cbfcd3b4bb81045d238dd05133723b8e6f
+    image: ghcr.io/elias02345/cloudgate:v0.5.0@sha256:8eaf8d60c7fe5370b21cd310e667eb536e8029981c88590e56c25462aa8a4118
     restart: on-failure
     environment:
       # The platform (Umbrel) updates the image; CloudGate's own in-app

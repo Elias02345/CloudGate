@@ -1,4 +1,4 @@
-app_version: v0.3.13
+app_version: v0.5.0
 # CloudGate needs no special Linux capabilities for the default packaging
 # (container port 8080 only, unprivileged). If the optional local-nginx
 # reverse-proxy mode is enabled with ports below 1024, NET_BIND_SERVICE would
@@ -12,7 +12,7 @@ date_added: "2026-09-19"
 description: Self-hosted web UI for Cloudflare Tunnels — publish homelab services from behind CGNAT without port forwarding.
 home: https://github.com/Elias02345/CloudGate
 host_mounts: []
-# TODO(reviewer): replace with the CDN URL provided after the PR is opened,
+# Filled in by the TrueNAS reviewer with the CDN URL once the PR is opened,
 # per CONTRIBUTIONS.md ("Icons and screenshots will be hosted on the TrueNAS
 # CDN... The PR reviewer will upload them and provide you with the correct
 # URLs"). See packaging/README.md.
@@ -39,8 +39,9 @@ run_as_context:
     group_name: Host group is [root]
     uid: 0
     user_name: Host user is [root]
-# TODO(maintainer): no screenshots exist yet; add them and their CDN URLs
-# once the PR reviewer hosts them. See packaging/README.md.
+# Screenshots exist at packaging/assets/screenshots/ and are linked in the
+# PR description; filled in here with their CDN URLs once the PR reviewer
+# hosts them. See packaging/README.md.
 screenshots: []
 sources:
   - https://github.com/Elias02345/CloudGate

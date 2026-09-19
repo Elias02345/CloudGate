@@ -1,7 +1,7 @@
 name: cloudgate
 services:
   cloudgate:
-    image: ghcr.io/elias02345/cloudgate:v0.3.13@sha256:87749f4d4e2f0b6d33002f568304a2cbfcd3b4bb81045d238dd05133723b8e6f
+    image: ghcr.io/elias02345/cloudgate:v0.5.0@sha256:8eaf8d60c7fe5370b21cd310e667eb536e8029981c88590e56c25462aa8a4118
     network_mode: bridge
     ports:
       - target: 8080
@@ -61,15 +61,15 @@ x-casaos:
   architectures:
     - amd64
     - arm64
-  version: "0.3.13"
+  version: "0.5.0"
   update_at: "2026-09-19"
   release_notes:
     en_US: |
-      - The sidebar could not be used with a keyboard.
-      - A crash left no trace in the log CloudGate shows you.
-      - Deleting a Cloudflare account left its tunnels running.
-      - The confirmation did not say what it was about to do.
-      - After deleting an account or a tunnel, the tunnel and host lists refresh straight away instead of showing the old rows until their next poll.
+      - CloudGate is stable.
+      - Ready for homelab app stores.
+      - Admin UI on port 8080.
+      - Updates handled by your platform.
+      - Switches jumped instead of sliding.
   website: https://github.com/Elias02345/CloudGate
   repo: https://github.com/Elias02345/CloudGate
   support: https://github.com/Elias02345/CloudGate/issues
