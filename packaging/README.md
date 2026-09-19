@@ -83,7 +83,7 @@ files.
 
 ## Screenshots
 
-`assets/screenshots/` holds four 1440×900 shots of the real web UI
+`assets/screenshots/` holds four 1568×884 shots (the ZimaOS store format) of the real web UI
 (dashboard, hosts, tunnels, Cloudflare accounts). They were taken with
 headless Edge against a local Vite dev server whose API was a mock serving
 demo data (example.com hostnames, private IPs). The UI is real; only the
@@ -94,8 +94,12 @@ Where each store wants them:
 - **Umbrel**: in the PR body only (`umbrel-app.yml` keeps `gallery: []`).
   The Umbrel team creates and hosts the final gallery images.
 - **ZimaOS**: committed next to the compose file as
-  `zimaos/CloudGate/screenshot-1.png` … `screenshot-4.png`. The store build
-  picks up `screenshot-{n}` files by name.
+  `zimaos/CloudGate/screenshot-1.png` … `screenshot-4.png`, plus
+  `thumbnail.png` (store banner, 1568×884, same layout as the store's other
+  apps) and `icon.png`. The store build picks these files up by name.
+  `assets/thumbnail.svg` is the thumbnail source; render it from `assets/`
+  with `rsvg-convert -w 1568 -h 884 thumbnail.svg -o thumbnail.png` (needs
+  the Inter font).
 - **TrueNAS**: linked in the PR description. The reviewer uploads them to the
   TrueNAS CDN and fills `app.yaml`'s `screenshots:` and `icon:` with the
   final URLs.
