@@ -82,8 +82,8 @@ jobs:
         run: pnpm -r run build
 
       - name: Typecheck
+        # Strict here even though PR CI is still lenient: a release must typecheck.
         run: pnpm -r run typecheck
-        continue-on-error: true # pre-alpha — matches ci.yml; gradually tighten
 
       - name: Lint
         # No continue-on-error: unlike ci.yml, a release must not ship with
