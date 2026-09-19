@@ -10,8 +10,7 @@ shipped by CloudGate itself — these are submitted to each store's own repo.
   tile. `icon-512.png` / `icon-256.png` are rendered from it with
   `rsvg-convert -w <size> -h <size> icon.svg -o icon-<size>.png` (librsvg,
   e.g. in a `debian:bookworm-slim` container). ZimaOS carries its own copy
-  in `zimaos/CloudGate/icon.svg`. No screenshots exist yet; see
-  "Screenshots" below.
+  in `zimaos/CloudGate/icon.svg`. Screenshots: see "Screenshots" below.
 - `umbrel/cloudgate/` — [Umbrel App Store](https://github.com/getumbrel/umbrel-apps)
   package (`umbrel-app.yml` + `docker-compose.yml`), following that repo's
   `umbrel-package-app` skill.
@@ -84,20 +83,24 @@ files.
 
 ## Screenshots
 
-None are included — per the task, they're the maintainer's to add later.
+`assets/screenshots/` holds four 1440×900 shots of the real web UI
+(dashboard, hosts, tunnels, Cloudflare accounts). They were taken with
+headless Edge against a local Vite dev server whose API was a mock serving
+demo data (example.com hostnames, private IPs). The UI is real; only the
+data is demo data.
+
 Where each store wants them:
 
-- **Umbrel**: PR body only (`umbrel-app.yml` keeps `gallery: []`); the Umbrel
-  team creates and hosts final gallery images after review.
-- **ZimaOS**: `x-casaos.screenshot_link` (array of filenames) plus the actual
-  image files committed in `Apps/CloudGate/` alongside `docker-compose.yml`.
-- **TrueNAS**: attach to the PR description; the reviewer uploads them to the
-  TrueNAS CDN and gives back URLs for `app.yaml`'s `screenshots:` list (same
-  for `icon:`, currently a placeholder — see that file's `TODO(reviewer)`
-  comment).
-- **Unraid**: no screenshot field in the starter template; if desired later,
-  add a `<Screenshot>` tag to `templates/cloudgate.xml` pointing at a hosted
-  image.
+- **Umbrel**: in the PR body only (`umbrel-app.yml` keeps `gallery: []`).
+  The Umbrel team creates and hosts the final gallery images.
+- **ZimaOS**: committed next to the compose file as
+  `zimaos/CloudGate/screenshot-1.png` … `screenshot-4.png`. The store build
+  picks up `screenshot-{n}` files by name.
+- **TrueNAS**: linked in the PR description. The reviewer uploads them to the
+  TrueNAS CDN and fills `app.yaml`'s `screenshots:` and `icon:` with the
+  final URLs.
+- **Unraid**: optional `<Screenshot>` tags pointing at the raw GitHub URLs of
+  `assets/screenshots/*.png`.
 
 ## Unraid: dedicated repo, not a subfolder
 

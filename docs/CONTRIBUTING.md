@@ -1,6 +1,6 @@
 # Contributing to CloudGate
 
-Thanks for your interest! CloudGate is pre-alpha — issues and PRs are very welcome, especially for the M1 milestone.
+Thanks for your interest! Issues and PRs are very welcome.
 
 ## Required reading (before your first PR)
 
