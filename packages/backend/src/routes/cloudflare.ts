@@ -31,6 +31,7 @@ import {
 	listZones as cfListZones,
 	verifyToken,
 } from '../services/cloudflare-client.js';
+import { destroyTunnelsForAccount } from '../services/tunnel-teardown.js';
 
 const log = childLogger('routes:cloudflare');
 export const cloudflareRouter: RouterType = Router();
@@ -147,6 +148,19 @@ cloudflareRouter.delete(
 			res.status(400).json({ error: 'Invalid id', code: 'BAD_REQUEST' });
 			return;
 		}
+		// Ownership first: the teardown below selects tunnels by account id
+		// alone, so it must not run for an account this user does not own.
+		if (!(await getAccountById(id, req.user.id))) {
+			res.status(404).json({ error: 'Account not found', code: 'NOT_FOUND' });
+			return;
+		}
+
+		// tunnels.cloudflare_account_id is ON DELETE CASCADE, so without this
+		// the rows would vanish inside SQLite: daemons left running with no
+		// row to stop them from, tunnels left alive at Cloudflare, and every
+		// host on them silently orphaned. Tear them down first, properly.
+		await destroyTunnelsForAccount('cloudflare_account_id', id, req.user.id);
+
 		const ok = await deleteAccount(id, req.user.id);
 		if (!ok) {
 			res.status(404).json({ error: 'Account not found', code: 'NOT_FOUND' });
