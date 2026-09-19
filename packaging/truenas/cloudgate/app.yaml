@@ -9,7 +9,7 @@ categories:
   - networking
 changelog_url: https://github.com/Elias02345/CloudGate/blob/main/CHANGELOG.md
 date_added: "2026-09-19"
-description: Self-hosted web UI for Cloudflare Tunnels — publish homelab services from behind CGNAT without port forwarding.
+description: CloudGate puts your homelab services on the internet without port forwarding, using Cloudflare Tunnels and playit.gg tunnels, managed from one web interface.
 home: https://github.com/Elias02345/CloudGate
 host_mounts: []
 # Filled in by the TrueNAS reviewer with the CDN URL once the PR is opened,
@@ -23,6 +23,7 @@ keywords:
   - tunnel
   - reverse-proxy
   - cgnat
+  - playit
 lib_version: 2.3.13
 lib_version_hash: "644cb2c53051941e9128fbd4d666094573af5c57a62c037bc56820d25427e454"
 maintainers:
@@ -31,10 +32,11 @@ maintainers:
     url: https://github.com/Elias02345
 name: cloudgate
 run_as_context:
-  - description: Container [cloudgate] runs as root user and group. The backend
-      needs root to reload nginx/cloudflared and manage tunnel processes; see
-      CloudGate's own CLAUDE.md ("backend stays root, supports PUID/PGID for
-      the unprivileged parts").
+  - description: Container [cloudgate] starts as root. It supervises nginx,
+      cloudflared and the playit agent and reloads them when hosts change; the
+      Recovery UI runs as an unprivileged user. All capabilities are dropped
+      except CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID, NET_BIND_SERVICE and
+      KILL.
     gid: 0
     group_name: Host group is [root]
     uid: 0
