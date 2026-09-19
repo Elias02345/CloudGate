@@ -133,9 +133,6 @@ jobs:
         with:
           node-version: 22
 
-      - name: Render package files for this release
-        run: node scripts/stores/render.mjs "${VERSION}" "${DIGEST}"
-
       # The upstream work (fork/push/PR) authenticates as STORE_PUBLISH_TOKEN,
       # never as GITHUB_TOKEN — this repo's own token has no business on
       # someone else's repo. Only used in live mode; publish.sh handles the

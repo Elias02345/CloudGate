@@ -3,13 +3,14 @@
 # Per-store app-store publisher, run once per matrix entry by
 # .github/workflows/publish-stores.yml.
 #
-# Renders (by the caller, via scripts/stores/render.mjs) then:
-#   1. shallow-clones the upstream store repo's default branch
-#   2. creates/updates our branch cloudgate-v<VERSION> from upstream HEAD
-#   3. copies exactly our package files into the upstream app dir
-#   4. runs that store's own validator
-#   5. diffs — "already-current" if nothing changed
-#   6. dry-run: writes diff + would-be PR to the job summary
+#   1. shallow-clones the upstream store repo's default branch; starts from
+#      our open PR branch if one exists, else a new cloudgate-v<VERSION>
+#   2. app already in the store: renders the store's own copy of the files
+#      (version, image@digest, release notes only); first submission: copies
+#      our whole package folder
+#   3. runs that store's own validator
+#   4. diffs — "already-current" if nothing changed
+#   5. dry-run: writes diff + would-be PR to the job summary
 #      live:    pushes to our fork and opens/updates a PR
 #
 # Always writes store-status-<STORE>.json, even on failure (via the EXIT
@@ -42,17 +43,12 @@ case "$STORE" in
     UPSTREAM_BRANCH="master"
     APP_DIR="cloudgate"
     SRC_DIR="packaging/umbrel/cloudgate"
-    # data/.gitkeep is required too: lint-apps.mjs's persistence check wants
-    # every bind-mount source (${APP_DATA_DIR}/data here) committed in the
-    # app folder, not just referenced from docker-compose.yml.
-    FILES=(umbrel-app.yml docker-compose.yml data/.gitkeep)
     ;;
   zimaos)
     UPSTREAM_REPO="IceWhaleTech/CasaOS-AppStore"
     UPSTREAM_BRANCH="main"
     APP_DIR="Apps/CloudGate"
     SRC_DIR="packaging/zimaos/CloudGate"
-    FILES=(docker-compose.yml icon.svg)
     ;;
   *)
     echo "::error::unknown store '$STORE' (expected umbrel or zimaos)" >&2
@@ -86,17 +82,50 @@ if [ "${ENABLED:-}" = "false" ]; then
   exit 0
 fi
 
+UPSTREAM_NAME="${UPSTREAM_REPO#*/}"
+OWNER=""
+EXISTING=""
+if [ -n "$GH_TOKEN" ]; then
+  export GH_TOKEN
+  OWNER="$(gh api user --jq .login)"
+  # An open PR from our fork whose head branch starts with "cloudgate" — a
+  # previous release still in review, or the first listing PR. New versions
+  # go on top of it instead of opening a second PR.
+  EXISTING="$(gh pr list --repo "$UPSTREAM_REPO" --state open \
+    --json number,headRefName,url,headRepositoryOwner --jq \
+    "[.[] | select(.headRepositoryOwner.login == \"${OWNER}\" and (.headRefName | startswith(\"cloudgate\")))] | .[0] // empty")"
+fi
+
 WORKDIR="$(mktemp -d)"
 git clone --quiet --depth 1 --branch "$UPSTREAM_BRANCH" \
   "https://github.com/${UPSTREAM_REPO}.git" "$WORKDIR/upstream"
 cd "$WORKDIR/upstream"
-git checkout --quiet -b "$BRANCH"
+if [ -n "$EXISTING" ]; then
+  PR_HEAD="$(jq -r '.headRefName' <<<"$EXISTING")"
+  git fetch --quiet "https://github.com/${OWNER}/${UPSTREAM_NAME}.git" "$PR_HEAD"
+  git checkout --quiet -B "$PR_HEAD" FETCH_HEAD
+else
+  git checkout --quiet -b "$BRANCH"
+fi
 
-mkdir -p "$APP_DIR"
-for f in "${FILES[@]}"; do
-  mkdir -p "$(dirname "${APP_DIR}/${f}")"
-  cp "${REPO_ROOT}/${SRC_DIR}/${f}" "${APP_DIR}/${f}"
-done
+# RENDERED are the files render.mjs edits line by line (version, image@digest,
+# release notes). Once the app exists in the store, render *their* copies, so
+# whatever the store maintainers added (Umbrel's gallery, the submission URL,
+# review fixes) survives; assets are left alone. Only a first submission
+# copies our whole package folder.
+case "$STORE" in
+  umbrel) RENDERED=(umbrel-app.yml docker-compose.yml) ;;
+  zimaos) RENDERED=(docker-compose.yml) ;;
+esac
+if [ -f "${APP_DIR}/${RENDERED[0]}" ]; then
+  for f in "${RENDERED[@]}"; do cp "${APP_DIR}/${f}" "${REPO_ROOT}/${SRC_DIR}/${f}"; done
+  (cd "$REPO_ROOT" && node scripts/stores/render.mjs "$VERSION" "$DIGEST")
+  for f in "${RENDERED[@]}"; do cp "${REPO_ROOT}/${SRC_DIR}/${f}" "${APP_DIR}/${f}"; done
+else
+  (cd "$REPO_ROOT" && node scripts/stores/render.mjs "$VERSION" "$DIGEST")
+  mkdir -p "$APP_DIR"
+  cp -r "${REPO_ROOT}/${SRC_DIR}/." "${APP_DIR}/"
+fi
 
 echo "--- running upstream validator ($STORE) ---"
 case "$STORE" in
@@ -160,10 +189,6 @@ if [ -z "$GH_TOKEN" ]; then
   write_status "manual-action-required" "STORE_PUBLISH_MODE is live but the STORE_PUBLISH_TOKEN secret is not set."
   exit 0
 fi
-export GH_TOKEN
-
-OWNER="$(gh api user --jq .login)"
-UPSTREAM_NAME="${UPSTREAM_REPO#*/}"
 FORK="${OWNER}/${UPSTREAM_NAME}"
 
 if ! gh repo view "$FORK" >/dev/null 2>&1; then
@@ -182,23 +207,13 @@ git commit --quiet -m "$PR_TITLE"
 
 FORK_URL="https://x-access-token:${GH_TOKEN}@github.com/${FORK}.git"
 
-# Look for an existing OPEN PR opened from our fork whose head branch starts
-# with "cloudgate" (covers both a prior release's branch and a still-open
-# initial listing PR under a plain "cloudgate" branch name).
-EXISTING="$(gh pr list --repo "$UPSTREAM_REPO" --state open \
-  --json number,headRefName,url,headRepositoryOwner --jq \
-  "[.[] | select(.headRepositoryOwner.login == \"${OWNER}\" and (.headRefName | startswith(\"cloudgate\")))] | .[0] // empty")"
-
 if [ -n "$EXISTING" ]; then
   PR_NUMBER="$(jq -r '.number' <<<"$EXISTING")"
-  PR_HEAD="$(jq -r '.headRefName' <<<"$EXISTING")"
   PR_URL="$(jq -r '.url' <<<"$EXISTING")"
 
-  # force-with-lease against the branch's actual current remote state, not
-  # our local (possibly nonexistent) tracking ref for it.
-  git fetch --quiet "$FORK_URL" "$PR_HEAD:refs/remotes/fork/${PR_HEAD}" 2>/dev/null || true
-  EXPECTED_SHA="$(git rev-parse -q --verify "refs/remotes/fork/${PR_HEAD}" || echo "0000000000000000000000000000000000000000")"
-  { set +x; git push --force-with-lease="${PR_HEAD}:${EXPECTED_SHA}" "$FORK_URL" "HEAD:${PR_HEAD}"; } 2>&1 | sed "s#${GH_TOKEN}#***#g"
+  # The commit sits on top of the PR branch we checked out above, so this is
+  # a fast-forward: no force, and review commits on that branch stay.
+  { set +x; git push "$FORK_URL" "HEAD:${PR_HEAD}"; } 2>&1 | sed "s#${GH_TOKEN}#***#g"
 
   gh pr comment "$PR_NUMBER" --repo "$UPSTREAM_REPO" --body "Updated to v${VERSION}."
   write_status "pr-updated" "Pushed v${VERSION} onto existing PR #${PR_NUMBER} (${PR_HEAD})." "$PR_URL"
