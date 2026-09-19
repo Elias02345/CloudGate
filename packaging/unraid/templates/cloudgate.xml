@@ -22,6 +22,11 @@
 
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
 
+  <Screenshot>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/screenshots/1-dashboard.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/screenshots/2-hosts.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/screenshots/3-tunnels.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/screenshots/4-cloudflare.png</Screenshot>
+
   <Overview>
 CloudGate is a self-hosted web UI that manages Cloudflare Tunnels for you. Add a service - enter its local address and the public hostname you want - and CloudGate creates the Cloudflare Tunnel, DNS record, and ingress rule, and reloads the tunnel daemon for you.
 
