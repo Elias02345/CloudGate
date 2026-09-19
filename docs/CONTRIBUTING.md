@@ -48,7 +48,19 @@ The following test suites **must stay green** (CLAUDE.md §6):
 
 - `packages/backend/tests/bootstrap.test.ts`
 - `packages/backend/tests/persistence.test.ts`
-- `packages/backend/tests/updater.test.ts` (lands in M5)
+- `packages/backend/tests/updater-*.test.ts`
+
+## Lint & format
+
+CloudGate uses [Biome](https://biomejs.dev) for linting and formatting across the whole workspace:
+
+```bash
+pnpm lint                  # all packages
+pnpm typecheck              # all packages
+pnpm format                 # biome format --write .
+```
+
+CI runs `pnpm -r run build`, `pnpm -r run typecheck`, `pnpm -r run lint` and `pnpm -r run test` on every PR into `dev` or `main`.
 
 ## Commit & PR style
 
