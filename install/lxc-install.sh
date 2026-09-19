@@ -333,7 +333,7 @@ start_container() {
 }
 
 # -----------------------------------------------------------------------------
-# Post-start: wait for health + extract admin password
+# Post-start: wait for health + point the user at the setup page
 # -----------------------------------------------------------------------------
 
 wait_for_health() {
@@ -354,22 +354,11 @@ wait_for_health() {
   return 1
 }
 
-show_admin_password() {
-  banner "Initial admin credentials"
-  # Try logs first
-  local logs
-  logs="$(docker logs "${CG_CONTAINER}" 2>&1 | grep -A1 'Initial admin password' || true)"
-  if [[ -n "${logs}" ]]; then
-    echo "${logs}"
-  fi
-
-  # Also read from the secret file inside the container if available
-  if docker exec "${CG_CONTAINER}" test -f /data/secrets/initial-admin.txt 2>/dev/null; then
-    echo
-    echo "${C_BOLD}Initial admin file contents:${C_RESET}"
-    docker exec "${CG_CONTAINER}" cat /data/secrets/initial-admin.txt 2>/dev/null \
-      | sed 's/^/  /'
-  fi
+show_setup_next_steps() {
+  banner "Create your admin account"
+  echo "  Open http://${1}:${CG_HTTP_PORT}/ to create your admin account."
+  echo "  (Only reachable from your local network, and only for a short time after"
+  echo "  the container starts — restart it to reopen the setup page if you miss it.)"
 }
 
 # -----------------------------------------------------------------------------
@@ -429,15 +418,15 @@ main() {
   # Health check
   wait_for_health || true   # not fatal — recovery UI handles it
 
-  # Print credentials & next steps
-  echo
-  show_admin_password
-  echo
-
   # Detect primary IP for printing the URL
   local ip
   ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
   [[ -z "${ip}" ]] && ip="<host-ip>"
+
+  # Print next steps
+  echo
+  show_setup_next_steps "${ip}"
+  echo
 
   banner "All done!"
   echo

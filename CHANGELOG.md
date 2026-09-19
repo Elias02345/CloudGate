@@ -5,7 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **First-run admin setup page.** A fresh install now shows "Create your
+  admin account" as the very first screen instead of burying a generated
+  password in the container logs or `/data/secrets/initial-admin.txt`. Pick
+  your own email, name and password and you're logged in immediately — no
+  forced password change afterwards. `CLOUDGATE_INITIAL_ADMIN_PASSWORD`
+  still works for headless/scripted installs that need the admin account to
+  exist before anyone opens the UI.
+
+### Security
+
+- **First-run setup is time- and network-limited.** `POST /api/setup` only
+  works while zero users exist, within `CLOUDGATE_SETUP_WINDOW_MINUTES`
+  (default 30) of process start, and only from what looks like the local
+  network — a restart reopens the window. The same two guards were added to
+  the existing unauthenticated `POST /api/restore/first-run`, which had the
+  same exposure: anyone who could reach a fresh container over the internet
+  could otherwise restore their own backup onto it and become its admin.
 
 ---
 

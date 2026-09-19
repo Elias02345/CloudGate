@@ -1,4 +1,15 @@
-import { Alert, Anchor, Button, Card, Center, PasswordInput, Stack, Text, TextInput, Title } from '@mantine/core';
+import {
+	Alert,
+	Anchor,
+	Button,
+	Card,
+	Center,
+	PasswordInput,
+	Stack,
+	Text,
+	TextInput,
+	Title,
+} from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconAlertCircle, IconClock, IconUserPlus } from '@tabler/icons-react';
 import { useEffect } from 'react';
