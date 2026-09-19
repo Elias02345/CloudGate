@@ -13,7 +13,13 @@ import {
 	Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { IconAlertCircle, IconArrowUp, IconCircleCheck, IconRefresh } from '@tabler/icons-react';
+import {
+	IconAlertCircle,
+	IconArrowUp,
+	IconCircleCheck,
+	IconInfoCircle,
+	IconRefresh,
+} from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -111,6 +117,12 @@ export function UpdatesPage() {
 		<Stack>
 			<Title order={2}>{t('updates.title')}</Title>
 
+			{data.updates_disabled && (
+				<Alert color="blue" icon={<IconInfoCircle size={18} />} data-tour="updates-disabled">
+					{t('updates.disabled_message')}
+				</Alert>
+			)}
+
 			{modalTarget && modalStarting && (
 				<UpdateProgressModal
 					opened={modalOpen}
@@ -140,7 +152,7 @@ export function UpdatesPage() {
 						</Text>
 					)}
 
-					{data.update_available && data.latest_version && (
+					{!data.updates_disabled && data.update_available && data.latest_version && (
 						<Alert color="cyan" icon={<IconArrowUp size={18} />} title={t('updates.available_title')}>
 							<Stack gap="xs">
 								<Text>
@@ -167,7 +179,7 @@ export function UpdatesPage() {
 						</Alert>
 					)}
 
-					{!data.update_available && data.state !== 'failed' && (
+					{!data.updates_disabled && !data.update_available && data.state !== 'failed' && (
 						<Alert color="green" icon={<IconCircleCheck size={18} />}>
 							{t('updates.up_to_date')}
 						</Alert>
@@ -179,60 +191,64 @@ export function UpdatesPage() {
 						</Alert>
 					)}
 
-					<Box>
-						<Button
-							variant="light"
-							leftSection={<IconRefresh size={16} />}
-							onClick={onCheck}
-							loading={check.isPending}
-						>
-							{t('updates.check_now')}
-						</Button>
-					</Box>
+					{!data.updates_disabled && (
+						<Box>
+							<Button
+								variant="light"
+								leftSection={<IconRefresh size={16} />}
+								onClick={onCheck}
+								loading={check.isPending}
+							>
+								{t('updates.check_now')}
+							</Button>
+						</Box>
+					)}
 				</Stack>
 			</Card>
 
-			<Card withBorder>
-				<Stack>
-					<Title order={4}>{t('updates.settings_title')}</Title>
-					<Group justify="space-between">
-						<Stack gap={0}>
-							<Text>{t('updates.channel')}</Text>
-							<Text size="xs" c="dimmed">
-								{t('updates.channel_hint')}
-							</Text>
-						</Stack>
-						<Select
-							value={data.channel}
-							onChange={(v) => v && void onSettingsChange(v as UpdateStatus['channel'], data.mode)}
-							data={[
-								{ value: 'stable', label: t('updates.channel_stable') },
-								{ value: 'prerelease', label: t('updates.channel_prerelease') },
-								{ value: 'nightly', label: t('updates.channel_nightly') },
-								{ value: 'disabled', label: t('updates.channel_disabled') },
-							]}
-							w={{ base: '100%', sm: 260 }}
-						/>
-					</Group>
-					<Group justify="space-between">
-						<Stack gap={0}>
-							<Text>{t('updates.mode')}</Text>
-							<Text size="xs" c="dimmed">
-								{t('updates.mode_hint')}
-							</Text>
-						</Stack>
-						<Select
-							value={data.mode}
-							onChange={(v) => v && void onSettingsChange(data.channel, v as UpdateStatus['mode'])}
-							data={[
-								{ value: 'notify', label: t('updates.mode_notify') },
-								{ value: 'auto', label: t('updates.mode_auto') },
-							]}
-							w={{ base: '100%', sm: 260 }}
-						/>
-					</Group>
-				</Stack>
-			</Card>
+			{!data.updates_disabled && (
+				<Card withBorder>
+					<Stack>
+						<Title order={4}>{t('updates.settings_title')}</Title>
+						<Group justify="space-between">
+							<Stack gap={0}>
+								<Text>{t('updates.channel')}</Text>
+								<Text size="xs" c="dimmed">
+									{t('updates.channel_hint')}
+								</Text>
+							</Stack>
+							<Select
+								value={data.channel}
+								onChange={(v) => v && void onSettingsChange(v as UpdateStatus['channel'], data.mode)}
+								data={[
+									{ value: 'stable', label: t('updates.channel_stable') },
+									{ value: 'prerelease', label: t('updates.channel_prerelease') },
+									{ value: 'nightly', label: t('updates.channel_nightly') },
+									{ value: 'disabled', label: t('updates.channel_disabled') },
+								]}
+								w={{ base: '100%', sm: 260 }}
+							/>
+						</Group>
+						<Group justify="space-between">
+							<Stack gap={0}>
+								<Text>{t('updates.mode')}</Text>
+								<Text size="xs" c="dimmed">
+									{t('updates.mode_hint')}
+								</Text>
+							</Stack>
+							<Select
+								value={data.mode}
+								onChange={(v) => v && void onSettingsChange(data.channel, v as UpdateStatus['mode'])}
+								data={[
+									{ value: 'notify', label: t('updates.mode_notify') },
+									{ value: 'auto', label: t('updates.mode_auto') },
+								]}
+								w={{ base: '100%', sm: 260 }}
+							/>
+						</Group>
+					</Stack>
+				</Card>
+			)}
 		</Stack>
 	);
 }

@@ -108,8 +108,11 @@ function setStateField<K extends keyof UpdaterState>(key: K, value: UpdaterState
 	state = { ...state, [key]: value };
 }
 
-export function getStatus(): UpdaterState {
-	return { ...state };
+export function getStatus(): UpdaterState & { updates_disabled: boolean } {
+	// Read live, not cached in `state` — CLOUDGATE_DISABLE_UPDATES is an ENV
+	// override the operator sets at container level (app-store platforms),
+	// not something the UI or DB ever changes.
+	return { ...state, updates_disabled: getConfig().CLOUDGATE_DISABLE_UPDATES };
 }
 
 /**
@@ -415,6 +418,15 @@ export async function triggerInstall(targetVersion: string): Promise<void> {
 	}
 
 	const cfg = getConfig();
+	if (cfg.CLOUDGATE_DISABLE_UPDATES) {
+		// The frontend hides the install control when disabled; this is the
+		// same guard for the API key path (see CLAUDE.md — an app-store
+		// image swap racing an in-app self-update is exactly the scenario
+		// this env var exists to prevent).
+		throw new Error(
+			'Updates are disabled by the platform (CLOUDGATE_DISABLE_UPDATES) — update the container image instead'
+		);
+	}
 
 	// Reset + announce we're starting
 	setStateField('started_at', new Date().toISOString());

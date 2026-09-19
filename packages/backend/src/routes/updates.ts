@@ -9,6 +9,7 @@
 
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
+import { getConfig } from '../config.js';
 import { requireAdmin, requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import {
 	getStatus,
@@ -26,6 +27,13 @@ updatesRouter.get('/', requireAuth, requirePasswordSet, async (_req, res) => {
 });
 
 updatesRouter.post('/check', requireAuth, requirePasswordSet, async (_req, res) => {
+	// Platform-managed installs (CLOUDGATE_DISABLE_UPDATES) — nothing to
+	// check, and triggerCheck() already no-ops, but skip the GitHub round
+	// trip and just report the (unchanged) status.
+	if (getConfig().CLOUDGATE_DISABLE_UPDATES) {
+		res.json(getStatus());
+		return;
+	}
 	await triggerCheck();
 	res.json(getStatus());
 });
@@ -52,7 +60,11 @@ updatesRouter.post('/install', requireAuth, requirePasswordSet, requireAdmin, as
 		await triggerInstall(parsed.data.version);
 		res.json({ ok: true, message: 'Install dispatched — container will restart shortly' });
 	} catch (err) {
-		res.status(500).json({ error: (err as Error).message, code: 'UPDATE_FAILED' });
+		const disabled = getConfig().CLOUDGATE_DISABLE_UPDATES;
+		res.status(disabled ? 409 : 500).json({
+			error: (err as Error).message,
+			code: disabled ? 'UPDATES_DISABLED' : 'UPDATE_FAILED',
+		});
 	}
 });
 

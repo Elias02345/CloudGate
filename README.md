@@ -60,6 +60,10 @@ docker run -d --name cloudgate \
   ghcr.io/elias02345/cloudgate:latest
 ```
 
+> The admin UI/API is also served on port **8080** (`-p 8080:8080`) — the port
+> app-store platforms (Umbrel, TrueNAS, Unraid, ZimaOS) publish on their own.
+> 80/443 are only needed if you use CloudGate's local-nginx reverse-proxy mode.
+
 ### What happens next
 
 1. Open `http://<your-host-ip>/` in a browser.

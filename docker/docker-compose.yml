@@ -23,6 +23,11 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
+      # 8080 is the admin UI/API — the one port app-store platforms (Umbrel,
+      # TrueNAS, Unraid, ZimaOS) map. 80/443 are only needed for local-nginx
+      # reverse-proxy mode (hosts with mode='local_nginx'); keep them mapped
+      # here so existing users are unaffected.
+      - "8080:8080"
       - "80:80"
       - "443:443"
     volumes:

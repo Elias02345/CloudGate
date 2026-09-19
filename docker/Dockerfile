@@ -185,7 +185,7 @@ RUN groupadd -g 1000 cloudgate \
 # Data volume
 VOLUME ["/data"]
 
-EXPOSE 80 443
+EXPOSE 80 443 8080
 
 ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
     S6_KEEP_ENV=1 \
@@ -194,11 +194,15 @@ ENV S6_BEHAVIOUR_IF_STAGE2_FAILS=2 \
     NODE_ENV=production \
     PATH=/app/backend/node_modules/.bin:$PATH
 
-# Docker-native healthcheck. Recovery UI also answers on :80, so a 200 from
-# either /api/health or /__recovery/api/status means the container is alive.
+# Docker-native healthcheck. Probes the management port (8080), which nginx
+# serves identically to :80 (see docker/nginx/cloudgate.conf and
+# recovery.conf) — this keeps the healthcheck working for app-store
+# platforms that publish only 8080 and leave 80/443 unmapped. Recovery UI
+# also answers there, so a 200 from either /api/health or /api/status means
+# the container is alive.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
-    CMD curl -fsS http://127.0.0.1/api/health > /dev/null 2>&1 \
-        || curl -fsS http://127.0.0.1/api/status > /dev/null 2>&1 \
+    CMD curl -fsS http://127.0.0.1:8080/api/health > /dev/null 2>&1 \
+        || curl -fsS http://127.0.0.1:8080/api/status > /dev/null 2>&1 \
         || exit 1
 
 # Standard OCI annotations. Deliberately last: the version changes on every
