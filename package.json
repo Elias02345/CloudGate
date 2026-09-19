@@ -24,7 +24,9 @@
     "format": "biome format --write .",
     "clean": "pnpm -r exec rm -rf dist node_modules .turbo",
     "docker:build": "docker build -f docker/Dockerfile -t cloudgate:local .",
-    "docker:dev": "docker compose -f docker/docker-compose.dev.yml up --build"
+    "docker:dev": "docker compose -f docker/docker-compose.dev.yml up --build",
+    "stores:render": "node scripts/stores/render.mjs",
+    "stores:test": "node --test scripts/stores/render.test.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
