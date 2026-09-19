@@ -1,6 +1,6 @@
 # 💛 Support CloudGate
 
-CloudGate is built and maintained by one person (Elias) in spare time. It's MIT-licensed and free forever. If it saves you time setting up Cloudflare Tunnels for your homelab, a one-time tip is **hugely appreciated** — it covers GHCR storage, release signing certificates, and the hours I spend on bug-fixes and new features.
+CloudGate is built and maintained by one maintainer in spare time. It's MIT-licensed and free forever. If it saves you time setting up Cloudflare Tunnels for your homelab, a one-time tip is **hugely appreciated** — it covers GHCR storage, release signing certificates, and the hours spent on bug-fixes and new features.
 
 Inside the running app you'll find a **Support** entry in the sidebar with QR codes for all of these. Or use the addresses below directly.
 

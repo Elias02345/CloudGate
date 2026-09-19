@@ -41,7 +41,7 @@ releaseNotes: >-
   - The confirmation did not say what it was about to do.
 
   - After deleting an account or a tunnel, the tunnel and host lists refresh straight away instead of showing the old rows until their next poll.
-developer: Elias Kanakidis
+developer: Elias02345
 website: https://github.com/Elias02345/CloudGate
 dependencies: []
 repo: https://github.com/Elias02345/CloudGate
@@ -51,7 +51,7 @@ gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
-submitter: Elias Kanakidis
+submitter: Elias02345
 # TODO(maintainer): replace with the real getumbrel/umbrel-apps pull request
 # URL at submission time. Placeholder kept as a syntactically valid URL only
 # so `npm run lint:apps` can check everything else in this file.
