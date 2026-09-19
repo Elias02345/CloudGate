@@ -33,7 +33,9 @@ _Nothing yet._
   the new one is refused with "Framing … violates … frame-ancestors 'none'".
 
   **This one needs a new container image.** The headers live in the nginx
-  config, which updating through the UI cannot replace — see below.
+  config, and the release tarball carries only the application — so updating
+  through CloudGate's own update page cannot deliver them. The update page now
+  says so when it detects an image without them.
 
 - **A backup file name could run as script in the Recovery UI.** The recovery
   page listed the contents of `/data/db/backups/` by pasting each file name
@@ -74,11 +76,11 @@ _Nothing yet._
 
 ### Added
 
-- The update page's image check now also reports an image that serves the UI
-  without those headers, the same way it already reports one that still
-  exposes `/__recovery/`. Both fixes live in files a self-update cannot
-  deliver, so the only honest thing CloudGate can do is say which image you
-  need to pull.
+- The update page's image check now also reports an image that serves the web
+  UI without the security headers above, the same way it already reports one
+  that still exposes `/__recovery/`. Both fixes live in files a self-update
+  cannot deliver, so the only honest thing CloudGate can do is say that a new
+  image is needed.
 - The frontend has its first test, and it guards exactly that: every
   translation key the sources ask for must exist, English and German must
   carry the same keys, and no translation may be blank. A missing key used to
