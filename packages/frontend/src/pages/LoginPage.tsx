@@ -18,6 +18,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useLogin, useMe } from '../api/auth.js';
 import { ApiError } from '../api/client.js';
 import { useRestoreEligibility } from '../api/restore.js';
+import { useSetupStatus } from '../api/setup.js';
 
 export function LoginPage() {
 	const { t } = useTranslation();
@@ -26,6 +27,7 @@ export function LoginPage() {
 	const { data: me } = useMe();
 	const login = useLogin();
 	const eligibility = useRestoreEligibility();
+	const setupStatus = useSetupStatus();
 
 	// If already logged in, hop straight to the destination.
 	useEffect(() => {
@@ -36,6 +38,14 @@ export function LoginPage() {
 			navigate(dest, { replace: true });
 		}
 	}, [me, navigate, location.state]);
+
+	// No admin exists yet — this install hasn't been set up, so there's
+	// nothing to log in with. Send the visitor to /setup instead.
+	useEffect(() => {
+		if (setupStatus.data?.needs_setup) {
+			navigate('/setup', { replace: true });
+		}
+	}, [setupStatus.data, navigate]);
 
 	const form = useForm({
 		initialValues: { email: '', password: '' },

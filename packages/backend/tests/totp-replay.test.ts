@@ -21,6 +21,10 @@ let tmpDir: string;
 beforeAll(async () => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'cloudgate-totp-'));
 	process.env.CLOUDGATE_DATA_DIR = tmpDir;
+	// USER_ID below needs an actual seeded users(id)=1 row. Bootstrap only
+	// seeds one for a headless install (env var set); see bootstrap.ts
+	// `seedAdminIfMissing`.
+	process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD = 'unit-test-initial-pw-123456';
 	const { runBootstrap } = await import('../src/bootstrap.js');
 	const status = await runBootstrap();
 	if (!status.complete) throw new Error(`bootstrap failed: ${status.last_error}`);
@@ -29,10 +33,11 @@ beforeAll(async () => {
 afterAll(async () => {
 	const { closeDb } = await import('../src/db/db.js');
 	await closeDb();
+	delete process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD;
 	if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
 });
 
-/** The seeded admin from bootstrap. */
+/** The seeded admin from bootstrap (headless path — see beforeAll above). */
 const USER_ID = 1;
 
 describe('totpStepFor', () => {

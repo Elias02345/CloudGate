@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** Shared password policy — reused by password-change and first-run setup. */
+export const PasswordSchema = z.string().min(12).max(200);
+
 export const UserSchema = z.object({
 	id: z.number().int().positive(),
 	email: z.string().email(),
@@ -63,7 +66,7 @@ export type LoginResponse = z.infer<typeof LoginResponseSchema>;
 
 export const ChangePasswordRequestSchema = z.object({
 	current_password: z.string().min(1),
-	new_password: z.string().min(12).max(200),
+	new_password: PasswordSchema,
 	/** Optional — only honoured when the user is still on a default admin profile
 	 *  (must_change_password=true) and lets them set their own email/name during
 	 *  the first-login flow. Ignored on subsequent password changes. */
@@ -71,3 +74,22 @@ export const ChangePasswordRequestSchema = z.object({
 	name: z.string().min(1).max(100).optional(),
 });
 export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
+
+/**
+ * First-run admin setup — POST /api/setup. Only reachable while zero users
+ * exist, the setup window is open, and the caller is on the local network
+ * (see packages/backend/src/services/network-origin.ts + setup-window.ts).
+ */
+export const SetupRequestSchema = z.object({
+	email: z.string().email(),
+	name: z.string().min(1).max(100),
+	password: PasswordSchema,
+});
+export type SetupRequest = z.infer<typeof SetupRequestSchema>;
+
+export const SetupStatusResponseSchema = z.object({
+	needs_setup: z.boolean(),
+	window_open: z.boolean(),
+	window_closes_at: z.string().datetime().nullable(),
+});
+export type SetupStatusResponse = z.infer<typeof SetupStatusResponseSchema>;

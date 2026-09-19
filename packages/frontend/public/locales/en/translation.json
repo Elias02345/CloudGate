@@ -381,8 +381,8 @@
     "email_taken": "That email is already used by another user.",
     "name_required": "Name is required",
     "divider_password": "and the password",
-    "initial_password": "Auto-generated initial password",
-    "initial_password_hint": "From docker logs or /data/secrets/initial-admin.txt"
+    "initial_password": "Initial admin password",
+    "initial_password_hint": "The password set for this install via CLOUDGATE_INITIAL_ADMIN_PASSWORD."
   },
   "dashboard": {
     "title": "Dashboard",
