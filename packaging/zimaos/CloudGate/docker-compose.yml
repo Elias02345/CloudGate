@@ -68,12 +68,7 @@ x-casaos:
   version: "0.5.0"
   update_at: "2026-09-19"
   release_notes:
-    en_US: |
-      - CloudGate is stable.
-      - Ready for homelab app stores.
-      - Admin UI on port 8080.
-      - Updates handled by your platform.
-      - Switches jumped instead of sliding.
+    en_US: ""
   website: https://github.com/Elias02345/CloudGate
   repo: https://github.com/Elias02345/CloudGate
   support: https://github.com/Elias02345/CloudGate/issues
