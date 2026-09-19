@@ -1,6 +1,6 @@
 # CloudGate Architecture
 
-> Living document. The detailed planning record is in `~/.claude/plans/hallo-claude-ich-w-rde-eager-matsumoto.md` (developer-internal).
+> Living document — source of truth for system design.
 
 ## High-level diagram
 
@@ -8,8 +8,9 @@
 ┌──────────────────────────────────────────────────────────────────┐
 │  Browser                                                         │
 │  ───────                                                         │
-│  http://<host>/ ───► nginx :80 ──► frontend (static)             │
-│                              └──►  /api/* → backend :3000        │
+│  http://<host>:8080/  ───► nginx ──► frontend (static)           │
+│  http://<host>:80/    ───┘    (both ports serve the same UI/API) │
+│                                   └──► /api/* → backend :3000    │
 └──────────────────────────────────────────────────────────────────┘
                                   │
                                   ▼
@@ -22,6 +23,7 @@
 │                                                                  │
 │  backend                                                         │
 │   ├─► spawns cloudflared (child_process) ──► tunnels → CF edge   │
+│   ├─► spawns playit-agent for TCP/UDP hosts ──► Playit.gg edge   │
 │   ├─► writes /data/cloudflared/config.yml (Liquid template)      │
 │   ├─► writes /data/nginx/hosts/*.conf when in local_nginx mode   │
 │   └─► self-updater: polls GitHub, SHA256 verify, rollback       │
@@ -34,6 +36,7 @@
 │  secrets/           encryption.key, jwt.key, initial-admin.txt   │
 │  db/                db.sqlite + backups                          │
 │  cloudflared/       <tunnel-id>.json + config.yml + bin/         │
+│  playit/            bin/ (agent binary) + logs/                  │
 │  nginx/             hosts/, certs/, custom/                      │
 │  logs/              cloudgate.log, cloudflared.log, …            │
 │  updates/           staging/, backups/, .update.lock             │
@@ -100,7 +103,8 @@ so a fix to any of those reaches an installation only through a new image.
 - **Node 22** runtime — native modules: `better-sqlite3`, `argon2`.
 - **Express 5** + **TypeScript** + **Objection/Knex** ORM.
 - **React 19** + **Vite 6** + **Mantine 7** + **TanStack Query 5** + **react-i18next**.
-- **cloudflared** (official Debian package) for tunnel daemon.
+- **cloudflared** (official Debian package) for the Cloudflare Tunnel daemon.
+- **playit-agent** (downloaded on demand, sha256-verified) for TCP/UDP tunnels via Playit.gg.
 - **s6-overlay v3** for process supervision.
 - **debian-bookworm-slim** base image for runtime stage.
 

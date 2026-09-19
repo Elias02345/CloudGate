@@ -20,6 +20,8 @@ CloudGate stores all user state under `/data/`. The self-updater overwrites `/ap
 | `/data/db/db.sqlite` (+ `-wal`, `-shm`) | The whole app state. Touch only via Knex migrations. |
 | `/data/cloudflared/<tunnel-id>.json` | Cloudflare credentials. Losing them = orphaned tunnel on CF side. |
 | `/data/cloudflared/bin/` | User may have a newer cloudflared. Updated only via the cloudflared-update flow. |
+| `/data/playit/bin/` | User may have a newer playit agent, same as cloudflared above. |
+| `/data/playit/logs/` | Append-only, same as `/data/logs/` below. |
 | `/data/nginx/custom/` | User-authored snippets. Never overwrite. |
 | `/data/nginx/certs/` | Let's Encrypt certs. Rate-limited to re-issue. Never delete. |
 | `/data/logs/` | Append-only. Never truncate or delete. |
