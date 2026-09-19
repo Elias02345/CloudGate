@@ -9,6 +9,19 @@ _Nothing yet._
 
 ---
 
+## [0.3.10] — 2026-09-19
+
+### Changed
+
+- **The container image now identifies itself.** Homelab app stores and
+  container managers read a set of standard labels off an image to show a
+  name, a short description, the licence and a link back to the source.
+  CloudGate had none, so it appeared as a bare repository path. The image also
+  carries its version, which means a pulled image can be identified without
+  starting it.
+
+---
+
 ## [0.3.9] — 2026-09-19
 
 ### Fixed
