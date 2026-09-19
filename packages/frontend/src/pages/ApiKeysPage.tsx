@@ -150,7 +150,7 @@ export function ApiKeysPage() {
 				<Stack>
 					{keys.isLoading && <ListSkeleton rows={3} />}
 					{keys.isError && <ListError error={keys.error} onRetry={() => void keys.refetch()} />}
-					{keys.data && keys.data.keys.length === 0 && (
+					{!keys.isError && keys.data && keys.data.keys.length === 0 && (
 						<EmptyState icon={<IconKey size={40} stroke={1.5} />} title={t('api_keys.empty')} />
 					)}
 					{keys.data && keys.data.keys.length > 0 && (
