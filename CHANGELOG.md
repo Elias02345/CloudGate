@@ -21,6 +21,11 @@ _Nothing yet._
   a section in a new tab or copy its address like any other link. Mouse,
   touch and the phone menu behave exactly as before.
 
+  The same gap existed in the Cloudflare and Playit account lists, where
+  picking an account (to see its zones or quota) needed a mouse, and in the
+  audit log's details button. All three work with Tab, Enter and Space now,
+  and show where the keyboard focus is.
+
 - **A crash left no trace in the log CloudGate shows you.** When an error
   escaped and took the backend down, Node printed it to the container's
   stderr and nothing else — not to `/data/logs/cloudgate.log`, which is the
