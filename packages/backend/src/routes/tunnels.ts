@@ -31,6 +31,7 @@ import {
 	stopTunnel,
 } from '../services/tunnel-manager.js';
 import { readCurrentConfig } from '../services/tunnel-providers/cloudflared/config-writer.js';
+import { destroyTunnel } from '../services/tunnel-teardown.js';
 
 const log = childLogger('routes:tunnels');
 export const tunnelsRouter: RouterType = Router();
@@ -325,40 +326,9 @@ tunnelsRouter.delete(
 			return;
 		}
 
-		// Stop daemon first (provider-aware)
-		try {
-			await stopTunnel(id);
-		} catch (err) {
-			log.warn({ err: (err as Error).message }, 'tunnel stop failed (continuing)');
-		}
-
-		// Provider-specific upstream cleanup
-		if (row.provider === 'cloudflared' && row.cloudflare_account_id) {
-			const account = await getAccountById(row.cloudflare_account_id, req.user.id);
-			if (account) {
-				try {
-					const creds = decryptCredentials(account);
-					if (creds.type === 'api_token' && row.account_tag) {
-						const cf = clientFor(creds.token);
-						// biome-ignore lint/suspicious/noExplicitAny: SDK types
-						await (cf.zeroTrust.tunnels.cloudflared as any).delete(row.tunnel_id, {
-							account_id: row.account_tag,
-						});
-					}
-				} catch (err) {
-					log.warn(
-						{ err: (err as Error).message, tunnel_id: row.tunnel_id },
-						'CF tunnel delete failed (continuing)'
-					);
-				}
-			}
-		}
-		// Playit: no upstream delete needed — the agent itself is shared, and
-		// per-host port mappings get deleted via undeployHost when the user
-		// removes their hosts.
-
-		const knex = getDb();
-		await knex('tunnels').where({ id }).delete();
+		// Stop the daemon, clean up upstream, then delete the row. Shared with
+		// account deletion, which reaches the same tunnels by cascade.
+		await destroyTunnel(row, req.user.id);
 		res.status(204).end();
 	}
 );

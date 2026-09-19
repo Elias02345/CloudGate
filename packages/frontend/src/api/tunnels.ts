@@ -85,7 +85,11 @@ export function useDeleteTunnel() {
 	const qc = useQueryClient();
 	return useMutation({
 		mutationFn: (id: number) => api<void>(`/tunnels/${id}`, { method: 'DELETE' }),
-		onSuccess: () => qc.invalidateQueries({ queryKey: ['tunnels'] }),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: ['tunnels'] });
+			// The hosts that pointed at it are now unattached.
+			qc.invalidateQueries({ queryKey: ['hosts'] });
+		},
 	});
 }
 

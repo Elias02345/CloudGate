@@ -9,6 +9,57 @@ _Nothing yet._
 
 ---
 
+## [0.3.13] — 2026-09-19
+
+### Fixed
+
+- **The sidebar could not be used with a keyboard.** Every navigation entry
+  was built as a clickable element with no link behind it, which browsers
+  leave out of the Tab order entirely — so none of the 13 sections could be
+  reached without a mouse, and a screen reader had nothing to follow. They
+  are real links now: Tab reaches each one, Enter opens it, and you can open
+  a section in a new tab or copy its address like any other link. Mouse,
+  touch and the phone menu behave exactly as before.
+
+  The same gap existed in the Cloudflare and Playit account lists, where
+  picking an account (to see its zones or quota) needed a mouse, and in the
+  audit log's details button. All three work with Tab, Enter and Space now,
+  and show where the keyboard focus is.
+
+- **A crash left no trace in the log CloudGate shows you.** When an error
+  escaped and took the backend down, Node printed it to the container's
+  stderr and nothing else — not to `/data/logs/cloudgate.log`, which is the
+  log the Recovery UI displays and the one you would open when the container
+  keeps restarting. The backend now logs the crash itself, stack included,
+  before it exits, so the reason is in the file with everything else.
+
+- **Deleting a Cloudflare account left its tunnels running.** The database
+  deletes a tunnel automatically when the account it belongs to goes away.
+  That sounds tidy and it skipped everything that actually matters: the
+  cloudflared process kept running with no record left to stop it from, the
+  tunnel stayed alive at Cloudflare, and every host routed through it was
+  quietly cut loose. The only code that stops a daemon and removes a tunnel
+  upstream lived in "delete this one tunnel", so deleting the account around
+  it went straight past.
+
+  Unlinking a Playit account had the same hole by the opposite route: nothing
+  cleaned up after it at all, and its tunnels were left pointing at an account
+  that no longer existed — which surfaced much later as a decryption error
+  with no obvious cause.
+
+  Both now tear their tunnels down properly first, through the same code the
+  single-tunnel delete uses.
+
+- **The confirmation did not say what it was about to do.** Deleting a
+  Cloudflare account offered "this removes the account and all cached zones",
+  while in fact taking every tunnel and breaking every host on them. Both
+  provider dialogs now say so plainly, in both languages.
+
+- After deleting an account or a tunnel, the tunnel and host lists refresh
+  straight away instead of showing the old rows until their next poll.
+
+---
+
 ## [0.3.12] — 2026-09-19
 
 ### Security

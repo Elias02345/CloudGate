@@ -25,6 +25,7 @@ import {
 	PlayitApiError,
 	createPlayitClient,
 } from '../services/tunnel-providers/playit/client.js';
+import { destroyTunnelsForAccount } from '../services/tunnel-teardown.js';
 
 const log = childLogger('routes:playit');
 export const playitRouter: RouterType = Router();
@@ -106,6 +107,19 @@ playitRouter.delete(
 			res.status(400).json({ error: 'Invalid id', code: 'BAD_REQUEST' });
 			return;
 		}
+		// Ownership first: the teardown below selects tunnels by account id
+		// alone, so it must not run for an account this user does not own.
+		if (!(await getAccountById(id, req.user.id))) {
+			res.status(404).json({ error: 'Account not found', code: 'NOT_FOUND' });
+			return;
+		}
+
+		// tunnels.playit_account_id carries no foreign key, so nothing cleaned
+		// up after this at all: the agent kept running and the tunnel rows
+		// were left pointing at an account that no longer exists, which only
+		// shows up later as a decrypt failure nobody can explain.
+		await destroyTunnelsForAccount('playit_account_id', id, req.user.id);
+
 		const ok = await deleteAccount(id, req.user.id);
 		if (!ok) {
 			res.status(404).json({ error: 'Account not found', code: 'NOT_FOUND' });
