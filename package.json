@@ -20,6 +20,7 @@
     "lint": "pnpm -r run lint",
     "typecheck": "pnpm -r run typecheck",
     "test": "pnpm -r run test",
+    "release:check": "node scripts/release/check-version.mjs",
     "format": "biome format --write .",
     "clean": "pnpm -r exec rm -rf dist node_modules .turbo",
     "docker:build": "docker build -f docker/Dockerfile -t cloudgate:local .",
