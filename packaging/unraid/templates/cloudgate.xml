@@ -10,7 +10,7 @@
   packaging/README.md.
 -->
 <Container version="2">
-  <Name>cloudgate</Name>
+  <Name>CloudGate</Name>
   <Repository>ghcr.io/elias02345/cloudgate:latest</Repository>
   <Registry>https://ghcr.io/elias02345/cloudgate</Registry>
   <Network>bridge</Network>
@@ -28,11 +28,18 @@
   <Screenshot>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/screenshots/4-cloudflare.png</Screenshot>
 
   <Overview>
-CloudGate is a self-hosted web UI that manages Cloudflare Tunnels for you. Add a service - enter its local address and the public hostname you want - and CloudGate creates the Cloudflare Tunnel, DNS record, and ingress rule, and reloads the tunnel daemon for you.
+CloudGate puts the services in your homelab on the internet, even when your connection has no public IP address or open ports (CGNAT, DS-Lite, mobile internet). It manages Cloudflare Tunnels and playit.gg tunnels from one web interface.
 
-Solves the CGNAT / no-port-forwarding problem for free using Cloudflare's Tunnel infrastructure, without the manual cloudflared setup. No configuration required: an admin account and every secret are generated on first boot.
+Add a service by entering its local address and the public hostname you want. CloudGate creates the tunnel, the DNS record and the routing rule, and keeps the tunnel running.
 
-Not affiliated with Cloudflare.
+Features:
+- Cloudflare Tunnel for websites and web apps, with automatic DNS records
+- playit.gg tunnels for TCP/UDP services such as game servers and SSH
+- Optional local reverse proxy with Let's Encrypt certificates
+- Two-factor authentication, audit log and API keys
+- No configuration needed: the admin account and all secrets are created on first start
+
+Not affiliated with Cloudflare or playit.gg.
   </Overview>
 
   <!-- No Unraid forum support thread exists yet. Points at GitHub Issues in
@@ -51,7 +58,7 @@ Not affiliated with Cloudflare.
 
   <Category>Tools: Network:Other</Category>
 
-  <ExtraSearchTerms>cloudflare tunnel cgnat reverse proxy self-hosted</ExtraSearchTerms>
+  <ExtraSearchTerms>cloudflare tunnel playit cgnat reverse proxy self-hosted port forwarding</ExtraSearchTerms>
 
   <Requires>Outbound internet access for the Cloudflare Tunnel connection. No inbound port forwarding needed.</Requires>
 
