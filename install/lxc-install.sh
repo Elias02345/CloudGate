@@ -26,14 +26,11 @@ readonly CG_HTTP_PORT="${CG_HTTP_PORT:-80}"
 readonly CG_HTTPS_PORT="${CG_HTTPS_PORT:-443}"
 readonly CG_IMAGE_CANDIDATES=(
   "${CG_IMAGE:-ghcr.io/elias02345/cloudgate:latest}"
-  "ghcr.io/elias02345/cloudgate:main"
-  "ghcr.io/elias02345/cloudgate:nightly"
-  "ghcr.io/elias02345/cloudgate:dev"
 )
 readonly CG_REPO_URL="https://github.com/Elias02345/CloudGate.git"
-# Default branch for source builds. Switch to `main` once the first
-# stable release is tagged; until then `dev` has the latest working code.
-readonly CG_REPO_BRANCH="${CG_REPO_BRANCH:-dev}"
+# Default branch for source builds (used only when no prebuilt image could be
+# pulled — see build_image_from_source). `main` carries the stable releases.
+readonly CG_REPO_BRANCH="${CG_REPO_BRANCH:-main}"
 
 readonly LOG_PREFIX="[cloudgate]"
 

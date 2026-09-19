@@ -31,6 +31,13 @@ export interface UpdateStatus {
 	mode: 'auto' | 'notify' | 'scheduled';
 	last_error: string | null;
 	release_notes_url?: string | null;
+	/**
+	 * True when CLOUDGATE_DISABLE_UPDATES is set — an app-store platform
+	 * (Umbrel, TrueNAS, Unraid, ZimaOS) owns the image and an in-app
+	 * self-update would race the platform re-pinning the old one. Check /
+	 * install / channel controls have nothing to act on in this state.
+	 */
+	updates_disabled: boolean;
 
 	// Fine-grained install progress (only set during downloading/verifying/installing)
 	step?: UpdateStep | null;
@@ -59,7 +66,10 @@ export function useUpdateStatus(opts: { refetchInterval?: number | false } = {})
 	return useQuery<UpdateStatus>({
 		queryKey: ['updates'],
 		queryFn: () => api('/updates'),
-		refetchInterval: opts.refetchInterval ?? 30_000,
+		// No point polling for an update that can never apply — once we know
+		// updates are platform-disabled, stop background refetching.
+		refetchInterval: (query) =>
+			query.state.data?.updates_disabled ? false : (opts.refetchInterval ?? 30_000),
 	});
 }
 

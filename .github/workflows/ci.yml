@@ -67,17 +67,98 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
-      - name: Smoke test image starts
+      # Covers the app-store port story end to end:
+      #   - 8080 (management port, what a store platform publishes) and 80
+      #     (back-compat, what existing -p 80:80 users publish) both serve
+      #     the full admin UI/API identically.
+      #   - recovery mode (bootstrap failed) is served on 8080 too.
+      #   - the sacred secrets under /data survive a container replacement
+      #     (rm -f + re-run from the same volume/image) unchanged — the
+      #     scenario an app-store "update" (swap the whole image) exercises.
+      - name: Smoke test — ports, recovery mode, replacement persistence
         run: |
-          docker run -d --name cg-test -p 8080:80 -v "$(pwd)/ci-data:/data" cloudgate:ci
-          for i in $(seq 1 60); do
-            if curl -fsS http://localhost:8080/api/health > /dev/null 2>&1; then
-              echo "Container healthy after ${i}s"
-              docker logs cg-test
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Container did not become healthy in 120s"
-          docker logs cg-test
-          exit 1
+          set -uo pipefail
+
+          fail() {
+            echo "::error::$*"
+            for c in cg-test cg-recovery; do
+              if docker ps -a --format '{{.Names}}' | grep -qx "$c"; then
+                echo "--- docker logs $c ---"
+                docker logs "$c" 2>&1 | tail -100
+              fi
+            done
+            exit 1
+          }
+
+          # curl a URL until it returns the expected HTTP status, or give up.
+          # $1=url $2=expected status $3=label (for the failure message)
+          wait_for_status() {
+            local url="$1" want="$2" label="$3" got=""
+            for _ in $(seq 1 60); do
+              got="$(curl -s -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || echo 000)"
+              [[ "$got" == "$want" ]] && return 0
+              sleep 2
+            done
+            fail "${label}: expected HTTP ${want} from ${url}, last got ${got:-<no response>}"
+          }
+
+          cleanup() {
+            docker rm -f cg-test cg-recovery >/dev/null 2>&1 || true
+            docker volume rm cg-smoke-data cg-smoke-recovery >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker volume create cg-smoke-data >/dev/null
+          docker volume create cg-smoke-recovery >/dev/null
+
+          echo "=== Normal boot: :8080 and :80 serve the same admin UI/API ==="
+          docker run -d --name cg-test -p 18080:8080 -p 18081:80 -v cg-smoke-data:/data cloudgate:ci >/dev/null
+
+          wait_for_status "http://localhost:18080/api/health" 200 "health on :8080"
+          echo "Healthy on :8080"
+          wait_for_status "http://localhost:18081/api/health" 200 "health on :80 (back-compat)"
+          echo "Healthy on :80"
+
+          wait_for_status "http://localhost:18080/" 200 "SPA index on :8080"
+          curl -fsS "http://localhost:18080/" | grep -qi "<html" \
+            || fail "SPA index on :8080 did not return HTML"
+          echo "SPA index served on :8080"
+
+          echo "=== Replacement persistence: sacred /data secrets survive a container swap ==="
+          jwt_before="$(docker exec cg-test sha256sum /data/secrets/jwt.key 2>/dev/null | awk '{print $1}')"
+          enc_before="$(docker exec cg-test sha256sum /data/secrets/encryption.key 2>/dev/null | awk '{print $1}')"
+          [[ -n "$jwt_before" ]] || fail "could not read /data/secrets/jwt.key sha256 before replacement"
+          [[ -n "$enc_before" ]] || fail "could not read /data/secrets/encryption.key sha256 before replacement"
+
+          # Simulates an app-store platform replacing the whole container from
+          # the same image + volume — never an in-place self-update.
+          docker rm -f cg-test >/dev/null
+          docker run -d --name cg-test -p 18080:8080 -p 18081:80 -v cg-smoke-data:/data cloudgate:ci >/dev/null
+          wait_for_status "http://localhost:18080/api/health" 200 "health on :8080 after replacement"
+
+          jwt_after="$(docker exec cg-test sha256sum /data/secrets/jwt.key 2>/dev/null | awk '{print $1}')"
+          enc_after="$(docker exec cg-test sha256sum /data/secrets/encryption.key 2>/dev/null | awk '{print $1}')"
+          [[ "$jwt_before" == "$jwt_after" ]] || fail "jwt.key changed across container replacement ($jwt_before -> $jwt_after)"
+          [[ "$enc_before" == "$enc_after" ]] || fail "encryption.key changed across container replacement ($enc_before -> $enc_after)"
+          echo "jwt.key and encryption.key unchanged across replacement"
+
+          admin_count="$(docker exec cg-test sqlite3 /data/db/db.sqlite 'SELECT COUNT(*) FROM users;' 2>/dev/null || echo 0)"
+          [[ "${admin_count:-0}" -ge 1 ]] || fail "admin user missing from DB after container replacement (count=${admin_count:-0})"
+          echo "Admin user still present after replacement (count=${admin_count})"
+
+          docker rm -f cg-test >/dev/null
+
+          echo "=== Recovery mode is served on :8080 too ==="
+          # CLOUDGATE_RECOVERY_MODE=true makes bootstrap.ts bail out on
+          # purpose (see packages/backend/src/bootstrap.ts) — the same
+          # documented escape hatch an operator uses, and a more reliable
+          # trigger than hand-corrupting the DB file.
+          docker run -d --name cg-recovery -p 18080:8080 -p 18081:80 \
+            -e CLOUDGATE_RECOVERY_MODE=true -v cg-smoke-recovery:/data cloudgate:ci >/dev/null
+
+          wait_for_status "http://localhost:18080/api/status" 200 "recovery /api/status on :8080"
+          echo "Recovery UI reachable on :8080"
+
+          docker rm -f cg-recovery >/dev/null
+
+          echo "All smoke checks passed"

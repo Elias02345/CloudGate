@@ -5,7 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Admin UI/API is now also served on port 8080**, in addition to the
+  existing 80/443. App-store platforms (Umbrel, TrueNAS, Unraid, ZimaOS)
+  typically map only a single container port, and 8080 is now that port —
+  `docker/nginx/cloudgate.conf` and `recovery.conf` serve the full admin
+  UI/API (and the Recovery UI, when bootstrap fails) identically there.
+  Existing `-p 80:80 -p 443:443` installs are unaffected.
+- Updates page now shows a clear notice when `CLOUDGATE_DISABLE_UPDATES` is
+  set — "Updates are managed by your platform" — and hides the check/install/
+  channel controls that can't do anything in that state, instead of leaving
+  them present but silently non-functional.
+
+### Fixed
+
+- **`CLOUDGATE_DISABLE_UPDATES=false` (and other boolean env vars) silently
+  did the opposite of what was set.** They were parsed with `Boolean(value)`,
+  which treats any non-empty string — including the word `"false"` — as
+  `true`. Boolean env vars now parse `true/1/yes/on` and `false/0/no/off/""`
+  explicitly (case-insensitive).
+- `install/lxc-install.sh` no longer falls back to the `:main` / `:nightly` /
+  `:dev` image tags when the pinned image can't be pulled — those tags don't
+  reliably exist and could pull an unexpected build. Source-build fallback
+  now defaults to the `main` branch.
 
 ---
 

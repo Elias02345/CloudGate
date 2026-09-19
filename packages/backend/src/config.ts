@@ -5,6 +5,22 @@ import { z } from 'zod';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+// `z.coerce.boolean()` casts with JS's `Boolean(value)` — any non-empty
+// string is truthy, so `CLOUDGATE_DISABLE_UPDATES=false` coerces to `true`.
+// An operator setting that env var to the word "false" would silently
+// disable updates instead of leaving them on. This parses the handful of
+// values env vars actually use for booleans; anything else falls back to
+// `fallback` rather than guessing.
+function envBoolean(fallback: boolean) {
+	return z.preprocess((value) => {
+		if (typeof value !== 'string') return value;
+		const v = value.trim().toLowerCase();
+		if (['true', '1', 'yes', 'on'].includes(v)) return true;
+		if (['false', '0', 'no', 'off', ''].includes(v)) return false;
+		return value;
+	}, z.boolean().default(fallback));
+}
+
 const ConfigSchema = z.object({
 	NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 	PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -23,10 +39,10 @@ const ConfigSchema = z.object({
 	CLOUDGATE_UPDATE_MODE: z.enum(['auto', 'notify', 'scheduled']).default('notify'),
 	CLOUDGATE_UPDATE_REPO: z.string().default('Elias02345/CloudGate'),
 	CLOUDGATE_GITHUB_TOKEN: z.string().optional(),
-	CLOUDGATE_DISABLE_UPDATES: z.coerce.boolean().default(false),
+	CLOUDGATE_DISABLE_UPDATES: envBoolean(false),
 
 	// Recovery / debug
-	CLOUDGATE_RECOVERY_MODE: z.coerce.boolean().default(false),
+	CLOUDGATE_RECOVERY_MODE: envBoolean(false),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
