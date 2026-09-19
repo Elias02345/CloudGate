@@ -13,6 +13,28 @@ _Nothing yet._
 
 ### Security
 
+- **Any website could load the CloudGate UI in a frame.** The backend sets a
+  full set of security headers, but it only ever sees requests to `/api/`:
+  nginx serves the SPA's HTML straight off disk. So the one response where
+  `frame-ancestors` and `X-Frame-Options` mean anything — the document — was
+  sent without them, and without a Content-Security-Policy, an
+  `X-Content-Type-Options` or a `Referrer-Policy`. The headers were all
+  landing on JSON responses that have no frames and no subresources.
+
+  An attacker's page could therefore embed the whole interface. Your session
+  token lives in the browser's local storage, which the framed copy can read,
+  so the framed CloudGate is a logged-in CloudGate — ready for an invisible
+  overlay to collect clicks on whatever button sits underneath.
+
+  nginx now sends the document its own policy, plus `X-Frame-Options: DENY`,
+  `nosniff`, `Referrer-Policy: no-referrer` and `Cross-Origin-Opener-Policy`.
+  The recovery page gets the same four. Demonstrated against two running
+  containers side by side: the old one renders inside a foreign page's iframe,
+  the new one is refused with "Framing … violates … frame-ancestors 'none'".
+
+  **This one needs a new container image.** The headers live in the nginx
+  config, which updating through the UI cannot replace — see below.
+
 - **A backup file name could run as script in the Recovery UI.** The recovery
   page listed the contents of `/data/db/backups/` by pasting each file name
   straight into the table's HTML and into the Restore button's `onclick`
@@ -52,6 +74,11 @@ _Nothing yet._
 
 ### Added
 
+- The update page's image check now also reports an image that serves the UI
+  without those headers, the same way it already reports one that still
+  exposes `/__recovery/`. Both fixes live in files a self-update cannot
+  deliver, so the only honest thing CloudGate can do is say which image you
+  need to pull.
 - The frontend has its first test, and it guards exactly that: every
   translation key the sources ask for must exist, English and German must
   carry the same keys, and no translation may be blank. A missing key used to
