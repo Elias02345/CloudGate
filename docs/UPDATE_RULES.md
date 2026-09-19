@@ -30,6 +30,8 @@ The self-updater operates under a **bind-mount assumption**: the user's `/data/`
 /data/db/backups/               # historical snapshots; updater APPENDS here only
 /data/cloudflared/*.json        # tunnel credentials (NOT config.yml — see below)
 /data/cloudflared/bin/          # user-managed binaries
+/data/playit/bin/               # user-managed playit agent binary
+/data/playit/logs/              # append-only, same rule as /data/logs/
 /data/nginx/custom/             # hand-rolled snippets
 /data/nginx/certs/              # ACME-issued certificates
 /data/logs/                     # append-only logs

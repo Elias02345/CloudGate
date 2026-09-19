@@ -8,7 +8,7 @@
     "url": "https://github.com/Elias02345/CloudGate.git"
   },
   "license": "MIT",
-  "author": "Elias Kanakidis",
+  "author": "Elias02345",
   "engines": {
     "node": ">=22.0.0",
     "pnpm": ">=9.0.0"

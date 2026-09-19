@@ -2,19 +2,19 @@
 
 ## Supported Versions
 
-Only the latest release tagged on `main` receives security fixes.
-
 | Version | Supported |
 | ------- | --------- |
-| latest `v0.x.y` on `main` | ✅ |
-| `dev` builds (`:nightly`) | ⚠️ best-effort |
+| Latest release (currently `v0.5.0`) on `main` | ✅ |
+| `dev` / nightly builds (`:nightly`) | ⚠️ best-effort |
 | anything older | ❌ |
 
 ## Reporting a Vulnerability
 
 **Please do NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, email: **elias-kanakidis@gmx.de** with subject prefix `[CloudGate Security]`.
+Instead, use GitHub's private vulnerability reporting: open a
+[**new security advisory**](https://github.com/Elias02345/CloudGate/security/advisories/new)
+("Report a vulnerability" on the repo's Security tab).
 
 Include:
 - Affected version (`docker inspect` or `/api/health` output)
@@ -26,16 +26,12 @@ You'll get an acknowledgement within 7 days. Critical issues will be patched on 
 
 ## Release Signing
 
-All official releases on `main` are signed with GPG.
+Signed releases are planned but not yet enabled — no release is currently GPG-signed.
 
-- **Public key fingerprint:** _(to be added once first release is signed)_
-- **Public key file:** `docker/keys/release.pub` (also baked into the Docker image)
-- **Verify a release tarball:**
-  ```bash
-  gpg --verify cloudgate-v0.x.y.tar.gz.sig cloudgate-v0.x.y.tar.gz
-  ```
-
-The self-updater inside CloudGate verifies GPG signatures automatically before installing any update — unsigned or wrongly-signed updates are refused.
+The self-updater's integrity check does not depend on signing: it enforces a
+mandatory SHA256 checksum on every downloaded release and aborts the update if
+it's missing or doesn't match. GPG signature verification will run only once a
+release actually ships a signature; see `CLAUDE.md` §5 for the current state.
 
 ## Threat Model (overview)
 
@@ -45,10 +41,13 @@ CloudGate is designed for self-hosted homelab use. We assume:
 - The Cloudflare API token is the most sensitive secret — stored encrypted at rest.
 
 We protect against:
-- ✅ Compromised CloudGate releases (GPG signing)
 - ✅ Stolen DB without keys (token encryption AES-256-GCM)
 - ✅ Brute-force login (rate limiting + Argon2id + optional 2FA)
 - ✅ Container brick-state (Recovery UI + rollback)
+- ✅ Tampered release downloads (mandatory SHA256 verification)
+
+We do NOT yet protect against:
+- ❌ A compromised release artifact reaching the updater undetected — release signing is planned but not enabled yet.
 
 We do NOT protect against:
 - ❌ Compromised host OS (root access bypasses everything)
@@ -57,4 +56,4 @@ We do NOT protect against:
 
 ## Disclosure Timeline
 
-After a fix is released, we publish details in the GitHub Release notes and on the [Discussions](https://github.com/Elias02345/CloudGate/discussions) board.
+After a fix is released, details are published in the GitHub Release notes and as a GitHub security advisory.

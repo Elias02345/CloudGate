@@ -2,23 +2,6 @@
 
 If Home Assistant returns a bare **400: Bad Request** as soon as it's reachable through CloudGate — LAN access still works fine — this doc is for you.
 
-## Kurzfassung (Deutsch)
-
-Home Assistant lehnt Anfragen mit `400: Bad Request` ab, sobald ein `X-Forwarded-For`-Header ankommt, den HA nicht erwartet. Cloudflare Tunnel fügt diesen Header bei **jeder** Anfrage hinzu, und `cloudflared` kann ihn nicht entfernen — deshalb tritt der Fehler bei jedem CloudGate-Tunnel-Setup zuverlässig auf. LAN-Zugriff funktioniert, weil dort kein Proxy-Header mitgeschickt wird; Push-Benachrichtigungen funktionieren, weil sie über HA Cloud/Firebase laufen und nie durch den Tunnel gehen.
-
-**Die Lösung** ist auf HA-Seite: in `configuration.yaml`
-
-```yaml
-http:
-  use_x_forwarded_for: true
-  trusted_proxies:
-    - 172.18.0.0/24
-```
-
-eintragen (Adresse = das Docker-Subnetz, aus dem CloudGate HA erreicht — **kein einzelnes IP anpinnen**, sonst bricht es beim nächsten Container-Neustart wieder). CloudGate erkennt dieses Problem automatisch und zeigt die passende Adresse auf der Host-Detailseite an. Danach HA neu starten. Läuft der Host im `local_nginx`-Modus, gibt es alternativ die Option `forwarded_headers: strip`, die aber HAs Brute-Force-Schutz pro Client außer Kraft setzt — die `trusted_proxies`-Lösung ist vorzuziehen.
-
----
-
 ## Root cause
 
 Home Assistant runs a `forwarded_middleware` on every incoming request (see HA source: `homeassistant/components/http/forwarded.py`). If the request carries an `X-Forwarded-For` header, HA performs two checks, and raises a bare `HTTPBadRequest` (400) if either one fails:
