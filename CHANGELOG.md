@@ -5,30 +5,49 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 
 ## [Unreleased]
 
+_Nothing yet._
+
+---
+
+## [0.5.0] — 2026-09-19
+
+The first stable release, and the first one offered in homelab app stores.
+
 ### Added
 
-- **Admin UI/API is now also served on port 8080**, in addition to the
-  existing 80/443. App-store platforms (Umbrel, TrueNAS, Unraid, ZimaOS)
-  typically map only a single container port, and 8080 is now that port —
-  `docker/nginx/cloudgate.conf` and `recovery.conf` serve the full admin
-  UI/API (and the Recovery UI, when bootstrap fails) identically there.
-  Existing `-p 80:80 -p 443:443` installs are unaffected.
-- Updates page now shows a clear notice when `CLOUDGATE_DISABLE_UPDATES` is
-  set — "Updates are managed by your platform" — and hides the check/install/
-  channel controls that can't do anything in that state, instead of leaving
-  them present but silently non-functional.
+- **CloudGate is stable.** The pre-alpha label is gone; v0.5.0 is the first
+  release meant for production use.
+- **Ready for homelab app stores.** `packaging/` holds the store packages for
+  Unraid, TrueNAS, Umbrel and ZimaOS, with a new app icon and screenshots.
+  Each package publishes only the admin port, keeps all data in `/data`, and
+  leaves updates to the platform.
+- **Admin UI on port 8080.** The web UI, the API and the Recovery UI are now
+  also served on container port 8080, which is what store platforms publish.
+  Port 80/443 behave exactly as before, so existing `-p 80:80 -p 443:443`
+  installations need no change.
+- **Updates handled by your platform.** With `CLOUDGATE_DISABLE_UPDATES=true`
+  the Updates page says that the platform updates CloudGate and hides the
+  controls that cannot work there; in-app installs are refused, also through
+  API keys.
 
 ### Fixed
 
-- **`CLOUDGATE_DISABLE_UPDATES=false` (and other boolean env vars) silently
-  did the opposite of what was set.** They were parsed with `Boolean(value)`,
-  which treats any non-empty string — including the word `"false"` — as
-  `true`. Boolean env vars now parse `true/1/yes/on` and `false/0/no/off/""`
-  explicitly (case-insensitive).
-- `install/lxc-install.sh` no longer falls back to the `:main` / `:nightly` /
-  `:dev` image tags when the pinned image can't be pulled — those tags don't
-  reliably exist and could pull an unexpected build. Source-build fallback
-  now defaults to the `main` branch.
+- **Switches jumped instead of sliding.** A global style replaced the switch
+  animation; the knob slides and the colour fades again, and the host switch
+  flips as soon as you click it instead of after the server answers.
+- **`CLOUDGATE_DISABLE_UPDATES=false` turned updates off.** Boolean settings
+  treated every non-empty value, including the word "false", as true. They
+  now accept `true/1/yes/on` and `false/0/no/off`.
+- **The one-line installer could install a development build.** It now only
+  pulls `:latest`, which points at a verified stable release, and source
+  builds use `main`.
+
+### Changed
+
+- **Releases are verified before they are published.** A release tag must be
+  on `main` and match every package version; build, typecheck, lint and tests
+  must pass; the image for both architectures is pushed and checked before the
+  GitHub Release exists, and `:latest` moves last.
 
 ---
 
