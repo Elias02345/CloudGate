@@ -1,0 +1,134 @@
+name: Packaging
+
+# Cheap, store-side checks for packaging/ and scripts/stores/. Deliberately
+# separate from ci.yml: this never needs to build or test the app itself,
+# only the app-store package files — see packaging/README.md.
+on:
+  push:
+    branches: [dev]
+    paths:
+      - "packaging/**"
+      - "scripts/stores/**"
+      - "docker/**"
+      - ".github/workflows/packaging.yml"
+      - ".github/workflows/release.yml"
+  pull_request:
+    branches: [dev, main]
+    paths:
+      - "packaging/**"
+      - "scripts/stores/**"
+      - "docker/**"
+      - ".github/workflows/packaging.yml"
+      - ".github/workflows/release.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  packaging:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: render.mjs tests (determinism + input validation)
+        run: node --test scripts/stores/render.test.mjs
+
+      - name: Render current version twice and diff (end-to-end reproducibility)
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          dummy_digest="sha256:$(printf '0%.0s' {1..64})"
+          node scripts/stores/render.mjs "$version" "$dummy_digest"
+          node scripts/stores/render.mjs "$version" "$dummy_digest"
+          git diff --exit-code -- packaging/umbrel packaging/zimaos
+          # Restore the real digest — the lines above only exist to prove
+          # the rewrite is idempotent, not to actually change the package.
+          git checkout -- packaging/umbrel packaging/zimaos
+
+      - name: XML well-formedness (Unraid)
+        run: |
+          python3 -c "
+          import xml.dom.minidom as m, glob, sys
+          files = glob.glob('packaging/unraid/**/*.xml', recursive=True)
+          assert files, 'no Unraid XML files found'
+          for f in files:
+              m.parse(f)
+              print(f, 'OK')
+          "
+
+      - name: YAML parse (Umbrel, ZimaOS, TrueNAS)
+        run: |
+          pip install --quiet --disable-pip-version-check pyyaml
+          python3 -c "
+          import yaml, glob
+          files = [
+              f for f in glob.glob('packaging/**/*.yml', recursive=True)
+              + glob.glob('packaging/**/*.yaml', recursive=True)
+              # Jinja2 templates, not plain YAML.
+              if '/templates/docker-compose.yaml' not in f.replace('\\\\', '/')
+          ]
+          assert files, 'no YAML files found under packaging/'
+          for f in files:
+              with open(f, encoding='utf-8') as fh:
+                  yaml.safe_load(fh.read())
+              print(f, 'OK')
+          "
+
+      - name: docker compose config -q (Umbrel)
+        run: |
+          set -euo pipefail
+          # app_proxy has no `image:` in the source file by Umbrel's own
+          # convention — umbrelOS injects one before running compose. Shim
+          # it in only for this syntax check; never committed.
+          cat > /tmp/umbrel-app-proxy-shim.yml <<'EOF'
+          services:
+            app_proxy:
+              image: alpine:3
+          EOF
+          APP_DATA_DIR=/tmp/umbrel-data docker compose \
+            -f packaging/umbrel/cloudgate/docker-compose.yml \
+            -f /tmp/umbrel-app-proxy-shim.yml \
+            config -q
+
+      - name: docker compose config -q (ZimaOS)
+        run: docker compose -f packaging/zimaos/CloudGate/docker-compose.yml config -q
+
+      - name: Assert packaging conventions
+        run: |
+          set -euo pipefail
+
+          echo "No :dev / :nightly / :main CloudGate image refs (Unraid :latest is allowed)"
+          if grep -rnE 'cloudgate:(dev|nightly|main)([^0-9A-Za-z._-]|$)' packaging/; then
+            echo "Found a moving-tag CloudGate image reference above." >&2
+            exit 1
+          fi
+
+          declare -A must_contain=(
+            ["packaging/umbrel/cloudgate/docker-compose.yml"]="/data|APP_PORT: 8080|CLOUDGATE_DISABLE_UPDATES"
+            ["packaging/zimaos/CloudGate/docker-compose.yml"]="target: /data|target: 8080|CLOUDGATE_DISABLE_UPDATES"
+            ["packaging/truenas/cloudgate/ix_values.yaml"]="data_path: /data|web_port: 8080"
+            ["packaging/truenas/cloudgate/templates/docker-compose.yaml"]="CLOUDGATE_DISABLE_UPDATES"
+            ["packaging/unraid/templates/cloudgate.xml"]='Target="/data"|Target="8080"|CLOUDGATE_DISABLE_UPDATES'
+          )
+          for file in "${!must_contain[@]}"; do
+            IFS='|' read -ra patterns <<< "${must_contain[$file]}"
+            for pattern in "${patterns[@]}"; do
+              if ! grep -qE "$pattern" "$file"; then
+                echo "Expected '$file' to match /$pattern/ — mounts /data, targets container port 8080, and sets CLOUDGATE_DISABLE_UPDATES." >&2
+                exit 1
+              fi
+            done
+          done
+
+          echo "No host 80/443 published by default"
+          if grep -rnE '(published:\s*"?\b(80|443)\b|Default="?\b(80|443)\b)' packaging/umbrel packaging/zimaos packaging/truenas packaging/unraid; then
+            echo "Found a default publishing host port 80 or 443 above — those are advanced/opt-in only." >&2
+            exit 1
+          fi
+
+          echo "All packaging convention checks passed."

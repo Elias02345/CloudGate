@@ -1,0 +1,161 @@
+# App-store packaging
+
+Source files for listing CloudGate on self-hosting app stores. Not built or
+shipped by CloudGate itself — these are submitted to each store's own repo.
+
+## Layout
+
+- `assets/` — `icon.svg` (orange cloud on a dark rounded-square background,
+  derived from `packages/frontend/public/favicon.svg`) plus rendered
+  `icon-512.png` / `icon-256.png`. Rendered with Python's `svglib` +
+  `reportlab` (`renderPM`, via the `rlPyCairo` backend) — no Node dependency
+  was added to the repo for this. No screenshots exist yet; see "Screenshots"
+  below.
+- `umbrel/cloudgate/` — [Umbrel App Store](https://github.com/getumbrel/umbrel-apps)
+  package (`umbrel-app.yml` + `docker-compose.yml`), following that repo's
+  `umbrel-package-app` skill.
+- `zimaos/CloudGate/` — [ZimaOS/CasaOS App Store](https://github.com/IceWhaleTech/CasaOS-AppStore)
+  package (`docker-compose.yml` with a top-level `x-casaos` block, v2
+  protocol), per that repo's `docs/specs/compose-and-x-casaos.md`.
+- `truenas/cloudgate/` — [TrueNAS Apps](https://github.com/truenas/apps)
+  community-train package (`app.yaml`, `ix_values.yaml`, `questions.yaml`,
+  `README.md`, `templates/docker-compose.yaml` Jinja2 template,
+  `templates/test_values/basic-values.yaml`). Deliberately does **not**
+  include `templates/library/` (the vendored rendering library) — see
+  "TrueNAS library vendoring" below.
+- `unraid/` — Unraid Community Applications template
+  (`ca_profile.xml` + `templates/cloudgate.xml`). Source of truth for files
+  that must eventually live in a **separate, dedicated** GitHub repo — see
+  "Unraid: dedicated repo, not a subfolder" below.
+
+## How each package is validated
+
+Validated by cloning the relevant upstream repo into a scratch directory,
+copying the package in, and running that store's own tooling. Nothing
+upstream is vendored into this repo; the clones are throwaway.
+
+| Store | Validator | What it checks |
+|---|---|---|
+| Umbrel | `node .tools/lint-apps.mjs cloudgate --check-images` (from a clone of `getumbrel/umbrel-apps`) | Manifest shape, port uniqueness, image pinning + multi-arch pull, `app_proxy` wiring, persistence paths |
+| ZimaOS | `.github/actions/validate-compose/scripts/validate_compose.py` (from a clone of `IceWhaleTech/CasaOS-AppStore`) | YAML validity, top-level `name` format, `x-casaos.id` reverse-domain format, `docker compose config -q` (needs Docker) |
+| TrueNAS | YAML parses; port checked against `.github/scripts/port_validation.py`; library API calls cross-checked against `library/2.3.13/*.py` source (from a clone of `truenas/apps`) | See "TrueNAS: what could not be validated" below — full rendering needs Docker |
+| Unraid | `xml.dom.minidom.parse()` (Python stdlib) | Well-formed XML only — no official schema validator is published |
+
+`.github/workflows/packaging.yml` runs the parts of this that don't need a
+clone of an upstream repo (see that file for exactly what).
+
+## What `scripts/stores/render.mjs` rewrites — and what it doesn't
+
+`node scripts/stores/render.mjs <X.Y.Z> <sha256:digest>` rewrites, in place:
+
+- `packaging/umbrel/cloudgate/umbrel-app.yml` — `version`, `releaseNotes`
+- `packaging/umbrel/cloudgate/docker-compose.yml` — image tag + digest
+- `packaging/zimaos/CloudGate/docker-compose.yml` — image tag + digest,
+  `x-casaos.version`, `update_at`, `release_notes`
+
+It deliberately leaves alone:
+
+- **`packaging/truenas/**`** — TrueNAS's own Renovate bot bumps
+  `ix_values.yaml` image tags automatically after a PR merges into
+  `truenas/apps` (see that repo's `CONTRIBUTIONS.md`, "If the versioning of
+  an image is not SemVer, a custom versioning regex must be added in the
+  renovate-config.js file"). The package's own `app.yaml.version` is a
+  *packaging* version (starts at `1.0.0`, bumped by hand only when the
+  package definition itself changes, per their contribution guide) — it is
+  not tied to CloudGate's release version, so this script has no business
+  touching it either.
+- **`packaging/unraid/**`** — `Repository` is pinned to `:latest` by design
+  (the Unraid/Community Applications convention; CA's own tooling pulls
+  fresh on every install/update), so there is no tag or digest field to
+  rewrite.
+
+Release notes are pulled from CHANGELOG.md's matching `## [X.Y.Z]` section:
+up to the first 5 top-level bullet lines, with a leading
+`⚠ Breaking changes:` line prepended if that section has a
+`### ... Breaking ...` subsection.
+
+The rewrite is line-based text editing, not a YAML library — none is a
+dependency anywhere in this workspace (checked `pnpm-lock.yaml`), so this
+avoids adding one just to touch four fields. It's covered by
+`scripts/stores/render.test.mjs` (`pnpm run stores:test`), including a
+determinism check: rendering twice in a row must produce byte-identical
+files.
+
+## Screenshots
+
+None are included — per the task, they're the maintainer's to add later.
+Where each store wants them:
+
+- **Umbrel**: PR body only (`umbrel-app.yml` keeps `gallery: []`); the Umbrel
+  team creates and hosts final gallery images after review.
+- **ZimaOS**: `x-casaos.screenshot_link` (array of filenames) plus the actual
+  image files committed in `Apps/CloudGate/` alongside `docker-compose.yml`.
+- **TrueNAS**: attach to the PR description; the reviewer uploads them to the
+  TrueNAS CDN and gives back URLs for `app.yaml`'s `screenshots:` list (same
+  for `icon:`, currently a placeholder — see that file's `TODO(reviewer)`
+  comment).
+- **Unraid**: no screenshot field in the starter template; if desired later,
+  add a `<Screenshot>` tag to `templates/cloudgate.xml` pointing at a hosted
+  image.
+
+## Unraid: dedicated repo, not a subfolder
+
+Community Applications requires a **separate, dedicated repository** for
+templates. Two independent sources confirm this:
+
+1. `unraid-community-apps-starter`'s own README: "Use this repository as a
+   GitHub template when you want a clean starting point for a **new**
+   Community Applications submission repository."
+2. The CA "Docker FAQ for template creators/maintainers" forum thread:
+   "Create a GitHub repository and upload the XML(s). Use a separate
+   repository for your xml files. (Keep it separate from the docker
+   associated files if you've built your own container.)"
+
+So `packaging/unraid/` here is the source of truth to copy into that future
+dedicated repo (e.g. `Elias02345/unraid-templates`), not something CA reads
+directly from `Elias02345/CloudGate`. `templates/cloudgate.xml`'s
+`<TemplateURL>` points at that eventual repo path as a placeholder; CA
+rewrites `TemplateURL` to the correct value on registration regardless of
+what's committed, per the same FAQ thread.
+
+## TrueNAS library vendoring
+
+`templates/library/` (a copy of `truenas/apps`'s `library/2.3.13/`) is
+generated by `devbox run copy-lib`, which runs a Docker container
+(`ghcr.io/truenas/apps_validation`) against the target repo. It must be
+committed for the app to actually render on TrueNAS, but only inside the
+**fork of `truenas/apps`** used to open the PR — never in this repo, which
+has nothing to do with TrueNAS's rendering pipeline. Run `devbox run
+copy-lib` from that fork's root after copying `packaging/truenas/cloudgate/`
+into `ix-dev/community/cloudgate/` there.
+
+## TrueNAS: what could not be validated
+
+`ci.py --render-only`, `generate_metadata.py`, and `devbox run copy-lib` /
+`validate` all shell out to
+`docker run ... ghcr.io/truenas/apps_validation ...` — none of them work
+without a running Docker daemon. This environment has no Docker Engine and
+no WSL access (sandboxed), so the actual Jinja2 render was never executed.
+Confidence instead comes from:
+
+- Structural parity with `adguard-home`, the closest existing community app
+  (single container, root `run_as_context`, `network`/`storage` groups with
+  no user/group group).
+- Every library method the template calls (`add_env`, `add_user_envs`,
+  `add_port`, `add_storage`, `healthcheck.set_test`, `portals.add`) checked
+  by hand against `library/2.3.13/*.py`'s actual signatures.
+- `.github/scripts/port_validation.py` run (via a small Windows-path-safe
+  wrapper — the upstream script assumes POSIX `/` path separators) to
+  confirm the default WebUI port (`30492`) doesn't collide with any existing
+  app.
+- Catching that `add_port(values.network.web_port)` alone would have bound
+  the container's fixed internal port 8080 to whatever host port the user
+  picked (copying AdGuard Home's pattern too literally — AdGuard's own
+  binary is told to bind `port_number` directly via a CLI flag, so its
+  container port isn't fixed; CloudGate's is). Fixed by passing
+  `{"container_port": values.consts.web_port}` explicitly, matching how
+  `adguard-home` itself handles its *DNS* port (53) being fixed while the
+  host port is user-chosen.
+
+Recommend the maintainer run `devbox run app-render community cloudgate` (or
+`ci.py --render-only`) locally with Docker before opening the real PR.

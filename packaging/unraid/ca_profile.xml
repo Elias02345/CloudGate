@@ -1,0 +1,16 @@
+<!--
+  Repo-root profile for the future dedicated Community Applications
+  template repository (see templates/cloudgate.xml for why it must be
+  dedicated, not a subfolder of this repo).
+-->
+<CommunityApplications>
+  <Profile>
+    CloudGate is a self-hosted web UI for Cloudflare Tunnels - publish homelab services from behind CGNAT without port forwarding. This repository hosts the Unraid Community Applications template for it. Support: see the Support/Project links on the template itself.
+  </Profile>
+  <Icon>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/icon-256.png</Icon>
+  <WebPage>https://github.com/Elias02345/CloudGate</WebPage>
+  <!-- TODO-FOR-ELIAS: same placeholder as templates/cloudgate.xml's <Support> -->
+  <Forum>https://forums.unraid.net/topic/TODO-FOR-ELIAS-cloudgate-support-thread</Forum>
+  <DonateLink>https://www.paypal.me/EliasK09</DonateLink>
+  <DonateText>Support this project</DonateText>
+</CommunityApplications>

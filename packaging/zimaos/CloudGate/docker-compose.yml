@@ -1,0 +1,76 @@
+name: cloudgate
+services:
+  cloudgate:
+    image: ghcr.io/elias02345/cloudgate:v0.3.13@sha256:87749f4d4e2f0b6d33002f568304a2cbfcd3b4bb81045d238dd05133723b8e6f
+    network_mode: bridge
+    ports:
+      - target: 8080
+        published: "8080"
+        protocol: tcp
+    environment:
+      # The platform updates the image; CloudGate's own in-app updater must
+      # stay off so the two don't fight over /app.
+      CLOUDGATE_DISABLE_UPDATES: "true"
+      PUID: "1000"
+      PGID: "1000"
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/data
+        target: /data
+    restart: unless-stopped
+x-casaos:
+  id: io.github.elias02345.cloudgate
+  main: cloudgate
+  index: /
+  port_map: "8080"
+  scheme: http
+  # Points at this same file's icon.svg once merged into
+  # IceWhaleTech/CasaOS-AppStore, matching how every other app in that repo
+  # references its own committed icon (see packaging/README.md).
+  icon: https://cdn.jsdelivr.net/gh/IceWhaleTech/CasaOS-AppStore@main/Apps/CloudGate/icon.svg
+  title:
+    en_US: CloudGate
+  tagline:
+    en_US: Self-hosted web UI for Cloudflare Tunnels — publish homelab services from behind CGNAT without port forwarding
+  description:
+    en_US: |
+      CloudGate is a WebUI that manages Cloudflare Tunnels for you. Add a
+      service — enter its local address and the public hostname you want —
+      and CloudGate creates the Cloudflare Tunnel, DNS record, and ingress
+      rule, and reloads the tunnel daemon for you.
+
+      Many home connections (CGNAT, DS-Lite, mobile-only uplinks) have no
+      public IPv4 and no port forwarding, so ordinary reverse proxies do not
+      work. Cloudflare Tunnel solves this for free, but the manual setup is a
+      hard wall for non-sysadmins. CloudGate does the setup and the
+      day-to-day management for you.
+
+      Features:
+      - Hybrid routing: per host, choose "via Cloudflare Tunnel" or "local
+        nginx reverse proxy".
+      - Auto-updates itself when new releases ship, without ever touching
+        your data (disabled in this package — the platform updates the
+        image instead).
+      - No required configuration — an admin account and all secrets are
+        generated on first boot.
+
+      Not affiliated with Cloudflare; uses Cloudflare's public Tunnel
+      infrastructure through their documented API.
+  author: Elias Kanakidis
+  developer: Elias Kanakidis
+  category: Networking
+  architectures:
+    - amd64
+    - arm64
+  version: "0.3.13"
+  update_at: "2026-09-19"
+  release_notes:
+    en_US: |
+      - **The sidebar could not be used with a keyboard.** Every navigation entry
+      - **A crash left no trace in the log CloudGate shows you.** When an error
+      - **Deleting a Cloudflare account left its tunnels running.** The database
+      - **The confirmation did not say what it was about to do.** Deleting a
+      - After deleting an account or a tunnel, the tunnel and host lists refresh
+  website: https://github.com/Elias02345/CloudGate
+  repo: https://github.com/Elias02345/CloudGate
+  support: https://github.com/Elias02345/CloudGate/issues
