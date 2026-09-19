@@ -139,7 +139,7 @@ export function AiSettingsPage() {
 			<Group>
 				<IconRobot size={26} style={{ color: 'var(--cg-accent-ai)' }} />
 				<Title order={2}>{t('ai_settings.title')}</Title>
-				<Badge variant="light">{t('common.optional' as never, { defaultValue: 'Optional' })}</Badge>
+				<Badge variant="light">{t('common.optional')}</Badge>
 			</Group>
 			<Text c="dimmed" size="sm">
 				{t('ai_settings.intro')}

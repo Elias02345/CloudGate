@@ -6,6 +6,8 @@
     "delete": "Delete",
     "edit": "Edit",
     "confirm": "Confirm",
+    "close": "Close",
+    "optional": "Optional",
     "load_failed": "Could not be loaded",
     "load_failed_hint": "CloudGate got no answer. Is the service still running?",
     "retry": "Try again"

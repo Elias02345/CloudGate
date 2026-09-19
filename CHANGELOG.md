@@ -9,6 +9,27 @@ _Nothing yet._
 
 ---
 
+## [0.3.12] — 2026-09-19
+
+### Fixed
+
+- **Two buttons showed a raw translation key instead of a label.** The AI chat
+  drawer's close button announced itself to screen readers as the literal text
+  `common.close`, because the key it asked for existed in neither language
+  file. Two more places papered over the same gap with a hard-coded English
+  fallback, so German users read "Close" and "Optional" in an otherwise German
+  interface. All three now have real translations in both languages.
+
+### Added
+
+- The frontend has its first test, and it guards exactly that: every
+  translation key the sources ask for must exist, English and German must
+  carry the same keys, and no translation may be blank. A missing key used to
+  be invisible until someone opened the page in the right language — now it
+  fails the build.
+
+---
+
 ## [0.3.11] — 2026-09-19
 
 ### Fixed
