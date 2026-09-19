@@ -86,7 +86,7 @@ That's it. CloudGate manages keys, secrets, and updates automatically.
 | **Hosts (Cloudflare mode)** | DNS CNAME auto-create · tunnel-config rewrite · HEAD-probe test · enable/disable toggle |
 | **Hosts (local nginx mode)** | Per-host conf with `nginx -t` validation · Let's Encrypt via DNS-01 · auto-renewal cron |
 | **Security** | Argon2id passwords · AES-256-GCM token encryption · 2FA TOTP · per-route rate limiting · audit log |
-| **Self-update** | 6h GitHub polling · GPG signature verification · atomic in-place install with auto-rollback |
+| **Self-update** | 6h GitHub polling · mandatory SHA256 verification · atomic in-place install with auto-rollback |
 | **Resilience** | Recovery UI fallback (no blank pages) · DB snapshots per update · sacred-path persistence contract |
 | **UX** | i18n DE+EN · light/dark theme · live dashboard · SSE-driven cache invalidation |
 

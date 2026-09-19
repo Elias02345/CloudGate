@@ -39,6 +39,14 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
 	const resolveRef = useRef<((value: boolean) => void) | null>(null);
 
 	const confirm = useCallback<ConfirmFn>((opts) => {
+		// A second prompt before the first is answered — a double-click on a
+		// delete button fires two handlers before React has even mounted the
+		// modal. Overwriting the resolver would strand the first caller's
+		// promise forever: whoever awaited it would sit there, and the guard
+		// it belongs to (`if (!(await confirm(…))) return;`) would never run or
+		// return. Settle the superseded one as "no" first — the user has not
+		// answered it, and declining is the only safe reading of that.
+		resolveRef.current?.(false);
 		setOptions(opts);
 		return new Promise<boolean>((resolve) => {
 			resolveRef.current = resolve;

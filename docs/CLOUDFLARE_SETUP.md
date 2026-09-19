@@ -38,8 +38,13 @@ Set the following permission rows:
 
 CloudGate **never** asks for broader scopes (e.g. account-wide settings, billing). If you see a request to add other scopes, file a security issue (see `SECURITY.md`).
 
-## OAuth flow (alternative, limited)
+## OAuth flow — not implemented
 
-CloudGate also supports the `cloudflared login` style "OAuth"-ish flow, which gives you a `cert.pem` scoped to specific zones. It's simpler (no token-creation in dashboard) but **does not** allow listing zones across the account — you'll only see the zone you explicitly authorize.
+Earlier versions of this document described a `cloudflared login` style
+"OAuth"-ish flow as an alternative. **It does not exist in CloudGate.** The
+only way to add an account is the API token flow above: the create-account
+endpoint accepts a token and nothing else, and zone sync rejects the `oauth`
+credential type outright (`CF_UNSUPPORTED_AUTH`).
 
-**Recommended for first-time users: the API Token flow above.** OAuth is convenience for power users who already understand cloudflared's auth model.
+The API token flow is the supported path, and the recommended one regardless —
+it is the only one that can list zones across the account.

@@ -39,7 +39,22 @@
 	border-radius: var(--mantine-radius-md);
 	box-shadow: var(--cg-shadow-surface);
 	font-size: var(--mantine-font-size-sm);
+	/*
+	 * Transparent to clicks unless there is something to click.
+	 *
+	 * Cloudy stands next to whatever he is talking about, and the bubble's
+	 * side is chosen only from viewport overflow — so a ~220px bubble can land
+	 * squarely on the control he is pointing at and swallow clicks meant for
+	 * it, for as long as it is shown. A bubble that is merely saying something
+	 * must not do that. The dismissible one (the support nudge) is a real
+	 * button and keeps its clicks, exactly like the figure wrap above.
+	 */
+	pointer-events: none;
+}
+
+.cloudy-bubble[data-dismissible="true"] {
 	pointer-events: auto;
+	cursor: pointer;
 }
 
 .cloudy-bubble[data-side="right"] {
