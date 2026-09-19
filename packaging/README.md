@@ -5,12 +5,13 @@ shipped by CloudGate itself — these are submitted to each store's own repo.
 
 ## Layout
 
-- `assets/` — `icon.svg` (orange cloud on a dark rounded-square background,
-  derived from `packages/frontend/public/favicon.svg`) plus rendered
-  `icon-512.png` / `icon-256.png`. Rendered with Python's `svglib` +
-  `reportlab` (`renderPM`, via the `rlPyCairo` backend) — no Node dependency
-  was added to the repo for this. No screenshots exist yet; see "Screenshots"
-  below.
+- `assets/` — `icon.svg`, the app icon: the Tabler `cloud-computing` glyph
+  (MIT) the web UI shows in its header, in a brand-orange gradient on a dark
+  tile. `icon-512.png` / `icon-256.png` are rendered from it with
+  `rsvg-convert -w <size> -h <size> icon.svg -o icon-<size>.png` (librsvg,
+  e.g. in a `debian:bookworm-slim` container). ZimaOS carries its own copy
+  in `zimaos/CloudGate/icon.svg`. No screenshots exist yet; see
+  "Screenshots" below.
 - `umbrel/cloudgate/` — [Umbrel App Store](https://github.com/getumbrel/umbrel-apps)
   package (`umbrel-app.yml` + `docker-compose.yml`), following that repo's
   `umbrel-package-app` skill.
