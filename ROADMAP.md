@@ -8,7 +8,7 @@
 
 CloudGate is stable as of v0.5.0. What it does today:
 
-- **Setup** — one-liner installer for Ubuntu/LXC, plain `docker run`, or an app-store package (see [Planned](#planned) for store acceptance status). Zero required configuration: encryption key, JWT secret and the initial admin account are generated on first boot.
+- **Setup** — one-liner installer for Ubuntu/LXC, plain `docker run`, or an app-store package (listings pending review; see the README). Zero required configuration: encryption key, JWT secret and the initial admin account are generated on first boot.
 - **Cloudflare Tunnel hosting** — add a service, get a public hostname. CloudGate creates the tunnel, the DNS record, and the ingress rule, and reloads `cloudflared` for you. Multiple Cloudflare accounts and multiple tunnels are supported.
 - **Playit.gg tunnels for TCP/UDP** — Minecraft (Java via SRV, Bedrock via literal `host:port`), SSH, and other raw TCP/UDP services that Cloudflare's free tier can't carry to a vanilla client.
 - **Hybrid mode** — per host, choose "via Cloudflare Tunnel" or "local nginx reverse proxy" with Let's Encrypt via DNS-01 and automatic renewal.
@@ -33,8 +33,7 @@ Real open items, roughly in the order they'd land:
 - **Postgres support.** The schema is designed to be Postgres-portable (Knex/Objection), but only SQLite is wired up.
 - **Webhooks and a Prometheus `/metrics` endpoint.** Neither exists yet — notifications on host/update events currently mean checking the audit log or the UI.
 - **Notification integrations** (Discord, Telegram, Pushover, ntfy) for update and host-failure events.
-- **Bring-your-own-DNS.** Only Cloudflare is supported as a DNS/tunnel provider today.
-- **README screenshots.** `packaging/assets/screenshots/` has real UI screenshots (used by the store packages); the README doesn't embed any yet.
+- **Bring-your-own-DNS.** Cloudflare is the only supported DNS provider today.
 
 ---
 

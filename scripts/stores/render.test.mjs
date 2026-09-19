@@ -91,7 +91,7 @@ tagline: Self-hosted web UI for Cloudflare Tunnels
 description: >-
   Some description.
 releaseNotes: ""
-developer: Elias Kanakidis
+developer: Elias02345
 website: https://github.com/Elias02345/CloudGate
 dependencies: []
 repo: https://github.com/Elias02345/CloudGate
@@ -101,7 +101,7 @@ gallery: []
 path: ""
 defaultUsername: ""
 defaultPassword: ""
-submitter: Elias Kanakidis
+submitter: Elias02345
 submission: "https://github.com/getumbrel/umbrel-apps/pull/TBD"
 `;
 

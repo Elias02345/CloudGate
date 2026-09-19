@@ -56,4 +56,4 @@ We do NOT protect against:
 
 ## Disclosure Timeline
 
-After a fix is released, we publish details in the GitHub Release notes and on the [Discussions](https://github.com/Elias02345/CloudGate/discussions) board.
+After a fix is released, details are published in the GitHub Release notes and as a GitHub security advisory.

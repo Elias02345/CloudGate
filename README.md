@@ -1,11 +1,13 @@
 # 🌩️ CloudGate
 
-> **Self-hosted WebUI for Cloudflare Tunnels.** Host services from behind CGNAT without port forwarding — Immich, Nextcloud, Jellyfin, Proxmox, Home Assistant, you name it.
+> **Self-hosted WebUI for Cloudflare Tunnels and playit.gg.** Host services from behind CGNAT without port forwarding — Immich, Nextcloud, Jellyfin, Proxmox, Home Assistant, you name it.
 
 **Status:** stable — v0.5.0 is the first production-ready release.
 
+![CloudGate hosts overview](packaging/assets/screenshots/2-hosts.png)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Build](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml)
+[![Build](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml)
 [![Sponsor](https://img.shields.io/badge/💛-Sponsor-ff6620.svg)](SPONSORING.md)
 
 ---
@@ -67,7 +69,7 @@ docker run -d --name cloudgate \
 
 ### What happens next
 
-1. Open `http://<your-host-ip>/` in a browser.
+1. Open `http://<your-host-ip>/` (or port `8080`) in a browser.
 2. Login as `admin@cloudgate.local` with the password shown in container logs:
    ```bash
    docker logs cloudgate | grep -A1 "INITIAL ADMIN PASSWORD"
@@ -161,7 +163,7 @@ See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for the dev workflow.
 
 ## 💛 Support
 
-CloudGate is free forever (MIT) but maintained by one maintainer in spare time. If it saves you a Sunday afternoon, a small tip helps cover infrastructure + signing keys + ongoing dev time:
+CloudGate is free forever (MIT) and maintained by a single developer in their spare time. If it saves you a Sunday afternoon, a small tip helps cover infrastructure + signing keys + ongoing dev time:
 
 - ☕ [**PayPal**](https://www.paypal.me/EliasK09) — one-click
 - ₿ Bitcoin: `bc1qphk3h7sw6j429c62ypw6zxgmkfeevmxs437ze3`
