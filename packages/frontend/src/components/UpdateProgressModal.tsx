@@ -580,7 +580,7 @@ export function UpdateProgressModal({
 							{t('update_modal.open_recovery')}
 						</Anchor>
 						<Button variant="default" onClick={onClose}>
-							{t('common.close' as never, { defaultValue: 'Close' })}
+							{t('common.close')}
 						</Button>
 					</Group>
 				)}
