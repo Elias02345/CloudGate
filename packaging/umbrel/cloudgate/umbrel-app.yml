@@ -32,16 +32,7 @@ description: >-
 
 
   Not affiliated with Cloudflare or playit.gg.
-releaseNotes: >-
-  - CloudGate is stable.
-
-  - Ready for homelab app stores.
-
-  - Admin UI on port 8080.
-
-  - Updates handled by your platform.
-
-  - Switches jumped instead of sliding.
+releaseNotes: ""
 developer: Elias02345
 website: https://github.com/Elias02345/CloudGate
 dependencies: []
