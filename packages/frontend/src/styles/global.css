@@ -234,6 +234,18 @@ body {
 	--cg-row-edge: var(--mantine-primary-color-filled);
 }
 
+/* Keyboard focus on a selectable row or card. Rows reuse the edge hover and
+   selection already draw, since an outline on a <tr> renders unreliably. */
+.cg-clickable:focus-visible {
+	outline: 2px solid var(--mantine-primary-color-filled);
+	outline-offset: 2px;
+}
+
+tr.cg-clickable:focus-visible {
+	outline: none;
+	--cg-row-edge: var(--mantine-primary-color-filled);
+}
+
 tr.cg-clickable > td {
 	border-top: 1px solid var(--cg-row-edge);
 	border-bottom: 1px solid var(--cg-row-edge);

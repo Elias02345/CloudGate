@@ -12,6 +12,7 @@ import {
 	Table,
 	Text,
 	Title,
+	UnstyledButton,
 } from '@mantine/core';
 import { IconClipboardList } from '@tabler/icons-react';
 import { type ReactNode, useState } from 'react';
@@ -47,24 +48,28 @@ function MetaChip({
 	size,
 	maw,
 }: { meta: unknown; position: 'left' | 'bottom'; size: number; maw: number }) {
+	const { t } = useTranslation();
 	return (
 		<Popover position={position} withArrow shadow="sm">
 			<Popover.Target>
-				<Code
-					className="cg-clickable"
-					w={size}
-					h={size}
-					style={{
-						display: 'flex',
-						alignItems: 'center',
-						justifyContent: 'center',
-						padding: 0,
-						flexShrink: 0,
-						fontSize: size < 20 ? 11 : 12,
-					}}
-				>
-					{'{}'}
-				</Code>
+				{/* A button around the chip, not the chip itself: a <code> cannot take
+				    focus, so the details were reachable only by mouse. */}
+				<UnstyledButton aria-label={t('audit.col_meta')} style={{ flexShrink: 0, lineHeight: 0 }}>
+					<Code
+						className="cg-clickable"
+						w={size}
+						h={size}
+						style={{
+							display: 'flex',
+							alignItems: 'center',
+							justifyContent: 'center',
+							padding: 0,
+							fontSize: size < 20 ? 11 : 12,
+						}}
+					>
+						{'{}'}
+					</Code>
+				</UnstyledButton>
 			</Popover.Target>
 			<Popover.Dropdown>
 				<Code block maw={maw} mah={300} style={{ overflow: 'auto' }}>

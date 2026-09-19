@@ -33,6 +33,7 @@ import { useConfirm } from '../components/ConfirmProvider.js';
 import { EmptyState } from '../components/EmptyState.js';
 import { ListError } from '../components/ListError.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
+import { selectableProps } from '../components/selectable.js';
 
 function InfoLine({ label, children }: { label: string; children: ReactNode }) {
 	return (
@@ -139,8 +140,8 @@ export function CloudflarePage() {
 												<Table.Tr
 													key={a.id}
 													className="cg-clickable"
-													data-selected={selectedId === a.id || undefined}
-													onClick={() => setSelectedId(a.id)}
+													aria-selected={selectedId === a.id}
+													{...selectableProps(selectedId === a.id, () => setSelectedId(a.id))}
 												>
 													<Table.Td>
 														<Text fw={500}>{a.label}</Text>
@@ -197,8 +198,10 @@ export function CloudflarePage() {
 										radius="md"
 										p="sm"
 										className="cg-clickable"
-										data-selected={selectedId === a.id || undefined}
-										onClick={() => setSelectedId(a.id)}
+										// biome-ignore lint/a11y/useSemanticElements: the card holds its own delete button, and a <button> cannot contain another
+										role="button"
+										aria-pressed={selectedId === a.id}
+										{...selectableProps(selectedId === a.id, () => setSelectedId(a.id))}
 									>
 										<Stack gap={6}>
 											<Group justify="space-between" wrap="nowrap" align="flex-start">
