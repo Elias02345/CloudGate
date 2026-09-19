@@ -134,7 +134,7 @@ case "$STORE" in
     npm run lint:apps -- cloudgate --check-images
     ;;
   zimaos)
-    pip install --quiet --disable-pip-version-check PyYAML
+    python3 -c "import yaml" 2>/dev/null || pip install --quiet --disable-pip-version-check PyYAML
     python3 .github/actions/validate-compose/scripts/validate_compose.py \
       --app-path CloudGate --report-json out/validation-report.json
     ;;
