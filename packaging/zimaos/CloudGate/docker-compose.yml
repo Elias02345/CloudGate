@@ -48,9 +48,8 @@ x-casaos:
       Features:
       - Hybrid routing: per host, choose "via Cloudflare Tunnel" or "local
         nginx reverse proxy".
-      - Auto-updates itself when new releases ship, without ever touching
-        your data (disabled in this package — the platform updates the
-        image instead).
+      - Updates arrive through the ZimaOS App Store and never touch your
+        data.
       - No required configuration — an admin account and all secrets are
         generated on first boot.
 
@@ -66,11 +65,11 @@ x-casaos:
   update_at: "2026-09-19"
   release_notes:
     en_US: |
-      - **The sidebar could not be used with a keyboard.** Every navigation entry
-      - **A crash left no trace in the log CloudGate shows you.** When an error
-      - **Deleting a Cloudflare account left its tunnels running.** The database
-      - **The confirmation did not say what it was about to do.** Deleting a
-      - After deleting an account or a tunnel, the tunnel and host lists refresh
+      - The sidebar could not be used with a keyboard.
+      - A crash left no trace in the log CloudGate shows you.
+      - Deleting a Cloudflare account left its tunnels running.
+      - The confirmation did not say what it was about to do.
+      - After deleting an account or a tunnel, the tunnel and host lists refresh straight away instead of showing the old rows until their next poll.
   website: https://github.com/Elias02345/CloudGate
   repo: https://github.com/Elias02345/CloudGate
   support: https://github.com/Elias02345/CloudGate/issues

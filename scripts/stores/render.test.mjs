@@ -57,12 +57,16 @@ _Nothing yet._
 ### Fixed
 
 - The sidebar could not be used with a keyboard.
+- **A crash left no trace.** When an error escaped, the process
+  exited before the log was written. Now it is logged first.
 `;
 
 test("extractReleaseNotes finds the matching version section", () => {
-  const { breaking, bullets } = extractReleaseNotes(SAMPLE_CHANGELOG, "0.3.13");
+  const { breaking, bullets, date } = extractReleaseNotes(SAMPLE_CHANGELOG, "0.3.13");
   assert.equal(breaking, false);
-  assert.deepEqual(bullets, ["The sidebar could not be used with a keyboard."]);
+  assert.equal(date, "2026-09-19");
+  // Wrapped bullets are joined, then reduced to the bold lead-in.
+  assert.deepEqual(bullets, ["The sidebar could not be used with a keyboard.", "A crash left no trace."]);
 });
 
 test("extractReleaseNotes detects a Breaking Changes subsection and caps at 5 bullets", () => {

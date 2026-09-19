@@ -24,8 +24,7 @@ description: >-
   - Hybrid routing: per host, choose "via Cloudflare Tunnel" or "local nginx
     reverse proxy".
 
-  - Auto-updates itself when new releases ship, without ever touching your
-    data.
+  - Updates arrive through the Umbrel App Store and never touch your data.
 
   - No required configuration — an admin account and all secrets are
     generated on first boot.
@@ -33,15 +32,15 @@ description: >-
   - Not affiliated with Cloudflare; uses Cloudflare's public Tunnel
     infrastructure through their documented API.
 releaseNotes: >-
-  - **The sidebar could not be used with a keyboard.** Every navigation entry
+  - The sidebar could not be used with a keyboard.
 
-  - **A crash left no trace in the log CloudGate shows you.** When an error
+  - A crash left no trace in the log CloudGate shows you.
 
-  - **Deleting a Cloudflare account left its tunnels running.** The database
+  - Deleting a Cloudflare account left its tunnels running.
 
-  - **The confirmation did not say what it was about to do.** Deleting a
+  - The confirmation did not say what it was about to do.
 
-  - After deleting an account or a tunnel, the tunnel and host lists refresh
+  - After deleting an account or a tunnel, the tunnel and host lists refresh straight away instead of showing the old rows until their next poll.
 developer: Elias Kanakidis
 website: https://github.com/Elias02345/CloudGate
 dependencies: []

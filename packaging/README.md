@@ -38,7 +38,7 @@ upstream is vendored into this repo; the clones are throwaway.
 |---|---|---|
 | Umbrel | `node .tools/lint-apps.mjs cloudgate --check-images` (from a clone of `getumbrel/umbrel-apps`) | Manifest shape, port uniqueness, image pinning + multi-arch pull, `app_proxy` wiring, persistence paths |
 | ZimaOS | `.github/actions/validate-compose/scripts/validate_compose.py` (from a clone of `IceWhaleTech/CasaOS-AppStore`) | YAML validity, top-level `name` format, `x-casaos.id` reverse-domain format, `docker compose config -q` (needs Docker) |
-| TrueNAS | YAML parses; port checked against `.github/scripts/port_validation.py`; library API calls cross-checked against `library/2.3.13/*.py` source (from a clone of `truenas/apps`) | See "TrueNAS: what could not be validated" below — full rendering needs Docker |
+| TrueNAS | YAML parses; port checked against `.github/scripts/port_validation.py`; library API calls cross-checked against `library/2.3.13/*.py` source (from a clone of `truenas/apps`) | Full `ci.py --wait=true` run passed — see "TrueNAS: how it was validated" below |
 | Unraid | `xml.dom.minidom.parse()` (Python stdlib) | Well-formed XML only — no official schema validator is published |
 
 `.github/workflows/packaging.yml` runs the parts of this that don't need a
@@ -129,33 +129,26 @@ has nothing to do with TrueNAS's rendering pipeline. Run `devbox run
 copy-lib` from that fork's root after copying `packaging/truenas/cloudgate/`
 into `ix-dev/community/cloudgate/` there.
 
-## TrueNAS: what could not be validated
+## TrueNAS: how it was validated
 
-`ci.py --render-only`, `generate_metadata.py`, and `devbox run copy-lib` /
-`validate` all shell out to
-`docker run ... ghcr.io/truenas/apps_validation ...` — none of them work
-without a running Docker daemon. This environment has no Docker Engine and
-no WSL access (sandboxed), so the actual Jinja2 render was never executed.
-Confidence instead comes from:
+Run in a clone of `truenas/apps` with Docker (WSL):
 
-- Structural parity with `adguard-home`, the closest existing community app
-  (single container, root `run_as_context`, `network`/`storage` groups with
-  no user/group group).
-- Every library method the template calls (`add_env`, `add_user_envs`,
-  `add_port`, `add_storage`, `healthcheck.set_test`, `portals.add`) checked
-  by hand against `library/2.3.13/*.py`'s actual signatures.
-- `.github/scripts/port_validation.py` run (via a small Windows-path-safe
-  wrapper — the upstream script assumes POSIX `/` path separators) to
-  confirm the default WebUI port (`30492`) doesn't collide with any existing
-  app.
-- Catching that `add_port(values.network.web_port)` alone would have bound
-  the container's fixed internal port 8080 to whatever host port the user
-  picked (copying AdGuard Home's pattern too literally — AdGuard's own
-  binary is told to bind `port_number` directly via a CLI flag, so its
-  container port isn't fixed; CloudGate's is). Fixed by passing
-  `{"container_port": values.consts.web_port}` explicitly, matching how
-  `adguard-home` itself handles its *DNS* port (53) being fixed while the
-  host port is user-chosen.
+```bash
+cp -r <CloudGate>/packaging/truenas/cloudgate ix-dev/community/
+python3 .github/scripts/ci.py --train community --app cloudgate --test-file basic-values.yaml --wait=true
+```
 
-Recommend the maintainer run `devbox run app-render community cloudgate` (or
-`ci.py --render-only`) locally with Docker before opening the real PR.
+`ci.py` vendors the library (`apps_catalog_hash_generate`), renders the
+compose file and starts it. Result on 2026-09-19, with `ix_values.yaml`
+temporarily pointed at a local build of `dev` (the published v0.3.13 image
+predates port 8080): "Containers started successfully", healthy on 8080.
+
+That run caught two bugs a static review missed: `TZ` must not be added by
+the template (the library adds it), and the library drops **all** Linux
+capabilities by default. CloudGate starts as root, so the template sets
+`set_user(0, 0)` and adds exactly the capabilities it needs (see the comment
+in `templates/docker-compose.yaml`). They were found by starting the image
+with `--cap-drop ALL` plus candidate sets.
+
+`port_validation.py` confirmed the default WebUI port `30492` is free. The
+vendored `templates/library/` is generated in the fork, not stored here.

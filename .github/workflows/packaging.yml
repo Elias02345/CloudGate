@@ -44,8 +44,11 @@ jobs:
           version="$(node -p "require('./package.json').version")"
           dummy_digest="sha256:$(printf '0%.0s' {1..64})"
           node scripts/stores/render.mjs "$version" "$dummy_digest"
+          cp -r packaging/umbrel /tmp/umbrel-1 && cp -r packaging/zimaos /tmp/zimaos-1
           node scripts/stores/render.mjs "$version" "$dummy_digest"
-          git diff --exit-code -- packaging/umbrel packaging/zimaos
+          # The second run must change nothing the first one wrote.
+          diff -r /tmp/umbrel-1 packaging/umbrel
+          diff -r /tmp/zimaos-1 packaging/zimaos
           # Restore the real digest — the lines above only exist to prove
           # the rewrite is idempotent, not to actually change the package.
           git checkout -- packaging/umbrel packaging/zimaos

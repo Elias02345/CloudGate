@@ -24,8 +24,8 @@
 //   - packaging/unraid/**: `Repository` is pinned to `:latest` by design
 //     (Unraid convention), so there is no tag/digest field to rewrite.
 //
-// Deterministic: for the same (version, digest, CHANGELOG.md, today's date)
-// it always writes byte-identical output, so running it twice back to back
+// Deterministic: for the same (version, digest, CHANGELOG.md) — the update
+// date comes from the CHANGELOG heading, not the clock — it always writes byte-identical output, so running it twice back to back
 // is a no-op diff.
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -53,9 +53,12 @@ export function parseArgs(argv) {
 // --- CHANGELOG.md extraction --------------------------------------------
 
 /**
- * Pull a short summary out of CHANGELOG.md's `## [X.Y.Z]` section: up to 5
- * top-level bullet lines (first line of each, continuation lines dropped),
- * plus whether the section has a "Breaking Changes" subsection.
+ * Pull a short summary out of CHANGELOG.md's `## [X.Y.Z] — YYYY-MM-DD`
+ * section: up to 5 top-level bullets, each reduced to its bold lead-in
+ * (`- **Title.** details…` → `Title.`) or, without one, its first sentence.
+ * Wrapped continuation lines are joined first so nothing is cut mid-sentence.
+ * Also returns the section date (the store's update date, so the output
+ * depends only on the inputs) and whether a Breaking Changes subsection exists.
  */
 export function extractReleaseNotes(changelogText, version) {
   const lines = changelogText.split("\n");
@@ -63,21 +66,31 @@ export function extractReleaseNotes(changelogText, version) {
   if (startIdx === -1) {
     throw new Error(`CHANGELOG.md has no "## [${version}]" section.`);
   }
+  const date = lines[startIdx].match(/(\d{4}-\d{2}-\d{2})\s*$/)?.[1];
+  if (!date) {
+    throw new Error(`CHANGELOG.md's "## [${version}]" heading has no trailing YYYY-MM-DD date.`);
+  }
   let endIdx = lines.findIndex((l, i) => i > startIdx && /^## \[/.test(l));
   if (endIdx === -1) endIdx = lines.length;
   const section = lines.slice(startIdx + 1, endIdx);
 
   const breaking = section.some((l) => /^### .*breaking/i.test(l));
-  const bullets = section
-    .filter((l) => /^- /.test(l))
+  const items = [];
+  for (const l of section) {
+    if (/^- /.test(l)) items.push(l.slice(2).trim());
+    else if (items.length && /^\s+\S/.test(l) && !/^\s*- /.test(l)) items[items.length - 1] += ` ${l.trim()}`;
+    else if (!/^\s*$/.test(l)) items.push(null); // a heading or paragraph ends the current bullet
+  }
+  const bullets = items
+    .filter(Boolean)
     .slice(0, 5)
-    .map((l) => l.replace(/^- /, "").trim());
+    .map((b) => b.match(/^\*\*(.+?)\*\*/)?.[1] ?? b.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? b);
 
   if (bullets.length === 0) {
     throw new Error(`CHANGELOG.md's "## [${version}]" section has no top-level bullet lines.`);
   }
 
-  return { breaking, bullets };
+  return { breaking, bullets, date };
 }
 
 function indent(text, prefix) {
@@ -168,8 +181,8 @@ function readFile(p) {
   return readFileSync(p, "utf8");
 }
 
-export function render({ version, digest, changelogText, today = new Date().toISOString().slice(0, 10) }) {
-  const { breaking, bullets } = extractReleaseNotes(changelogText, version);
+export function render({ version, digest, changelogText }) {
+  const { breaking, bullets, date: today } = extractReleaseNotes(changelogText, version);
 
   const umbrelManifestPath = path.join(ROOT, "packaging/umbrel/cloudgate/umbrel-app.yml");
   const umbrelComposePath = path.join(ROOT, "packaging/umbrel/cloudgate/docker-compose.yml");
