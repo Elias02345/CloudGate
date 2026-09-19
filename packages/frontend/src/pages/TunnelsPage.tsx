@@ -51,6 +51,7 @@ import {
 } from '../api/tunnels.js';
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { EmptyState } from '../components/EmptyState.js';
+import { ListError } from '../components/ListError.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
 
 function statusColor(s: string): string {
@@ -233,6 +234,7 @@ export function TunnelsPage() {
 			<Card withBorder data-tour="tunnels-list">
 				<Stack>
 					{tunnels.isLoading && <ListSkeleton rows={4} />}
+					{tunnels.isError && <ListError error={tunnels.error} onRetry={() => void tunnels.refetch()} />}
 					{tunnels.data?.tunnels.length === 0 && (
 						<EmptyState icon={<IconRoute size={40} stroke={1.5} />} title={t('tunnels.empty')} />
 					)}

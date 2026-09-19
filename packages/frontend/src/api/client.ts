@@ -22,6 +22,14 @@ export class ApiError extends Error {
 	}
 }
 
+/**
+ * Fired once when a request comes back 401 with a token in hand, i.e. the
+ * session is gone. An event rather than a direct call into the query client:
+ * this module sits at the bottom of the import graph and must not depend on
+ * React or on main.tsx.
+ */
+export const UNAUTHORIZED_EVENT = 'cloudgate:unauthorized';
+
 export function getStoredToken(): string | null {
 	try {
 		return localStorage.getItem(TOKEN_KEY);
@@ -70,6 +78,21 @@ export async function api<T>(
 		const message = (data as { error?: string } | null)?.error ?? `HTTP ${res.status}`;
 		const code = (data as { code?: string } | null)?.code ?? 'HTTP_ERROR';
 		const details = (data as { details?: unknown } | null)?.details;
+
+		// A dead session used to go unnoticed everywhere except /auth/me.
+		// Every other query just threw, TanStack Query kept the last good
+		// data, and the app carried on showing it as if it were current —
+		// polling in the background, failing silently, logging nobody out.
+		//
+		// The token is dropped here and the app told once, so whichever
+		// request happens to hit the 401 first is enough to end the session.
+		// The login request is exempt: a wrong password is a 401 about
+		// credentials, not about an expired session.
+		if (res.status === 401 && token && path !== '/auth/login') {
+			setStoredToken(null);
+			window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+		}
+
 		throw new ApiError(res.status, code, message, details);
 	}
 

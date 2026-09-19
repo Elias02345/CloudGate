@@ -18,6 +18,7 @@ import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuditLog } from '../api/audit.js';
 import { EmptyState } from '../components/EmptyState.js';
+import { ListError } from '../components/ListError.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
 
 const ACTION_COLORS: Record<string, string> = {
@@ -77,7 +78,7 @@ function MetaChip({
 export function AuditLogPage() {
 	const { t } = useTranslation();
 	const [page, setPage] = useState(1);
-	const { data, isLoading } = useAuditLog({ page });
+	const { data, isLoading, isError, error, refetch } = useAuditLog({ page });
 
 	const totalPages = data ? Math.max(1, Math.ceil(data.total / data.per_page)) : 1;
 
@@ -91,6 +92,7 @@ export function AuditLogPage() {
 			<Card withBorder data-tour="audit-filters">
 				<Stack>
 					{isLoading && <ListSkeleton rows={6} />}
+					{isError && <ListError error={error} onRetry={() => void refetch()} />}
 					{data && data.data.length === 0 && (
 						<EmptyState icon={<IconClipboardList size={40} stroke={1.5} />} title={t('audit.empty')} />
 					)}

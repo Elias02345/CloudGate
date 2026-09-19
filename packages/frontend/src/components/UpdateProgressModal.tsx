@@ -504,7 +504,17 @@ export function UpdateProgressModal({
 							cursor: 'pointer',
 							borderBottom: terminalOpen ? '1px solid var(--mantine-color-gray-3)' : 'none',
 						}}
+						// biome-ignore lint/a11y/useSemanticElements: needs Mantine's Group flex layout, not a <button>'s box model — role/tabIndex/onKeyDown make it keyboard-operable without changing the visual design
+						role="button"
+						tabIndex={0}
+						aria-expanded={terminalOpen}
 						onClick={() => setTerminalOpen((v) => !v)}
+						onKeyDown={(e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								setTerminalOpen((v) => !v);
+							}
+						}}
 					>
 						<Group gap="xs">
 							<IconTerminal2 size={16} />
@@ -515,7 +525,7 @@ export function UpdateProgressModal({
 								{logLines.length}
 							</Badge>
 						</Group>
-						<ActionIcon variant="subtle" size="sm">
+						<ActionIcon variant="subtle" size="sm" aria-hidden="true" tabIndex={-1}>
 							{terminalOpen ? <IconChevronUp size={14} /> : <IconChevronDown size={14} />}
 						</ActionIcon>
 					</Group>

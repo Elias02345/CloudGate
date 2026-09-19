@@ -31,6 +31,7 @@ import {
 } from '../api/cloudflare.js';
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { EmptyState } from '../components/EmptyState.js';
+import { ListError } from '../components/ListError.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
 
 function InfoLine({ label, children }: { label: string; children: ReactNode }) {
@@ -104,6 +105,7 @@ export function CloudflarePage() {
 					</Text>
 
 					{accounts.isLoading && <ListSkeleton rows={3} />}
+					{accounts.isError && <ListError error={accounts.error} onRetry={() => void accounts.refetch()} />}
 					{accounts.data?.accounts.length === 0 && (
 						<EmptyState
 							icon={<IconCloudPlus size={40} stroke={1.5} />}
@@ -175,6 +177,7 @@ export function CloudflarePage() {
 																	void deleteMutation.mutate(a.id);
 																	if (selectedId === a.id) setSelectedId(null);
 																}}
+																title={t('cloudflare.delete_title')}
 															>
 																<IconTrash size={16} />
 															</ActionIcon>
@@ -233,6 +236,7 @@ export function CloudflarePage() {
 														void deleteMutation.mutate(a.id);
 														if (selectedId === a.id) setSelectedId(null);
 													}}
+													title={t('cloudflare.delete_title')}
 												>
 													<IconTrash size={18} />
 												</ActionIcon>
