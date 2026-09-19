@@ -9,6 +9,28 @@ _Nothing yet._
 
 ---
 
+## [0.3.11] — 2026-09-19
+
+### Fixed
+
+- **Mistyping your current password logged you out.** 0.3.9 taught CloudGate
+  to end a session when the server rejects it — but it read any rejection as
+  "your session is over", and the server also rejects a wrong current password
+  the same way. So a typo on the change-password form threw you back to the
+  login screen instead of saying the password was wrong. CloudGate now
+  distinguishes the two: only a problem with the session itself ends it. A
+  wrong password, or a wrong second factor, just says so.
+- An empty list and a failed one could appear at the same time, saying "nothing
+  here yet" and "could not be loaded" side by side.
+
+### Changed
+
+- The container image labels were being written before the parts of the image
+  that take the longest to build, so every release rebuilt and re-downloaded
+  all of them from scratch. Moved to the end.
+
+---
+
 ## [0.3.10] — 2026-09-19
 
 ### Changed

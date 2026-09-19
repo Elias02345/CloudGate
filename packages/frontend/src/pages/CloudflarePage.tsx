@@ -106,7 +106,7 @@ export function CloudflarePage() {
 
 					{accounts.isLoading && <ListSkeleton rows={3} />}
 					{accounts.isError && <ListError error={accounts.error} onRetry={() => void accounts.refetch()} />}
-					{accounts.data?.accounts.length === 0 && (
+					{!accounts.isError && accounts.data?.accounts.length === 0 && (
 						<EmptyState
 							icon={<IconCloudPlus size={40} stroke={1.5} />}
 							title={t('cloudflare.empty')}

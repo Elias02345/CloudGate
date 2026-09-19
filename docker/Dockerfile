@@ -48,19 +48,6 @@ RUN pnpm --filter @cloudgate/backend deploy --prod /deploy/backend && \
 # -----------------------------------------------------------------------------
 FROM debian:bookworm-slim AS runtime
 
-# Standard OCI annotations. Container app stores and management UIs (Unraid,
-# CasaOS, Portainer, Komodo …) read these off the image to show a name, a
-# description and a link back to the source, rather than a bare repository
-# path. `version` is filled from the build arg so a pulled image can say which
-# release it is without starting it.
-ARG CLOUDGATE_VERSION=dev
-LABEL org.opencontainers.image.title="CloudGate" \
-      org.opencontainers.image.description="Self-hosted web UI for Cloudflare Tunnels and playit.gg — publish services from behind CGNAT without port forwarding." \
-      org.opencontainers.image.source="https://github.com/Elias02345/CloudGate" \
-      org.opencontainers.image.documentation="https://github.com/Elias02345/CloudGate#readme" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.vendor="Elias Kanakidis" \
-      org.opencontainers.image.version="${CLOUDGATE_VERSION}"
 
 ARG S6_OVERLAY_VERSION=3.2.0.0
 ARG CLOUDFLARED_VERSION=2026.9.1
@@ -213,5 +200,23 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
     CMD curl -fsS http://127.0.0.1/api/health > /dev/null 2>&1 \
         || curl -fsS http://127.0.0.1/api/status > /dev/null 2>&1 \
         || exit 1
+
+# Standard OCI annotations. Deliberately last: the version changes on every
+# release, and a layer whose digest changes invalidates every layer after
+# it. Placed before the apt/Node/cloudflared/s6 installs, this made each
+# release re-download and re-verify all of them.
+# Standard OCI annotations. Container app stores and management UIs (Unraid,
+# CasaOS, Portainer, Komodo …) read these off the image to show a name, a
+# description and a link back to the source, rather than a bare repository
+# path. `version` is filled from the build arg so a pulled image can say which
+# release it is without starting it.
+ARG CLOUDGATE_VERSION=dev
+LABEL org.opencontainers.image.title="CloudGate" \
+      org.opencontainers.image.description="Self-hosted web UI for Cloudflare Tunnels and playit.gg — publish services from behind CGNAT without port forwarding." \
+      org.opencontainers.image.source="https://github.com/Elias02345/CloudGate" \
+      org.opencontainers.image.documentation="https://github.com/Elias02345/CloudGate#readme" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Elias Kanakidis" \
+      org.opencontainers.image.version="${CLOUDGATE_VERSION}"
 
 ENTRYPOINT ["/init"]

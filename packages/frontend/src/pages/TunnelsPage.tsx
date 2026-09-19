@@ -235,7 +235,7 @@ export function TunnelsPage() {
 				<Stack>
 					{tunnels.isLoading && <ListSkeleton rows={4} />}
 					{tunnels.isError && <ListError error={tunnels.error} onRetry={() => void tunnels.refetch()} />}
-					{tunnels.data?.tunnels.length === 0 && (
+					{!tunnels.isError && tunnels.data?.tunnels.length === 0 && (
 						<EmptyState icon={<IconRoute size={40} stroke={1.5} />} title={t('tunnels.empty')} />
 					)}
 					{tunnels.data && tunnels.data.tunnels.length > 0 && (

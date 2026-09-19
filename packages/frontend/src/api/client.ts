@@ -83,12 +83,18 @@ export async function api<T>(
 		// Every other query just threw, TanStack Query kept the last good
 		// data, and the app carried on showing it as if it were current —
 		// polling in the background, failing silently, logging nobody out.
-		//
 		// The token is dropped here and the app told once, so whichever
-		// request happens to hit the 401 first is enough to end the session.
-		// The login request is exempt: a wrong password is a 401 about
-		// credentials, not about an expired session.
-		if (res.status === 401 && token && path !== '/auth/login') {
+		// request hits it first is enough to end the session.
+		//
+		// Keyed on the CODE, not the status. A 401 does not mean "your session
+		// is over": the backend also answers 401 for a wrong current password
+		// (`AUTH_FAILED`) and a wrong second factor (`TOTP_*`), both sent with
+		// a perfectly good token. Gating on the status logged people out for
+		// mistyping their password on the change-password form — the request
+		// they were making at that exact moment. `UNAUTHENTICATED` comes only
+		// from the auth middleware, i.e. only when the token itself is
+		// missing, invalid, expired or revoked.
+		if (res.status === 401 && code === 'UNAUTHENTICATED' && token) {
 			setStoredToken(null);
 			window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
 		}

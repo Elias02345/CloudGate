@@ -207,7 +207,7 @@ export function HostsPage() {
 				<Stack>
 					{hosts.isLoading && <ListSkeleton rows={4} />}
 					{hosts.isError && <ListError error={hosts.error} onRetry={() => void hosts.refetch()} />}
-					{hosts.data?.hosts.length === 0 && (
+					{!hosts.isError && hosts.data?.hosts.length === 0 && (
 						<EmptyState
 							icon={<IconWorld size={40} stroke={1.5} />}
 							title={t('hosts.empty')}

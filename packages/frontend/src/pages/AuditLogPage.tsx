@@ -93,7 +93,7 @@ export function AuditLogPage() {
 				<Stack>
 					{isLoading && <ListSkeleton rows={6} />}
 					{isError && <ListError error={error} onRetry={() => void refetch()} />}
-					{data && data.data.length === 0 && (
+					{!isError && data && data.data.length === 0 && (
 						<EmptyState icon={<IconClipboardList size={40} stroke={1.5} />} title={t('audit.empty')} />
 					)}
 					{data && data.data.length > 0 && (
