@@ -14,64 +14,20 @@
  * Pure + synchronous so it is trivial to unit test.
  */
 
-function ipv4ToInt(ip: string): number | null {
-	const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
-	if (!m) return null;
-	const [a, b, c, d] = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
-	if ([a, b, c, d].some((o) => o < 0 || o > 255)) return null;
-	return ((a << 24) | (b << 16) | (c << 8) | d) >>> 0;
-}
+import { BlockList, isIP } from 'node:net';
 
-function inIpv4Range(ip: string, base: string, prefixBits: number): boolean {
-	const ipInt = ipv4ToInt(ip);
-	const baseInt = ipv4ToInt(base);
-	if (ipInt === null || baseInt === null) return false;
-	const mask = prefixBits === 0 ? 0 : (0xffffffff << (32 - prefixBits)) >>> 0;
-	return (ipInt & mask) === (baseInt & mask);
-}
-
-/** Expands a full (possibly `::`-compressed) IPv6 literal to a 128-bit value. */
-function ipv6ToBigInt(ip: string): bigint | null {
-	if (!ip.includes(':')) return null;
-	let addr = ip;
-
-	// Trailing IPv4-mapped tail, e.g. "::ffff:127.0.0.1" — fold it into two hextets.
-	const v4Tail = /(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/.exec(addr);
-	const v4TailText = v4Tail?.[1];
-	if (v4TailText) {
-		const v4Int = ipv4ToInt(v4TailText);
-		if (v4Int === null) return null;
-		const hex = v4Int.toString(16).padStart(8, '0');
-		addr = `${addr.slice(0, addr.length - v4TailText.length)}${hex.slice(0, 4)}:${hex.slice(4)}`;
-	}
-
-	const halves = addr.split('::');
-	if (halves.length > 2) return null;
-	const head = halves[0] ? halves[0].split(':').filter(Boolean) : [];
-	const tail = halves.length === 2 && halves[1] ? halves[1].split(':').filter(Boolean) : [];
-	if (halves.length === 1 && head.length !== 8) return null;
-	const missing = 8 - head.length - tail.length;
-	if (halves.length === 2 && missing < 0) return null;
-	const groups = halves.length === 2 ? [...head, ...Array(missing).fill('0'), ...tail] : head;
-	if (groups.length !== 8) return null;
-
-	let value = 0n;
-	for (const g of groups) {
-		if (!/^[0-9a-fA-F]{1,4}$/.test(g)) return null;
-		value = (value << 16n) | BigInt(Number.parseInt(g, 16));
-	}
-	return value;
-}
-
-function inIpv6Range(ip: string, base: string, prefixBits: number): boolean {
-	const ipVal = ipv6ToBigInt(ip);
-	const baseVal = ipv6ToBigInt(base);
-	if (ipVal === null || baseVal === null) return false;
-	const shift = BigInt(128 - prefixBits);
-	const fullMask = (1n << 128n) - 1n;
-	const mask = shift === 0n ? fullMask : (fullMask >> shift) << shift;
-	return (ipVal & mask) === (baseVal & mask);
-}
+// ponytail: node:net's BlockList does the CIDR math (and matches IPv4-mapped
+// IPv6 against the IPv4 rules), so no hand-rolled address parsing here.
+const PRIVATE = new BlockList();
+PRIVATE.addSubnet('127.0.0.0', 8, 'ipv4'); // loopback
+PRIVATE.addSubnet('10.0.0.0', 8, 'ipv4'); // RFC1918
+PRIVATE.addSubnet('172.16.0.0', 12, 'ipv4'); // RFC1918
+PRIVATE.addSubnet('192.168.0.0', 16, 'ipv4'); // RFC1918
+PRIVATE.addSubnet('100.64.0.0', 10, 'ipv4'); // CGNAT / Tailscale
+PRIVATE.addSubnet('169.254.0.0', 16, 'ipv4'); // link-local
+PRIVATE.addAddress('::1', 'ipv6'); // loopback
+PRIVATE.addSubnet('fc00::', 7, 'ipv6'); // unique local
+PRIVATE.addSubnet('fe80::', 10, 'ipv6'); // link-local
 
 /**
  * True for loopback, RFC1918, CGNAT (100.64/10, used by Tailscale), and
@@ -84,26 +40,9 @@ export function isPrivateIp(ip: string | undefined | null): boolean {
 		.trim()
 		.replace(/^\[|\]$/g, '')
 		.replace(/%.*$/, '');
-
-	const mapped = /^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i.exec(clean);
-	const v4 = mapped?.[1] ?? clean;
-	if (ipv4ToInt(v4) !== null) {
-		return (
-			inIpv4Range(v4, '127.0.0.0', 8) || // loopback
-			inIpv4Range(v4, '10.0.0.0', 8) || // RFC1918
-			inIpv4Range(v4, '172.16.0.0', 12) || // RFC1918
-			inIpv4Range(v4, '192.168.0.0', 16) || // RFC1918
-			inIpv4Range(v4, '100.64.0.0', 10) || // CGNAT / Tailscale
-			inIpv4Range(v4, '169.254.0.0', 16) // link-local
-		);
-	}
-
-	if (clean.includes(':')) {
-		if (clean === '::1') return true; // loopback
-		return inIpv6Range(clean, 'fc00::', 7) || inIpv6Range(clean, 'fe80::', 10); // ULA / link-local
-	}
-
-	return false;
+	const family = isIP(clean);
+	if (family === 0) return false;
+	return PRIVATE.check(clean, family === 4 ? 'ipv4' : 'ipv6');
 }
 
 function headerValues(header: string | string[] | undefined): string[] {
