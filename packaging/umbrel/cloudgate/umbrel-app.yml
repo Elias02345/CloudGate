@@ -1,0 +1,58 @@
+manifestVersion: 1
+id: cloudgate
+category: networking
+name: CloudGate
+version: "0.3.13"
+tagline: Self-hosted web UI for Cloudflare Tunnels — publish homelab services from behind CGNAT without port forwarding
+description: >-
+  CloudGate is a WebUI that manages Cloudflare Tunnels for you. Add a
+  service — enter its local address and the public hostname you want — and
+  CloudGate creates the Cloudflare Tunnel, DNS record, and ingress rule, and
+  reloads the tunnel daemon for you.
+
+
+  Many home connections (CGNAT, DS-Lite, mobile-only uplinks) have no public
+  IPv4 and no port forwarding, so ordinary reverse proxies do not work.
+  Cloudflare Tunnel solves this for free, but the manual setup is a hard wall
+  for non-sysadmins. CloudGate does the setup and the day-to-day management
+  for you.
+
+
+  Features:
+
+
+  - Hybrid routing: per host, choose "via Cloudflare Tunnel" or "local nginx
+    reverse proxy".
+
+  - Updates arrive through the Umbrel App Store and never touch your data.
+
+  - No required configuration — an admin account and all secrets are
+    generated on first boot.
+
+  - Not affiliated with Cloudflare; uses Cloudflare's public Tunnel
+    infrastructure through their documented API.
+releaseNotes: >-
+  - The sidebar could not be used with a keyboard.
+
+  - A crash left no trace in the log CloudGate shows you.
+
+  - Deleting a Cloudflare account left its tunnels running.
+
+  - The confirmation did not say what it was about to do.
+
+  - After deleting an account or a tunnel, the tunnel and host lists refresh straight away instead of showing the old rows until their next poll.
+developer: Elias Kanakidis
+website: https://github.com/Elias02345/CloudGate
+dependencies: []
+repo: https://github.com/Elias02345/CloudGate
+support: https://github.com/Elias02345/CloudGate/issues
+port: 7844
+gallery: []
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+submitter: Elias Kanakidis
+# TODO(maintainer): replace with the real getumbrel/umbrel-apps pull request
+# URL at submission time. Placeholder kept as a syntactically valid URL only
+# so `npm run lint:apps` can check everything else in this file.
+submission: "https://github.com/getumbrel/umbrel-apps/pull/TBD"

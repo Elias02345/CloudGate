@@ -15,7 +15,7 @@ export function UpdateBanner() {
 	const { data } = useUpdateStatus();
 	const navigate = useNavigate();
 
-	if (!data?.update_available || !data.latest_version) return null;
+	if (data?.updates_disabled || !data?.update_available || !data.latest_version) return null;
 
 	return (
 		<Tooltip label={t('updates.banner_tooltip', { version: data.latest_version })}>

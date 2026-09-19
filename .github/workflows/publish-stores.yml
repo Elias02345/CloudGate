@@ -1,0 +1,216 @@
+name: Publish to app stores
+
+# Opens/updates the per-release PR against Umbrel and ZimaOS's own app-store
+# repos. Unraid tracks :latest (nothing to do) and TrueNAS's Renovate bot
+# handles itself — see packaging/README.md and the summary job below.
+#
+# Two triggers:
+#   - workflow_call, from release.yml, with the tag+digest it already built
+#     and verified — no re-resolution needed.
+#   - workflow_dispatch, for a manual/backfill run against an already
+#     published tag — resolves the digest itself via `imagetools inspect`.
+#
+# Publishing is gated by the STORE_PUBLISH_MODE repo variable so this can be
+# wired in and exercised (dry-run) before it's trusted to push anywhere.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v0.3.14"
+        required: true
+        type: string
+      digest:
+        description: "Image index digest, sha256:<hex>"
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v0.3.14"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  # Resolves and validates (tag, digest, mode) once so the matrix jobs below
+  # don't repeat that work or disagree with each other.
+  prepare:
+    name: Resolve inputs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
+      digest: ${{ steps.resolve.outputs.digest }}
+      mode: ${{ steps.mode.outputs.mode }}
+    steps:
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+        if: github.event_name == 'workflow_dispatch'
+
+      - name: Resolve tag/digest
+        id: resolve
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_DIGEST: ${{ inputs.digest }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -Eeuo pipefail
+
+          if ! [[ "$INPUT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag '$INPUT_TAG' does not match ^v<major>.<minor>.<patch>\$"
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            image="ghcr.io/elias02345/cloudgate:${INPUT_TAG}"
+            out="$(docker buildx imagetools inspect "$image")"
+            echo "$out"
+            digest="$(printf '%s\n' "$out" | awk '/^Digest:/{print $2; exit}')"
+            for plat in linux/amd64 linux/arm64; do
+              if ! printf '%s\n' "$out" | grep -Eq "Platform:[[:space:]]+${plat}"; then
+                echo "::error::$image is missing platform $plat"
+                exit 1
+              fi
+            done
+          else
+            digest="$INPUT_DIGEST"
+          fi
+
+          if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::digest '$digest' does not match ^sha256:[0-9a-f]{64}\$"
+            exit 1
+          fi
+
+          {
+            echo "tag=$INPUT_TAG"
+            echo "version=${INPUT_TAG#v}"
+            echo "digest=$digest"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Determine publish mode
+        id: mode
+        env:
+          STORE_PUBLISH_MODE: ${{ vars.STORE_PUBLISH_MODE }}
+        run: |
+          mode="dry-run"
+          [ "$STORE_PUBLISH_MODE" = "live" ] && mode="live"
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          echo "Publish mode: $mode"
+
+  # One job per store. `matrix` isn't available in a job-level `if:`, so a
+  # disabled store (its STORE_<NAME>_ENABLED variable explicitly "false")
+  # isn't skipped in the workflow UI — instead publish.sh checks ENABLED
+  # itself, first thing, and writes status "disabled" without cloning
+  # anything. Either way the summary table ends up with one row per store.
+  publish:
+    name: ${{ matrix.store }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        store: [umbrel, zimaos]
+    env:
+      STORE: ${{ matrix.store }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      DIGEST: ${{ needs.prepare.outputs.digest }}
+      MODE: ${{ needs.prepare.outputs.mode }}
+      ENABLED: ${{ (matrix.store == 'umbrel' && vars.STORE_UMBREL_ENABLED) || (matrix.store == 'zimaos' && vars.STORE_ZIMAOS_ENABLED) || '' }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      # The upstream work (fork/push/PR) authenticates as STORE_PUBLISH_TOKEN,
+      # never as GITHUB_TOKEN — this repo's own token has no business on
+      # someone else's repo. Only used in live mode; publish.sh handles the
+      # secret-missing case itself (status: manual-action-required).
+      - name: Render, validate, and publish (or dry-run)
+        id: publish
+        run: bash scripts/stores/publish.sh
+        env:
+          GH_TOKEN: ${{ secrets.STORE_PUBLISH_TOKEN }}
+
+      - name: Upload status artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: store-status-${{ matrix.store }}
+          path: store-status-${{ matrix.store }}.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  summary:
+    name: Store publish summary
+    needs: [prepare, publish]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: store-status-*
+          path: store-status
+          merge-multiple: true
+        continue-on-error: true
+
+      - name: Write summary table
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          DIGEST: ${{ needs.prepare.outputs.digest }}
+        run: |
+          set -Eeuo pipefail
+
+          status_for() {
+            local store="$1" file="store-status/store-status-${1}.json"
+            if [ -f "$file" ]; then
+              jq -r '"\(.status)|\(.detail)|\(.pr_url // "")"' "$file"
+            else
+              # publish.sh always writes a status, even when disabled, so a
+              # missing file means the job died before the script ran.
+              echo "failed|No status reported — the ${store} job failed before publishing started; see its log.|"
+            fi
+          }
+
+          row() {
+            local label="$1" status="$2" detail="$3" pr_url="$4"
+            local cell="$status"
+            [ -n "$pr_url" ] && cell="[$status]($pr_url)"
+            echo "| $label | $cell | $detail |"
+          }
+
+          failed=0
+          {
+            echo "## Store publish — ${TAG}"
+            echo
+            echo "| Store | Status | Detail |"
+            echo "|---|---|---|"
+            echo "| GHCR | done | \`ghcr.io/elias02345/cloudgate:${TAG}@${DIGEST}\` |"
+            echo "| Unraid | nothing to do | Community Applications template pins \`:latest\`, which \`promote\` already moved. |"
+            echo "| TrueNAS | nothing to do | Their Renovate bot picks up the new tag on its own schedule. Open an issue with truenas/apps if no PR appears within 48h. |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for store in umbrel zimaos; do
+            IFS='|' read -r status detail pr_url <<< "$(status_for "$store")"
+            row "$store" "$status" "$detail" "$pr_url" >> "$GITHUB_STEP_SUMMARY"
+            [ "$status" = "failed" ] && failed=1
+          done
+
+          if [ "$failed" -eq 1 ]; then
+            echo "::error::at least one store publish job failed — see the table above. The release itself already completed and is unaffected."
+            exit 1
+          fi

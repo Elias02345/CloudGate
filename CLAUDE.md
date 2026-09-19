@@ -195,3 +195,29 @@ The Recovery UI is the last resort, not an excuse for fragility. Ship updates th
 - Package manager: pnpm with workspaces
 
 When using external libraries, prefer mature, well-maintained packages. No bleeding-edge experiments in user-facing code.
+
+---
+
+## 10. App-Store Packaging & Release Automation
+
+CloudGate ships in homelab app stores (Unraid, TrueNAS, Umbrel, ZimaOS) from
+`packaging/`. Full description: [`docs/STORE_PUBLISHING.md`](docs/STORE_PUBLISHING.md).
+These rules keep store installations working:
+
+- ✅ Container port **8080** serves the admin UI/API and the Recovery UI. Store
+  packages publish only that port. Never remove the 8080 listener, and never
+  let a generated host config listen on 8080.
+- ✅ Port 80/443 keep their current behaviour for standalone installations.
+- ✅ Every store package mounts `/data` and sets `CLOUDGATE_DISABLE_UPDATES=true`.
+  A platform replaces the whole image; an in-app self-update followed by the
+  platform restarting its pinned image would run old code on a newer schema.
+- ✅ Only a stable `vX.Y.Z` tag on `main` publishes. `release.yml` pushes the
+  image and verifies amd64 + arm64 before the GitHub Release exists, and moves
+  `:latest` last. Keep that order.
+- ✅ Umbrel/ZimaOS pin `tag@sha256:<multi-arch index digest>`; `scripts/stores/render.mjs`
+  writes it. Its output must stay deterministic (no clock, no randomness).
+- ❌ No `:dev`, `:nightly` or `:main` image in any store package.
+- ❌ No host 80/443, `privileged`, host networking or Docker socket in a
+  store package by default.
+- ❌ Never change the `/data` mount path, and never change the TrueNAS
+  capability list without re-running `ci.py --wait=true` (see `packaging/README.md`).

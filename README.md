@@ -2,7 +2,7 @@
 
 > **Self-hosted WebUI for Cloudflare Tunnels.** Host services from behind CGNAT without port forwarding — Immich, Nextcloud, Jellyfin, Proxmox, Home Assistant, you name it.
 
-**Status:** 🚧 pre-alpha — under active development, not yet production-ready.
+**Status:** stable — v0.5.0 is the first production-ready release.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Build](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml)
@@ -59,6 +59,10 @@ docker run -d --name cloudgate \
   --restart unless-stopped \
   ghcr.io/elias02345/cloudgate:latest
 ```
+
+> The admin UI/API is also served on port **8080** (`-p 8080:8080`) — the port
+> app-store platforms (Umbrel, TrueNAS, Unraid, ZimaOS) publish on their own.
+> 80/443 are only needed if you use CloudGate's local-nginx reverse-proxy mode.
 
 ### What happens next
 

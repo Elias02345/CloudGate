@@ -64,7 +64,21 @@ export function useToggleHost() {
 	const qc = useQueryClient();
 	return useMutation({
 		mutationFn: (id: number) => api<{ enabled: boolean }>(`/hosts/${id}/toggle`, { method: 'POST' }),
-		onSuccess: () => qc.invalidateQueries({ queryKey: ['hosts'] }),
+		// Flip the switch immediately so it animates on click instead of snapping
+		// after the round-trip; roll back if the server refuses.
+		onMutate: async (id) => {
+			await qc.cancelQueries({ queryKey: ['hosts'] });
+			const previous = qc.getQueryData<{ hosts: HostDto[] }>(['hosts']);
+			qc.setQueryData<{ hosts: HostDto[] }>(
+				['hosts'],
+				(data) => data && { hosts: data.hosts.map((h) => (h.id === id ? { ...h, enabled: !h.enabled } : h)) }
+			);
+			return { previous };
+		},
+		onError: (_err, _id, ctx) => {
+			if (ctx?.previous) qc.setQueryData(['hosts'], ctx.previous);
+		},
+		onSettled: () => qc.invalidateQueries({ queryKey: ['hosts'] }),
 	});
 }
 

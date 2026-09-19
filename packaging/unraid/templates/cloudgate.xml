@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<!--
+  Community Applications requires a dedicated GitHub repository for
+  templates (kept separate from the app's own source repo) — confirmed via
+  the CA "Docker FAQ for template creators/maintainers" forum thread and the
+  unraid/unraid-community-apps-starter README ("Use this repository as a
+  GitHub template when you want a clean starting point for a new Community
+  Applications submission repository"). This file is the source of truth to
+  copy into that dedicated repo's templates/ directory once it exists. See
+  packaging/README.md.
+-->
+<Container version="2">
+  <Name>cloudgate</Name>
+  <Repository>ghcr.io/elias02345/cloudgate:latest</Repository>
+  <Registry>https://ghcr.io/elias02345/cloudgate</Registry>
+  <Network>bridge</Network>
+
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+
+  <Icon>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/icon-256.png</Icon>
+
+  <WebUI>http://[IP]:[PORT:8080]/</WebUI>
+
+  <Screenshot>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/screenshots/1-dashboard.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/screenshots/2-hosts.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/screenshots/3-tunnels.png</Screenshot>
+  <Screenshot>https://raw.githubusercontent.com/Elias02345/CloudGate/main/packaging/assets/screenshots/4-cloudflare.png</Screenshot>
+
+  <Overview>
+CloudGate is a self-hosted web UI that manages Cloudflare Tunnels for you. Add a service - enter its local address and the public hostname you want - and CloudGate creates the Cloudflare Tunnel, DNS record, and ingress rule, and reloads the tunnel daemon for you.
+
+Solves the CGNAT / no-port-forwarding problem for free using Cloudflare's Tunnel infrastructure, without the manual cloudflared setup. No configuration required: an admin account and every secret are generated on first boot.
+
+Not affiliated with Cloudflare.
+  </Overview>
+
+  <!-- TODO-FOR-ELIAS: no Unraid forum support thread exists yet. Create one
+       under "Docker Containers" and replace this placeholder before
+       submitting to Community Applications; CA requires either Support or
+       Project, so Project alone is enough to submit without it, but a
+       support thread is expected in practice. -->
+  <Support>https://forums.unraid.net/topic/TODO-FOR-ELIAS-cloudgate-support-thread</Support>
+  <Project>https://github.com/Elias02345/CloudGate</Project>
+
+  <!-- CA rewrites this to the correct raw URL on registration regardless of
+       what is committed here; kept pointed at the eventual dedicated CA
+       repo path for clarity in the meantime. -->
+  <TemplateURL>https://raw.githubusercontent.com/Elias02345/unraid-templates/main/templates/cloudgate.xml</TemplateURL>
+
+  <Category>Tools: Network:Other</Category>
+
+  <ExtraSearchTerms>cloudflare tunnel cgnat reverse proxy self-hosted</ExtraSearchTerms>
+
+  <Requires>Outbound internet access for the Cloudflare Tunnel connection. No inbound port forwarding needed.</Requires>
+
+  <Date>2026-09-19</Date>
+
+  <MinVer>6.9</MinVer>
+
+  <License>MIT</License>
+
+  <!-- Config entries -->
+
+  <!-- Container port 8080 only. Ports 80/443 are the optional local nginx
+       reverse-proxy mode (an alternative to Cloudflare Tunnel routing,
+       picked per host) and are NOT published by default - add a Config
+       entry for them yourself if you use that mode. -->
+  <Config Name="WebUI" Target="8080" Default="8080" Mode="tcp" Description="Port for the CloudGate admin web UI." Type="Port" Display="always" Required="true" Mask="false"/>
+
+  <Config Name="Data" Target="/data" Default="/mnt/user/appdata/cloudgate" Mode="rw" Description="Persistent CloudGate data: generated secrets, the SQLite database, and Cloudflare/nginx state." Type="Path" Display="always" Required="true" Mask="false"/>
+
+  <!-- The platform (Unraid/CA) updates the image via docker pull; CloudGate's
+       own in-app updater must stay off so the two don't fight over /app.
+       Advanced/hidden: not meant to be changed by the user. -->
+  <Config Name="CLOUDGATE_DISABLE_UPDATES" Target="CLOUDGATE_DISABLE_UPDATES" Default="true" Mode="" Description="Disables CloudGate's built-in self-updater. Unraid updates the image instead - leave this set to true." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <Config Name="TZ" Target="TZ" Default="UTC" Mode="" Description="Timezone, e.g. Europe/Berlin." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <Config Name="PUID" Target="PUID" Default="99" Mode="" Description="User ID to run the unprivileged parts of CloudGate as. The backend itself stays root (it reloads nginx/cloudflared)." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <Config Name="PGID" Target="PGID" Default="100" Mode="" Description="Group ID to run the unprivileged parts of CloudGate as." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+</Container>

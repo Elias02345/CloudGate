@@ -1,4 +1,4 @@
-import { ActionIcon, AppShell, Burger, Group, Menu, NavLink, Stack, Text, Title } from '@mantine/core';
+import { ActionIcon, AppShell, Burger, Group, Menu, NavLink, Stack, Title } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import {
 	IconArrowUp,
@@ -138,9 +138,6 @@ export function App() {
 								)}
 								<IconCloudComputing size={26} style={{ color: 'var(--cg-accent-logo)' }} />
 								<Title order={3}>CloudGate</Title>
-								<Text size="xs" c="dimmed" visibleFrom="xs">
-									pre-alpha
-								</Text>
 							</Group>
 							{me?.user && (
 								<Group gap="sm">

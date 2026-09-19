@@ -15,7 +15,7 @@ services:
     # NOTE the `v`: release.yml tags images with $GITHUB_REF_NAME, which is the
     # git tag itself (`v0.3.5`), not the bare version. A pin without it does
     # not exist and fails with "manifest unknown".
-    image: ghcr.io/elias02345/cloudgate:v0.3.11
+    image: ghcr.io/elias02345/cloudgate:v0.5.0
     container_name: cloudgate
     restart: unless-stopped
     # The container still starts services as root (it binds :80/:443 and
@@ -23,6 +23,11 @@ services:
     security_opt:
       - no-new-privileges:true
     ports:
+      # 8080 is the admin UI/API — the one port app-store platforms (Umbrel,
+      # TrueNAS, Unraid, ZimaOS) map. 80/443 are only needed for local-nginx
+      # reverse-proxy mode (hosts with mode='local_nginx'); keep them mapped
+      # here so existing users are unaffected.
+      - "8080:8080"
       - "80:80"
       - "443:443"
     volumes:

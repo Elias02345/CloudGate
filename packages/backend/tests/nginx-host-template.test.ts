@@ -271,6 +271,25 @@ describe('nginx host template', () => {
 		});
 	});
 
+	it('never listens on 8080 — that port is reserved for the image-level management UI', async () => {
+		// 8080 is the app-store management port (see docker/nginx/cloudgate.conf
+		// and recovery.conf). A generated per-host block that also bound it
+		// would conflict with nginx's `default_server` there and could shadow
+		// the admin UI/API on platforms that publish only 8080.
+		const configs = await Promise.all([
+			renderHostConfig(baseHost),
+			renderHostConfig({
+				...baseHost,
+				id: 2,
+				cert_path: '/data/nginx/certs/ha.crt',
+				cert_key_path: '/data/nginx/certs/ha.key',
+			}),
+		]);
+		for (const conf of configs) {
+			expect(conf).not.toMatch(/listen\s+(\[::\]:)?8080\b/);
+		}
+	});
+
 	it('produces a config real nginx accepts', async () => {
 		if (!nginxAvailable) {
 			// Textual assertions above still cover the regression; skip the

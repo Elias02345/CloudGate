@@ -9,6 +9,48 @@ _Nothing yet._
 
 ---
 
+## [0.5.0] — 2026-09-19
+
+The first stable release, and the first one offered in homelab app stores.
+
+### Added
+
+- **CloudGate is stable.** The pre-alpha label is gone; v0.5.0 is the first
+  release meant for production use.
+- **Ready for homelab app stores.** `packaging/` holds the store packages for
+  Unraid, TrueNAS, Umbrel and ZimaOS, with a new app icon and screenshots.
+  Each package publishes only the admin port, keeps all data in `/data`, and
+  leaves updates to the platform.
+- **Admin UI on port 8080.** The web UI, the API and the Recovery UI are now
+  also served on container port 8080, which is what store platforms publish.
+  Port 80/443 behave exactly as before, so existing `-p 80:80 -p 443:443`
+  installations need no change.
+- **Updates handled by your platform.** With `CLOUDGATE_DISABLE_UPDATES=true`
+  the Updates page says that the platform updates CloudGate and hides the
+  controls that cannot work there; in-app installs are refused, also through
+  API keys.
+
+### Fixed
+
+- **Switches jumped instead of sliding.** A global style replaced the switch
+  animation; the knob slides and the colour fades again, and the host switch
+  flips as soon as you click it instead of after the server answers.
+- **`CLOUDGATE_DISABLE_UPDATES=false` turned updates off.** Boolean settings
+  treated every non-empty value, including the word "false", as true. They
+  now accept `true/1/yes/on` and `false/0/no/off`.
+- **The one-line installer could install a development build.** It now only
+  pulls `:latest`, which points at a verified stable release, and source
+  builds use `main`.
+
+### Changed
+
+- **Releases are verified before they are published.** A release tag must be
+  on `main` and match every package version; build, typecheck, lint and tests
+  must pass; the image for both architectures is pushed and checked before the
+  GitHub Release exists, and `:latest` moves last.
+
+---
+
 ## [0.3.13] — 2026-09-19
 
 ### Fixed

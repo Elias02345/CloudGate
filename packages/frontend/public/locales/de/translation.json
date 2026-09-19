@@ -159,7 +159,8 @@
     "state_rolling_back": "Rollback läuft",
     "state_failed": "Fehlgeschlagen",
     "banner_label": "Update {{version}}",
-    "banner_tooltip": "Klicken zum Installieren von Version {{version}}"
+    "banner_tooltip": "Klicken zum Installieren von Version {{version}}",
+    "disabled_message": "Updates werden von deiner Plattform verwaltet. Um CloudGate zu aktualisieren, aktualisiere das App-/Container-Image in deiner Plattform (z. B. das neue Image ziehen)."
   },
   "update_modal": {
     "title_installing": "Installiere {{version}}",

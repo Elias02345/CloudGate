@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-CloudGate is pre-alpha. Only the latest `main`-tagged release receives security fixes.
+Only the latest release tagged on `main` receives security fixes.
 
 | Version | Supported |
 | ------- | --------- |
