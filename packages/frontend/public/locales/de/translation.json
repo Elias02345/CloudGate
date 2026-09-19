@@ -5,7 +5,10 @@
     "cancel": "Abbrechen",
     "delete": "Löschen",
     "edit": "Bearbeiten",
-    "confirm": "Bestätigen"
+    "confirm": "Bestätigen",
+    "load_failed": "Konnte nicht geladen werden",
+    "load_failed_hint": "CloudGate hat keine Antwort bekommen. Läuft der Dienst noch?",
+    "retry": "Erneut versuchen"
   },
   "header": {
     "user_menu": "Benutzermenü",
@@ -603,6 +606,7 @@
     "created_title": "Host erstellt",
     "created_message": "{{hostname}} wird ausgerollt.",
     "col_hostname": "Hostname",
+    "open_in_new_tab": "In neuem Tab öffnen",
     "col_target": "Weiterleitung",
     "col_mode": "Modus",
     "col_status": "Status",

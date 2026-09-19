@@ -41,6 +41,7 @@ import { ApiError } from '../api/client.js';
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { CopyButton } from '../components/CopyButton.js';
 import { EmptyState } from '../components/EmptyState.js';
+import { ListError } from '../components/ListError.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
 import { Tooltip } from '../components/Tooltip.js';
 
@@ -148,6 +149,7 @@ export function ApiKeysPage() {
 			<Card withBorder>
 				<Stack>
 					{keys.isLoading && <ListSkeleton rows={3} />}
+					{keys.isError && <ListError error={keys.error} onRetry={() => void keys.refetch()} />}
 					{keys.data && keys.data.keys.length === 0 && (
 						<EmptyState icon={<IconKey size={40} stroke={1.5} />} title={t('api_keys.empty')} />
 					)}
@@ -203,12 +205,18 @@ export function ApiKeysPage() {
 																color="yellow"
 																onClick={() => void onRotate(k)}
 																loading={rotate.isPending}
+																aria-label={t('api_keys.rotate')}
 															>
 																<IconRefresh size={16} />
 															</ActionIcon>
 														</Tooltip>
 														<Tooltip label={t('api_keys.revoke')}>
-															<ActionIcon variant="subtle" color="red" onClick={() => void onRevoke(k)}>
+															<ActionIcon
+																variant="subtle"
+																color="red"
+																onClick={() => void onRevoke(k)}
+																aria-label={t('api_keys.revoke')}
+															>
 																<IconTrash size={16} />
 															</ActionIcon>
 														</Tooltip>
@@ -340,7 +348,12 @@ export function ApiKeysPage() {
 							<CopyButton value={shownPlaintext ?? ''} timeout={1500}>
 								{({ copied, copy }) => (
 									<Tooltip label={copied ? t('donate.copied') : t('donate.copy')}>
-										<ActionIcon color={copied ? 'green' : 'gray'} variant="filled" onClick={copy}>
+										<ActionIcon
+											color={copied ? 'green' : 'gray'}
+											variant="filled"
+											onClick={copy}
+											aria-label={copied ? t('donate.copied') : t('donate.copy')}
+										>
 											{copied ? <IconCheck size={16} /> : <IconCopy size={16} />}
 										</ActionIcon>
 									</Tooltip>

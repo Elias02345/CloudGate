@@ -9,6 +9,45 @@ _Nothing yet._
 
 ---
 
+## [0.3.9] — 2026-09-19
+
+### Fixed
+
+- **A restarting backend threw you back to the login screen.** Any failure to
+  reach CloudGate was treated as "not signed in", so a restart, a brief
+  outage, or a dropped connection looked exactly like a session ending — and
+  you lost the page you were on for no reason. CloudGate now says it cannot
+  reach the service, keeps your session, and offers a retry that puts you back
+  where you were.
+- **A list that failed to load looked like an empty one.** With the service
+  unreachable, pages showed an empty card as though nothing were configured;
+  when a background refresh failed, they kept showing the previous data as if
+  it were current. Both now say what happened, with the error and a retry.
+- **A dead session went unnoticed outside the main check.** Everything else
+  kept failing quietly in the background. The first such response now ends the
+  session properly.
+- **A double-click on a delete button could hang the action.** The second
+  prompt replaced the first, and whatever was waiting on the first never got
+  an answer — so nothing happened at all, with no indication why.
+- Cloudy's speech bubble no longer swallows clicks meant for the control he is
+  standing next to. The support hint, which is meant to be clicked, still is.
+
+### Changed
+
+- **Every icon-only button now has a name** for screen readers and as a
+  tooltip — 16 of them had none, including "delete host". The log view in the
+  update dialog can be opened with the keyboard.
+
+### Documentation
+
+- The README and the architecture document both listed GPG signature
+  verification as an active guarantee; it is not enabled yet, and now says so.
+  The architecture document also still described `/__recovery/` in normal
+  operation as a feature — the exposure removed in 0.3.2 — and the Cloudflare
+  guide described an OAuth flow the software cannot perform.
+
+---
+
 ## [0.3.8] — 2026-09-18
 
 ### Changed

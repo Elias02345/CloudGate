@@ -18,9 +18,12 @@ import {
 	IconSettings,
 	IconUser,
 } from '@tabler/icons-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { useLogout, useMe } from './api/auth.js';
+import { UNAUTHORIZED_EVENT } from './api/client.js';
 import { useEventStream } from './api/events.js';
 import { AiChatFab } from './components/AiChat.js';
 import { AppTourProvider } from './components/AppTour.js';
@@ -51,6 +54,7 @@ export function App() {
 	const { t } = useTranslation();
 	const { data: me } = useMe();
 	const logout = useLogout();
+	const queryClient = useQueryClient();
 	const navigate = useNavigate();
 	const location = useLocation();
 
@@ -66,6 +70,19 @@ export function App() {
 
 	// Subscribe to backend events for live query invalidation
 	useEventStream();
+
+	// The session ended somewhere — an expired token, a password change in
+	// another tab, a restarted backend. api() has already dropped the token;
+	// re-reading /auth/me is what makes ProtectedRoute notice and send the
+	// user to the login page, instead of leaving them on a screen whose data
+	// can no longer refresh.
+	useEffect(() => {
+		const onUnauthorized = () => {
+			void queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+		};
+		window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+		return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
+	}, [queryClient]);
 
 	return (
 		<CloudyProvider>

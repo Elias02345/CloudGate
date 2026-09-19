@@ -48,8 +48,18 @@ export function CloudyStage() {
 				{...dismissProps}
 			>
 				<Cloudy pose={state.pose} facing={state.facing} size={size} sign={state.sign} />
+				{/*
+				 * data-dismissible drives pointer-events in stage.css: a bubble that
+				 * is only saying something must let clicks through to the control
+				 * underneath, since it is placed beside its target and can cover it.
+				 */}
 				{state.bubble && (
-					<div className="cloudy-bubble" data-side={bubbleSide} {...dismissProps}>
+					<div
+						className="cloudy-bubble"
+						data-side={bubbleSide}
+						data-dismissible={state.dismissible}
+						{...dismissProps}
+					>
 						{state.bubble}
 					</div>
 				)}

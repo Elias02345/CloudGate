@@ -49,6 +49,7 @@ import { useConfirm } from '../components/ConfirmProvider.js';
 import { CopyButton } from '../components/CopyButton.js';
 import { EditHostModal } from '../components/EditHostModal.js';
 import { EmptyState } from '../components/EmptyState.js';
+import { ListError } from '../components/ListError.js';
 import { ListSkeleton } from '../components/ListSkeleton.js';
 import { Tooltip } from '../components/Tooltip.js';
 
@@ -205,6 +206,7 @@ export function HostsPage() {
 			<Card withBorder data-tour="hosts-mode-switch">
 				<Stack>
 					{hosts.isLoading && <ListSkeleton rows={4} />}
+					{hosts.isError && <ListError error={hosts.error} onRetry={() => void hosts.refetch()} />}
 					{hosts.data?.hosts.length === 0 && (
 						<EmptyState
 							icon={<IconWorld size={40} stroke={1.5} />}
@@ -267,6 +269,7 @@ export function HostsPage() {
 																	href={`https://${h.hostname}`}
 																	target="_blank"
 																	rel="noreferrer"
+																	title={t('hosts.open_in_new_tab')}
 																>
 																	<IconExternalLink size={14} />
 																</ActionIcon>
@@ -294,7 +297,12 @@ export function HostsPage() {
 																<CopyButton value={endpointStr}>
 																	{({ copied, copy }) => (
 																		<Tooltip label={copied ? 'Copied' : 'Copy endpoint'}>
-																			<ActionIcon variant="subtle" size="sm" onClick={copy}>
+																			<ActionIcon
+																				variant="subtle"
+																				size="sm"
+																				onClick={copy}
+																				aria-label={copied ? t('donate.copied') : t('donate.copy')}
+																			>
 																				{copied ? <IconCopyCheck size={14} /> : <IconCopy size={14} />}
 																			</ActionIcon>
 																		</Tooltip>
@@ -385,6 +393,7 @@ export function HostsPage() {
 																		return;
 																	void deleteMutation.mutate(h.id);
 																}}
+																title={t('hosts.delete_title')}
 															>
 																<IconTrash size={16} />
 															</ActionIcon>
@@ -420,6 +429,7 @@ export function HostsPage() {
 															href={`https://${h.hostname}`}
 															target="_blank"
 															rel="noreferrer"
+															title={t('hosts.open_in_new_tab')}
 														>
 															<IconExternalLink size={14} />
 														</ActionIcon>
@@ -461,7 +471,12 @@ export function HostsPage() {
 														<CopyButton value={endpointStr}>
 															{({ copied, copy }) => (
 																<Tooltip label={copied ? 'Copied' : 'Copy endpoint'}>
-																	<ActionIcon variant="subtle" size="sm" onClick={copy}>
+																	<ActionIcon
+																		variant="subtle"
+																		size="sm"
+																		onClick={copy}
+																		aria-label={copied ? t('donate.copied') : t('donate.copy')}
+																	>
 																		{copied ? <IconCopyCheck size={14} /> : <IconCopy size={14} />}
 																	</ActionIcon>
 																</Tooltip>
@@ -536,6 +551,7 @@ export function HostsPage() {
 															return;
 														void deleteMutation.mutate(h.id);
 													}}
+													title={t('hosts.delete_title')}
 												>
 													<IconTrash size={18} />
 												</ActionIcon>
