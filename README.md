@@ -19,10 +19,11 @@ Many home internet connections (especially in Germany — 1&1, Vodafone Cable, m
 **CloudGate** is a WebUI that does it all:
 - Add a service: enter `192.168.1.42:8080` and `immich.yourdomain.com` → done.
 - CloudGate creates the Cloudflare Tunnel, DNS record, ingress rule, and reloads `cloudflared`.
+- Need raw TCP/UDP instead of HTTP — a Minecraft server, SSH, a game server? [Playit.gg](https://playit.gg) tunnels handle that (Cloudflare's free tier can't).
 - Hybrid mode: per host, pick **"via Cloudflare Tunnel"** OR **"local nginx reverse proxy"**.
-- Auto-updates itself when new releases ship. Never overwrites your data.
+- Self-updates when new releases ship on a standalone install — never overwrites your data. On an app-store install, the platform updates the image instead (see [Install from an app store](#install-from-an-app-store)).
 
-> **Not affiliated with Cloudflare.** CloudGate uses Cloudflare's public Tunnel infrastructure via their documented API.
+> **Not affiliated with Cloudflare or Playit.gg.** CloudGate uses their public, documented APIs.
 
 ---
 
@@ -77,20 +78,25 @@ docker run -d --name cloudgate \
 
 That's it. CloudGate manages keys, secrets, and updates automatically.
 
+### Install from an app store
+
+Packages for **Unraid, TrueNAS, Umbrel and ZimaOS** are prepared in [`packaging/`](packaging/) and listings are pending review with each store — CloudGate isn't listed in any app store yet. Once accepted, an app-store install publishes only the admin port and leaves updates to the platform (`CLOUDGATE_DISABLE_UPDATES=true`); see [`docs/STORE_PUBLISHING.md`](docs/STORE_PUBLISHING.md) for details.
+
 ---
 
 ## Features
 
 | Category | Capability |
 |---|---|
-| **Install** | One-liner installer for Ubuntu/LXC · Plain `docker run` · Multi-arch GHCR images |
+| **Install** | One-liner installer for Ubuntu/LXC · Plain `docker run` · Multi-arch GHCR images · app-store packages pending review |
 | **Bootstrap** | Auto-generated encryption key, JWT secret, admin password — zero env vars required |
 | **Cloudflare** | API-token auth · multi-account · automatic zone sync · token revocation cleanup |
 | **Tunnels** | Create, restart, delete · live status · log tail · auto-revive on container restart · SIGHUP reload |
+| **Playit.gg** | Raw TCP/UDP tunnels for Minecraft (Java + Bedrock), SSH and other non-HTTP services |
 | **Hosts (Cloudflare mode)** | DNS CNAME auto-create · tunnel-config rewrite · HEAD-probe test · enable/disable toggle |
 | **Hosts (local nginx mode)** | Per-host conf with `nginx -t` validation · Let's Encrypt via DNS-01 · auto-renewal cron |
 | **Security** | Argon2id passwords · AES-256-GCM token encryption · 2FA TOTP · per-route rate limiting · audit log |
-| **Self-update** | 6h GitHub polling · mandatory SHA256 verification · atomic in-place install with auto-rollback |
+| **Self-update** | 6h GitHub polling · mandatory SHA256 verification · atomic in-place install with auto-rollback (standalone installs only — app-store installs are updated by the platform) |
 | **Resilience** | Recovery UI fallback (no blank pages) · DB snapshots per update · sacred-path persistence contract |
 | **UX** | i18n DE+EN · light/dark theme · live dashboard · SSE-driven cache invalidation |
 
@@ -98,8 +104,8 @@ That's it. CloudGate manages keys, secrets, and updates automatically.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│  Browser ──http→ nginx :80 ──┬─→ React SPA (static)            │
-│                              └─→ /api → backend :3000          │
+│  Browser ──http→ nginx :8080 (and :80) ──┬─→ React SPA (static) │
+│                                          └─→ /api → backend :3000│
 └────────────────────────────────────────────────────────────────┘
                                   │
         ┌─────────────────────────┴───────────────────────────┐
@@ -109,6 +115,7 @@ That's it. CloudGate manages keys, secrets, and updates automatically.
         │                                  └─► failure ─► recovery-ui
         │                                                     │
         │  backend  ┌──► spawns cloudflared ──tunnels──→ CF   │
+        │           ├──► spawns playit-agent ──tunnels──→ Playit.gg
         │           ├──► writes /data/cloudflared/config.yml  │
         │           ├──► writes /data/nginx/hosts/*.conf      │
         │           ├──► self-updater (GitHub polling)        │
@@ -117,12 +124,12 @@ That's it. CloudGate manages keys, secrets, and updates automatically.
                                   │
               ┌───────────────────┴───────────────────┐
               │  /data volume — sacred                 │
-              │  secrets/  db/  cloudflared/           │
+              │  secrets/  db/  cloudflared/  playit/  │
               │  nginx/{hosts,certs,custom}  logs/     │
               │  updates/{staging,backups}             │
               │                                        │
               │  NEVER overwritten by updates          │
-              │  (see CLAUDE.md §10.3)                 │
+              │  (see CLAUDE.md §1)                    │
               └────────────────────────────────────────┘
 ```
 
@@ -133,6 +140,8 @@ That's it. CloudGate manages keys, secrets, and updates automatically.
 - [`docs/UPDATE_RULES.md`](docs/UPDATE_RULES.md) — detailed update-safety rules
 - [`docs/CLOUDFLARE_SETUP.md`](docs/CLOUDFLARE_SETUP.md) — how to create the Cloudflare API token
 - [`docs/HOME-ASSISTANT.md`](docs/HOME-ASSISTANT.md) — fixing Home Assistant's "400: Bad Request" behind a tunnel
+- [`docs/STORE_PUBLISHING.md`](docs/STORE_PUBLISHING.md) — how CloudGate reaches homelab app stores
+- [`docs/AGENT.md`](docs/AGENT.md) — API keys and REST recipes for scripting/AI-agent use
 
 ---
 
@@ -152,7 +161,7 @@ See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for the dev workflow.
 
 ## 💛 Support
 
-CloudGate is free forever (MIT) but maintained by one person in spare time. If it saves you a Sunday afternoon, a small tip helps cover infrastructure + signing keys + ongoing dev time:
+CloudGate is free forever (MIT) but maintained by one maintainer in spare time. If it saves you a Sunday afternoon, a small tip helps cover infrastructure + signing keys + ongoing dev time:
 
 - ☕ [**PayPal**](https://www.paypal.me/EliasK09) — one-click
 - ₿ Bitcoin: `bc1qphk3h7sw6j429c62ypw6zxgmkfeevmxs437ze3`
