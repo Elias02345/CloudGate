@@ -42,7 +42,10 @@ case "$STORE" in
     UPSTREAM_BRANCH="master"
     APP_DIR="cloudgate"
     SRC_DIR="packaging/umbrel/cloudgate"
-    FILES=(umbrel-app.yml docker-compose.yml)
+    # data/.gitkeep is required too: lint-apps.mjs's persistence check wants
+    # every bind-mount source (${APP_DATA_DIR}/data here) committed in the
+    # app folder, not just referenced from docker-compose.yml.
+    FILES=(umbrel-app.yml docker-compose.yml data/.gitkeep)
     ;;
   zimaos)
     UPSTREAM_REPO="IceWhaleTech/CasaOS-AppStore"
@@ -91,6 +94,7 @@ git checkout --quiet -b "$BRANCH"
 
 mkdir -p "$APP_DIR"
 for f in "${FILES[@]}"; do
+  mkdir -p "$(dirname "${APP_DIR}/${f}")"
   cp "${REPO_ROOT}/${SRC_DIR}/${f}" "${APP_DIR}/${f}"
 done
 
@@ -107,7 +111,12 @@ case "$STORE" in
     ;;
 esac
 
-if git diff --quiet -- "$APP_DIR"; then
+# Stage before diffing: plain `git diff` is blind to untracked files, which
+# is exactly what every file is on a first-ever submission (no cloudgate/ or
+# Apps/CloudGate/ upstream yet) — without staging first that case would
+# silently report "already-current" instead of opening the initial PR.
+git add -A -- "$APP_DIR"
+if git diff --cached --quiet -- "$APP_DIR"; then
   write_status "already-current" "packaging/${STORE} already matches ${UPSTREAM_REPO}@${UPSTREAM_BRANCH} for v${VERSION}; nothing to publish."
   exit 0
 fi
@@ -123,7 +132,7 @@ Updates the CloudGate package to v${VERSION}.
 Opened automatically by CloudGate's store-publisher workflow.
 EOF
 )"
-DIFF_OUT="$(git diff -- "$APP_DIR" | head -c 20000)"
+DIFF_OUT="$(git diff --cached -- "$APP_DIR" | head -c 20000)"
 
 if [ "$MODE" != "live" ]; then
   {
@@ -168,7 +177,7 @@ fi
 
 git config user.name "cloudgate-store-publisher"
 git config user.email "actions@users.noreply.github.com"
-git add "$APP_DIR"
+# $APP_DIR is already staged (from the diff check above).
 git commit --quiet -m "$PR_TITLE"
 
 FORK_URL="https://x-access-token:${GH_TOKEN}@github.com/${FORK}.git"
