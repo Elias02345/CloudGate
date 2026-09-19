@@ -78,6 +78,11 @@ on_exit() {
 }
 trap on_exit EXIT
 
+if [ "${ENABLED:-}" = "false" ]; then
+  write_status "disabled" "Skipped — STORE_$(echo "$STORE" | tr '[:lower:]' '[:upper:]')_ENABLED is set to false."
+  exit 0
+fi
+
 WORKDIR="$(mktemp -d)"
 git clone --quiet --depth 1 --branch "$UPSTREAM_BRANCH" \
   "https://github.com/${UPSTREAM_REPO}.git" "$WORKDIR/upstream"

@@ -85,9 +85,11 @@ jobs:
             exit 1
           fi
 
-          echo "tag=$INPUT_TAG" >> "$GITHUB_OUTPUT"
-          echo "version=${INPUT_TAG#v}" >> "$GITHUB_OUTPUT"
-          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          {
+            echo "tag=$INPUT_TAG"
+            echo "version=${INPUT_TAG#v}"
+            echo "digest=$digest"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Determine publish mode
         id: mode
@@ -99,15 +101,14 @@ jobs:
           echo "mode=$mode" >> "$GITHUB_OUTPUT"
           echo "Publish mode: $mode"
 
-  # One job per store. A store is skipped entirely (shows as "skipped" in
-  # the run, absent from the summary table's status but still listed) when
-  # its STORE_<NAME>_ENABLED variable is explicitly "false".
+  # One job per store. `matrix` isn't available in a job-level `if:`, so a
+  # disabled store (its STORE_<NAME>_ENABLED variable explicitly "false")
+  # isn't skipped in the workflow UI — instead publish.sh checks ENABLED
+  # itself, first thing, and writes status "disabled" without cloning
+  # anything. Either way the summary table ends up with one row per store.
   publish:
     name: ${{ matrix.store }}
     needs: prepare
-    if: |
-      (matrix.store != 'umbrel' || vars.STORE_UMBREL_ENABLED != 'false') &&
-      (matrix.store != 'zimaos' || vars.STORE_ZIMAOS_ENABLED != 'false')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -122,6 +123,7 @@ jobs:
       VERSION: ${{ needs.prepare.outputs.version }}
       DIGEST: ${{ needs.prepare.outputs.digest }}
       MODE: ${{ needs.prepare.outputs.mode }}
+      ENABLED: ${{ (matrix.store == 'umbrel' && vars.STORE_UMBREL_ENABLED) || (matrix.store == 'zimaos' && vars.STORE_ZIMAOS_ENABLED) || '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

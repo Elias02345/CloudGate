@@ -309,7 +309,10 @@ jobs:
   # job has already happened and is done regardless of what happens here.
   stores:
     name: Publish to app stores
-    needs: [image, promote]
+    # preflight is added only so this job can read needs.preflight.outputs.tag
+    # below — it's already an implicit ancestor of image/promote, so this
+    # doesn't change scheduling.
+    needs: [preflight, image, promote]
     uses: ./.github/workflows/publish-stores.yml
     with:
       tag: ${{ needs.preflight.outputs.tag }}
