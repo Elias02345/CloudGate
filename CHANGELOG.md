@@ -13,6 +13,14 @@ _Nothing yet._
 
 ### Fixed
 
+- **The sidebar could not be used with a keyboard.** Every navigation entry
+  was built as a clickable element with no link behind it, which browsers
+  leave out of the Tab order entirely — so none of the 13 sections could be
+  reached without a mouse, and a screen reader had nothing to follow. They
+  are real links now: Tab reaches each one, Enter opens it, and you can open
+  a section in a new tab or copy its address like any other link. Mouse,
+  touch and the phone menu behave exactly as before.
+
 - **A crash left no trace in the log CloudGate shows you.** When an error
   escaped and took the backend down, Node printed it to the container's
   stderr and nothing else — not to `/data/logs/cloudgate.log`, which is the

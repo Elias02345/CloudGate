@@ -31,7 +31,10 @@ beforeAll(async () => {
 	const status = await runBootstrap();
 	if (!status.complete) throw new Error(`bootstrap failed: ${status.last_error}`);
 	({ destroyTunnelsForAccount } = await import('../src/services/tunnel-teardown.js'));
-});
+	// Bootstrap plus the Cloudflare SDK's first import: ~9s alone, and past
+	// vitest's 10s hook default when the rest of the suite runs alongside —
+	// which skipped the whole file instead of failing it.
+}, 60_000);
 
 afterAll(async () => {
 	const { closeDb } = await import('../src/db/db.js');
