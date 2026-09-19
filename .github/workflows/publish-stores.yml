@@ -180,7 +180,9 @@ jobs:
             if [ -f "$file" ]; then
               jq -r '"\(.status)|\(.detail)|\(.pr_url // "")"' "$file"
             else
-              echo "disabled|Skipped — STORE_$(echo "$store" | tr '[:lower:]' '[:upper:]')_ENABLED is set to false.|"
+              # publish.sh always writes a status, even when disabled, so a
+              # missing file means the job died before the script ran.
+              echo "failed|No status reported — the ${store} job failed before publishing started; see its log.|"
             fi
           }
 
