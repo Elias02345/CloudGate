@@ -5,23 +5,57 @@ on:
     tags:
       - "v*.*.*"
 
+# Least privilege by default — each job below escalates only what it needs.
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 jobs:
-  release:
+  # Verify the tag is releasable, run the same checks CI runs (plus a
+  # version-consistency gate CI doesn't need), and build the tarball that
+  # the self-updater downloads. Nothing here touches the registry or the
+  # GitHub Release, so it needs no write permissions at all.
+  preflight:
+    name: Preflight (verify + build + tarball)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      sha: ${{ steps.resolve-sha.outputs.sha }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
 
-      - name: Extract version from tag
+      - name: Validate tag format
         id: version
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          tag="${GITHUB_REF_NAME}"
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$tag' does not match the required pattern ^v<major>.<minor>.<patch>\$ (e.g. v1.2.3)"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve tag to a commit SHA
+        id: resolve-sha
+        run: |
+          # For an ANNOTATED tag, `github.sha` is the tag object's own sha,
+          # not the commit it points at. Dereference explicitly so the
+          # ancestor check (and the summary job) compare real commits.
+          sha="$(git rev-list -n1 "${{ steps.version.outputs.tag }}")"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Verify the tag is on main
+        run: |
+          git fetch origin main --quiet
+          if ! git merge-base --is-ancestor "${{ steps.resolve-sha.outputs.sha }}" origin/main; then
+            echo "::error::Tag ${{ steps.version.outputs.tag }} (commit ${{ steps.resolve-sha.outputs.sha }}) is not an ancestor of origin/main — refusing to release a commit that hasn't landed on main"
+            exit 1
+          fi
 
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
@@ -32,11 +66,32 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install
-        run: pnpm install --no-frozen-lockfile
+      - name: Self-check the release-version gate
+        run: node --test scripts/release/check-version.test.mjs
+
+      - name: Check package versions match the tag
+        run: node scripts/release/check-version.mjs "${{ steps.version.outputs.tag }}"
+
+      - name: Install (frozen lockfile)
+        # Frozen on purpose: a release must build from exactly what's
+        # committed. If the lockfile is out of sync this fails loudly
+        # instead of silently regenerating it.
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         run: pnpm -r run build
+
+      - name: Typecheck
+        run: pnpm -r run typecheck
+        continue-on-error: true # pre-alpha — matches ci.yml; gradually tighten
+
+      - name: Lint
+        # No continue-on-error: unlike ci.yml, a release must not ship with
+        # biome errors. Warnings alone don't fail biome's own exit code.
+        run: pnpm -r run lint
+
+      - name: Test
+        run: pnpm -r run test
 
       - name: Build release tarball
         run: |
@@ -116,23 +171,33 @@ jobs:
             --output cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sig \
             cloudgate-${{ steps.version.outputs.tag }}.tar.gz
 
-      - name: Collect release files
-        id: files
-        run: |
-          files="cloudgate-${{ steps.version.outputs.tag }}.tar.gz cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sha256"
-          if [ -f "cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sig" ]; then
-            files="$files cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sig"
-          fi
-          echo "files<<EOF" >> "$GITHUB_OUTPUT"
-          for f in $files; do echo "$f"; done >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ steps.version.outputs.tag }}
-          generate_release_notes: true
-          files: ${{ steps.files.outputs.files }}
+          name: release-artifacts
+          path: |
+            cloudgate-${{ steps.version.outputs.tag }}.tar.gz
+            cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sha256
+            cloudgate-${{ steps.version.outputs.tag }}.tar.gz.sig
+          if-no-files-found: ignore # .sig is optional (no GPG secrets configured)
+          retention-days: 7
+
+  # Builds and pushes the version-tagged image only. :latest / :main are
+  # promoted from this exact, verified digest below — never built twice.
+  image:
+    name: Build & push image
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      image: ghcr.io/elias02345/cloudgate:${{ needs.preflight.outputs.tag }}
+      image_with_digest: ghcr.io/elias02345/cloudgate:${{ needs.preflight.outputs.tag }}@${{ steps.build.outputs.digest }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Login to GHCR
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
@@ -144,20 +209,121 @@ jobs:
       - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
-      - name: Build and push multi-arch image
+      - name: Build and push release image
+        id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           file: docker/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ghcr.io/elias02345/cloudgate:${{ steps.version.outputs.tag }}
-            ghcr.io/elias02345/cloudgate:latest
-            ghcr.io/elias02345/cloudgate:main
+          tags: ghcr.io/elias02345/cloudgate:${{ needs.preflight.outputs.tag }}
           # Stamps org.opencontainers.image.version on the image, so a pulled
           # image reports its release without being started.
           build-args: |
-            CLOUDGATE_VERSION=${{ steps.version.outputs.version }}
+            CLOUDGATE_VERSION=${{ needs.preflight.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify the published index is multi-arch and matches the build digest
+        run: |
+          image="ghcr.io/elias02345/cloudgate:${{ needs.preflight.outputs.tag }}"
+          out="$(docker buildx imagetools inspect "$image")"
+          echo "$out"
+
+          actual_digest="$(printf '%s\n' "$out" | awk '/^Digest:/{print $2; exit}')"
+          if [ "$actual_digest" != "${{ steps.build.outputs.digest }}" ]; then
+            echo "::error::imagetools inspect reports digest $actual_digest but build-push-action reported ${{ steps.build.outputs.digest }}"
+            exit 1
+          fi
+
+          for plat in linux/amd64 linux/arm64; do
+            if ! printf '%s\n' "$out" | grep -Eq "Platform:[[:space:]]+${plat}"; then
+              echo "::error::published index $image is missing platform $plat"
+              exit 1
+            fi
+          done
+
+  # Same GitHub Release contract as before (same files, generate_release_notes).
+  release:
+    name: Publish GitHub Release
+    needs: [preflight, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      url: ${{ steps.create_release.outputs.url }}
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-artifacts
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          name: ${{ needs.preflight.outputs.tag }}
+          tag_name: ${{ needs.preflight.outputs.tag }}
+          generate_release_notes: true
+          files: cloudgate-${{ needs.preflight.outputs.tag }}.tar.gz*
+
+  # Only now do :latest / :main move — onto the exact index the `image` job
+  # already built and verified, never a fresh build.
+  promote:
+    name: Promote to :latest / :main
+    needs: [image, release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      packages: write
+    steps:
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Point :latest and :main at the verified index
+        run: |
+          docker buildx imagetools create \
+            -t ghcr.io/elias02345/cloudgate:latest \
+            -t ghcr.io/elias02345/cloudgate:main \
+            ${{ needs.image.outputs.image_with_digest }}
+
+      - name: Verify :latest now matches the released digest
+        run: |
+          out="$(docker buildx imagetools inspect ghcr.io/elias02345/cloudgate:latest)"
+          echo "$out"
+          actual_digest="$(printf '%s\n' "$out" | awk '/^Digest:/{print $2; exit}')"
+          if [ "$actual_digest" != "${{ needs.image.outputs.digest }}" ]; then
+            echo "::error:::latest digest $actual_digest does not match released digest ${{ needs.image.outputs.digest }}"
+            exit 1
+          fi
+
+  # NOTE: a future publish-stores.yml wires in here as a job with `needs: promote`.
+
+  summary:
+    name: Release summary
+    needs: [preflight, image, release, promote]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Write job summary
+        run: |
+          {
+            echo "## Release ${{ needs.preflight.outputs.tag }}"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Tag | \`${{ needs.preflight.outputs.tag }}\` |"
+            echo "| Commit | \`${{ needs.preflight.outputs.sha }}\` |"
+            echo "| Image | \`${{ needs.image.outputs.image_with_digest }}\` |"
+            echo "| Architectures | linux/amd64, linux/arm64 |"
+            echo "| Release | ${{ needs.release.outputs.url }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
