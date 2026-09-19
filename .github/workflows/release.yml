@@ -155,5 +155,9 @@ jobs:
             ghcr.io/elias02345/cloudgate:${{ steps.version.outputs.tag }}
             ghcr.io/elias02345/cloudgate:latest
             ghcr.io/elias02345/cloudgate:main
+          # Stamps org.opencontainers.image.version on the image, so a pulled
+          # image reports its release without being started.
+          build-args: |
+            CLOUDGATE_VERSION=${{ steps.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
