@@ -11,6 +11,36 @@ _Nothing yet._
 
 ## [0.3.12] — 2026-09-19
 
+### Security
+
+- **A backup file name could run as script in the Recovery UI.** The recovery
+  page listed the contents of `/data/db/backups/` by pasting each file name
+  straight into the table's HTML and into the Restore button's `onclick`
+  handler. A name containing a quote therefore broke out and executed — on the
+  one CloudGate service that has no login, because it has to work when
+  authentication is broken, and that can restore a database over the live one
+  or move all of `/data` aside.
+
+  Any name CloudGate writes itself is harmless. A name it does not write is
+  the problem: restoring a backup archive from an untrusted source unpacks
+  whatever file names that archive carries into `/data`, and a homelab
+  operator opening the Recovery UI afterwards would have run them.
+
+  Three independent fixes, because of what this service can do:
+  - The backup listing now skips any name that is not
+    `[A-Za-z0-9._-]+.sqlite`, so a hostile name never reaches the browser.
+  - The table is built from DOM nodes with `textContent` instead of
+    concatenated HTML, so a name that did arrive would be shown, not run.
+  - The page sends a `Content-Security-Policy` with a per-response nonce. Its
+    own script carries the nonce; anything injected afterwards does not, and
+    the browser refuses to run it. The page's buttons moved from `onclick`
+    attributes to event listeners to make that possible.
+
+  Verified against a running Recovery UI: a planted
+  `evil'),alert(1),('.sqlite` is not listed, an injected inline handler does
+  not fire, and the page's own listing, log buttons and Restore action still
+  work.
+
 ### Fixed
 
 - **Two buttons showed a raw translation key instead of a label.** The AI chat
