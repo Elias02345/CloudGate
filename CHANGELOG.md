@@ -13,6 +13,13 @@ _Nothing yet._
 
 ### Fixed
 
+- **A crash left no trace in the log CloudGate shows you.** When an error
+  escaped and took the backend down, Node printed it to the container's
+  stderr and nothing else — not to `/data/logs/cloudgate.log`, which is the
+  log the Recovery UI displays and the one you would open when the container
+  keeps restarting. The backend now logs the crash itself, stack included,
+  before it exits, so the reason is in the file with everything else.
+
 - **Deleting a Cloudflare account left its tunnels running.** The database
   deletes a tunnel automatically when the account it belongs to goes away.
   That sounds tidy and it skipped everything that actually matters: the
