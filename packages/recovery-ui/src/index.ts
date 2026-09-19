@@ -8,6 +8,7 @@
  * when the backend cannot import its own files.
  */
 
+import { randomBytes } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs';
 import { copyFile, readFile, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -45,8 +46,24 @@ function blockCrossSite(req: express.Request, res: express.Response, next: expre
 }
 
 app.get('/', (_req, res) => {
+	// One nonce per response. The page's own <script> carries it; anything
+	// injected into the DOM later does not, so the browser refuses to run it.
+	// This is the backstop for the escaping below — on the one service that
+	// can overwrite the database without anyone logging in, one layer is thin.
+	const nonce = randomBytes(16).toString('base64');
 	res.setHeader('Content-Type', 'text/html; charset=utf-8');
-	res.send(renderPage());
+	res.setHeader(
+		'Content-Security-Policy',
+		[
+			"default-src 'none'",
+			`script-src 'nonce-${nonce}'`,
+			"style-src 'unsafe-inline'",
+			"connect-src 'self'",
+			"form-action 'none'",
+			"base-uri 'none'",
+		].join('; ')
+	);
+	res.send(renderPage(nonce));
 });
 
 // --- Status ---------------------------------------------------------------
@@ -96,12 +113,20 @@ interface BackupEntry {
 	type: 'pre-update' | 'manual';
 }
 
+/**
+ * A backup file name is whatever sits in the directory, and a restored archive
+ * can carry any name a filesystem accepts — quotes and angle brackets included.
+ * Names outside this set are never anything CloudGate wrote, so they are simply
+ * not listed rather than escaped downstream.
+ */
+const SAFE_BACKUP_NAME = /^[A-Za-z0-9._-]+\.sqlite$/;
+
 app.get('/api/backups', (_req, res) => {
 	const dir = join(DATA_DIR, 'db', 'backups');
 	const entries: BackupEntry[] = [];
 	if (existsSync(dir)) {
 		for (const name of readdirSync(dir)) {
-			if (!name.endsWith('.sqlite')) continue;
+			if (!SAFE_BACKUP_NAME.test(name)) continue;
 			try {
 				const stat = statSync(join(dir, name));
 				entries.push({
@@ -266,7 +291,7 @@ async function readTextIfExists(path: string): Promise<string | null> {
 // Touch unused import — keep available for future endpoints
 void rmSync;
 
-function renderPage(): string {
+function renderPage(nonce: string): string {
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -317,9 +342,9 @@ function renderPage(): string {
     <div class="card">
       <h2>Logs</h2>
       <p>
-        <button onclick="loadLog('cloudgate.log')">cloudgate.log</button>
-        <button onclick="loadLog('cloudflared.log')">cloudflared.log</button>
-        <button onclick="loadLog('update-history.log')">update-history.log</button>
+        <button data-log="cloudgate.log">cloudgate.log</button>
+        <button data-log="cloudflared.log">cloudflared.log</button>
+        <button data-log="update-history.log">update-history.log</button>
       </p>
       <pre id="log" class="muted">Pick a log above…</pre>
     </div>
@@ -338,14 +363,14 @@ function renderPage(): string {
         <strong>Soft reset</strong> — clear bootstrap markers, then restart.
         Keeps all your data + secrets. Re-runs migrations.
       </p>
-      <button class="secondary" onclick="doSoftReset()">Soft reset…</button>
+      <button class="secondary" id="soft-reset">Soft reset…</button>
 
       <p style="margin-top: 16px;">
         <strong>Hard reset</strong> — move everything in <code>/data</code> into
         <code>/data/.broken-&lt;ts&gt;</code>. Next start: completely fresh.
         Old data stays on the volume (you can copy it out later).
       </p>
-      <button class="danger" onclick="doHardReset()">Hard reset…</button>
+      <button class="danger" id="hard-reset">Hard reset…</button>
     </div>
 
     <div class="card">
@@ -363,7 +388,7 @@ function renderPage(): string {
     </p>
   </div>
 
-<script>
+<script nonce="${nonce}">
 fetch('/api/status').then(r => r.json()).then(s => {
   document.getElementById('status').textContent = JSON.stringify(s, null, 2);
 }).catch(e => {
@@ -383,24 +408,52 @@ function loadLog(name) {
   });
 }
 
+// Built node by node rather than as a string. The old version pasted the file
+// name into the row's HTML and into an inline onclick, so a name carrying a
+// quote ran as script on the one page that can wipe /data without a login.
 function loadBackups() {
+  const el = document.getElementById('backups');
   fetch('/api/backups').then(r => r.json()).then(j => {
-    const el = document.getElementById('backups');
+    el.textContent = '';
     if (!j.backups.length) {
-      el.innerHTML = '<p class="muted">No backups found in /data/db/backups/</p>';
+      const empty = document.createElement('p');
+      empty.className = 'muted';
+      empty.textContent = 'No backups found in /data/db/backups/';
+      el.appendChild(empty);
       return;
     }
-    let html = '<table><tr><th>Name</th><th>Size</th><th>When</th><th>Type</th><th></th></tr>';
-    for (const b of j.backups) {
-      const kb = (b.size / 1024).toFixed(0);
-      html += '<tr><td><code>' + b.name + '</code></td><td>' + kb + ' KB</td><td>' + b.mtime.slice(0, 19) +
-              '</td><td>' + b.type + '</td><td><button onclick="restoreDb(\\''+ b.name +'\\')">Restore</button></td></tr>';
+    const table = document.createElement('table');
+    const head = table.insertRow();
+    for (const label of ['Name', 'Size', 'When', 'Type', '']) {
+      const th = document.createElement('th');
+      th.textContent = label;
+      head.appendChild(th);
     }
-    html += '</table>';
-    el.innerHTML = html;
-  }).catch(e => { document.getElementById('backups').textContent = 'Error: ' + e.message; });
+    for (const b of j.backups) {
+      const row = table.insertRow();
+      const code = document.createElement('code');
+      code.textContent = b.name;
+      row.insertCell().appendChild(code);
+      row.insertCell().textContent = (b.size / 1024).toFixed(0) + ' KB';
+      row.insertCell().textContent = b.mtime.slice(0, 19);
+      row.insertCell().textContent = b.type;
+      const restore = document.createElement('button');
+      restore.textContent = 'Restore';
+      restore.addEventListener('click', function () { restoreDb(b.name); });
+      row.insertCell().appendChild(restore);
+    }
+    el.appendChild(table);
+  }).catch(e => { el.textContent = 'Error: ' + e.message; });
 }
 loadBackups();
+
+// Handlers are attached here rather than written as onclick attributes: an
+// inline handler is script, and CSP has no way to carry the nonce on one.
+for (const button of document.querySelectorAll('button[data-log]')) {
+  button.addEventListener('click', function () { loadLog(button.dataset.log); });
+}
+document.getElementById('soft-reset').addEventListener('click', doSoftReset);
+document.getElementById('hard-reset').addEventListener('click', doHardReset);
 
 function restoreDb(name) {
   const phrase = prompt('This will OVERWRITE the current database with ' + name +

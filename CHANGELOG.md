@@ -9,6 +9,86 @@ _Nothing yet._
 
 ---
 
+## [0.3.12] — 2026-09-19
+
+### Security
+
+- **Any website could load the CloudGate UI in a frame.** The backend sets a
+  full set of security headers, but it only ever sees requests to `/api/`:
+  nginx serves the SPA's HTML straight off disk. So the one response where
+  `frame-ancestors` and `X-Frame-Options` mean anything — the document — was
+  sent without them, and without a Content-Security-Policy, an
+  `X-Content-Type-Options` or a `Referrer-Policy`. The headers were all
+  landing on JSON responses that have no frames and no subresources.
+
+  An attacker's page could therefore embed the whole interface. Your session
+  token lives in the browser's local storage, which the framed copy can read,
+  so the framed CloudGate is a logged-in CloudGate — ready for an invisible
+  overlay to collect clicks on whatever button sits underneath.
+
+  nginx now sends the document its own policy, plus `X-Frame-Options: DENY`,
+  `nosniff`, `Referrer-Policy: no-referrer` and `Cross-Origin-Opener-Policy`.
+  The recovery page gets the same four. Demonstrated against two running
+  containers side by side: the old one renders inside a foreign page's iframe,
+  the new one is refused with "Framing … violates … frame-ancestors 'none'".
+
+  **This one needs a new container image.** The headers live in the nginx
+  config, and the release tarball carries only the application — so updating
+  through CloudGate's own update page cannot deliver them. The update page now
+  says so when it detects an image without them.
+
+- **A backup file name could run as script in the Recovery UI.** The recovery
+  page listed the contents of `/data/db/backups/` by pasting each file name
+  straight into the table's HTML and into the Restore button's `onclick`
+  handler. A name containing a quote therefore broke out and executed — on the
+  one CloudGate service that has no login, because it has to work when
+  authentication is broken, and that can restore a database over the live one
+  or move all of `/data` aside.
+
+  Any name CloudGate writes itself is harmless. A name it does not write is
+  the problem: restoring a backup archive from an untrusted source unpacks
+  whatever file names that archive carries into `/data`, and a homelab
+  operator opening the Recovery UI afterwards would have run them.
+
+  Three independent fixes, because of what this service can do:
+  - The backup listing now skips any name that is not
+    `[A-Za-z0-9._-]+.sqlite`, so a hostile name never reaches the browser.
+  - The table is built from DOM nodes with `textContent` instead of
+    concatenated HTML, so a name that did arrive would be shown, not run.
+  - The page sends a `Content-Security-Policy` with a per-response nonce. Its
+    own script carries the nonce; anything injected afterwards does not, and
+    the browser refuses to run it. The page's buttons moved from `onclick`
+    attributes to event listeners to make that possible.
+
+  Verified against a running Recovery UI: a planted
+  `evil'),alert(1),('.sqlite` is not listed, an injected inline handler does
+  not fire, and the page's own listing, log buttons and Restore action still
+  work.
+
+### Fixed
+
+- **Two buttons showed a raw translation key instead of a label.** The AI chat
+  drawer's close button announced itself to screen readers as the literal text
+  `common.close`, because the key it asked for existed in neither language
+  file. Two more places papered over the same gap with a hard-coded English
+  fallback, so German users read "Close" and "Optional" in an otherwise German
+  interface. All three now have real translations in both languages.
+
+### Added
+
+- The update page's image check now also reports an image that serves the web
+  UI without the security headers above, the same way it already reports one
+  that still exposes `/__recovery/`. Both fixes live in files a self-update
+  cannot deliver, so the only honest thing CloudGate can do is say that a new
+  image is needed.
+- The frontend has its first test, and it guards exactly that: every
+  translation key the sources ask for must exist, English and German must
+  carry the same keys, and no translation may be blank. A missing key used to
+  be invisible until someone opened the page in the right language — now it
+  fails the build.
+
+---
+
 ## [0.3.11] — 2026-09-19
 
 ### Fixed

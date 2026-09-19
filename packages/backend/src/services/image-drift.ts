@@ -52,6 +52,18 @@ export function driftProblemsInNginxConf(conf: string): string[] {
 				'Updating through the UI cannot replace this file. Pull a new container image (docker compose pull) and recreate the container.'
 		);
 	}
+	// 0.3.12 added the document's security headers here. nginx serves the
+	// SPA's HTML off disk, so helmet never sees it — an image without this
+	// block serves the UI with no frame-ancestors and no X-Frame-Options,
+	// and the whole interface can be framed by any origin while the
+	// operator's token sits in localStorage.
+	if (!/frame-ancestors/.test(conf)) {
+		problems.push(
+			'The container image serves the web UI without a Content-Security-Policy or X-Frame-Options, so any website can load CloudGate in a frame. ' +
+				'These headers live in the nginx config inside the image, which updating through the UI cannot replace. Pull a new container image (docker compose pull) and recreate the container.'
+		);
+	}
+
 	return problems;
 }
 

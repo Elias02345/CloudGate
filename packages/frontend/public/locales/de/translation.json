@@ -6,6 +6,8 @@
     "delete": "Löschen",
     "edit": "Bearbeiten",
     "confirm": "Bestätigen",
+    "close": "Schließen",
+    "optional": "Optional",
     "load_failed": "Konnte nicht geladen werden",
     "load_failed_hint": "CloudGate hat keine Antwort bekommen. Läuft der Dienst noch?",
     "retry": "Erneut versuchen"
