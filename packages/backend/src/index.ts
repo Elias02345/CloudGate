@@ -20,7 +20,7 @@ const pinoHttp: (opts?: any) => RequestHandler = pinoHttpDefault as any;
 import { runBootstrap } from './bootstrap.js';
 import { VERSION, getConfig } from './config.js';
 import { closeDb } from './db/db.js';
-import { childLogger, logger } from './logger.js';
+import { childLogger, installFatalHandlers, logger } from './logger.js';
 import { looksLikeApiKey, tryApiKey } from './middleware/api-key.js';
 import { apiKeyLimiter, globalLimiter } from './middleware/rate-limit.js';
 import { acmeRouter } from './routes/acme.js';
@@ -233,6 +233,8 @@ async function main(): Promise<void> {
 	process.on('SIGINT', () => void shutdown('SIGINT'));
 	process.on('SIGTERM', () => void shutdown('SIGTERM'));
 }
+
+installFatalHandlers();
 
 main().catch((err) => {
 	log.fatal({ err }, 'Fatal error during startup');
