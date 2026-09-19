@@ -2,7 +2,7 @@
 
 > **Self-hosted WebUI for Cloudflare Tunnels.** Host services from behind CGNAT without port forwarding — Immich, Nextcloud, Jellyfin, Proxmox, Home Assistant, you name it.
 
-**Status:** 🚧 pre-alpha — under active development, not yet production-ready.
+**Status:** stable — v0.5.0 is the first production-ready release.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Build](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/Elias02345/CloudGate/actions/workflows/ci.yml)
