@@ -80,11 +80,17 @@ export async function verifyToken(token: string): Promise<CloudflareTokenInfo> {
 export async function listAccounts(token: string): Promise<CloudflareAccountSummary[]> {
 	const cf = clientFor(token);
 	try {
-		const accounts: CloudflareAccountSummary[] = [];
-		for await (const acc of cf.accounts.list()) {
-			accounts.push({ id: String(acc.id), name: String(acc.name) });
+		// Derive accounts from the token-supported zone endpoint instead of /accounts.
+		const accounts = new Map<string, CloudflareAccountSummary>();
+		for await (const zone of cf.zones.list()) {
+			if (zone.account?.id) {
+				accounts.set(String(zone.account.id), {
+					id: String(zone.account.id),
+					name: String(zone.account.name ?? zone.account.id),
+				});
+			}
 		}
-		return accounts;
+		return [...accounts.values()];
 	} catch (err) {
 		throw mapError(err, 'list accounts');
 	}
