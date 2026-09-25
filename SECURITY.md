@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | ------- | --------- |
-| Latest release (currently `v0.5.0`) on `main` | ✅ |
+| Latest release (currently `v0.6.0`) on `main` | ✅ |
 | `dev` / nightly builds (`:nightly`) | ⚠️ best-effort |
 | anything older | ❌ |
 
