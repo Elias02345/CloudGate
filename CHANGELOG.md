@@ -9,6 +9,26 @@ _Nothing yet._
 
 ---
 
+## [0.6.0] — 2026-09-25
+
+### Added
+
+- **Create your admin account in the browser.** A fresh install opens with
+  "Create your admin account": you choose your email, name and password and
+  are logged in straight away. No more digging a generated password out of
+  the container logs. Headless installs can still set
+  `CLOUDGATE_INITIAL_ADMIN_PASSWORD`, which creates the admin as before.
+
+### Security
+
+- **First-run setup is limited in time and to your network.** Setup only
+  works while no account exists, for 30 minutes after CloudGate starts
+  (`CLOUDGATE_SETUP_WINDOW_MINUTES`), and only from the local network. A
+  restart reopens it. The first-run backup restore, which was reachable
+  without a login, has the same limits now.
+
+---
+
 ## [0.5.0] — 2026-09-19
 
 The first stable release, and the first one offered in homelab app stores.
