@@ -122,6 +122,36 @@ jobs:
             || fail "SPA index on :8080 did not return HTML"
           echo "SPA index served on :8080"
 
+          echo "=== First-run setup: fresh volume needs setup, POST /api/setup creates the admin, repeat is 409 ==="
+          status_body="$(curl -fsS "http://localhost:18080/api/setup/status")"
+          echo "${status_body}" | grep -q '"needs_setup":true' \
+            || fail "GET /api/setup/status did not report needs_setup=true on a fresh volume: ${status_body}"
+          echo "GET /api/setup/status reports needs_setup=true on a fresh volume"
+
+          # curl runs on this runner and reaches the container through its
+          # published port, same as a real browser on the LAN would — nginx
+          # sees the connecting peer as a loopback/private address and forwards
+          # it to the backend, which is exactly what the setup route's
+          # local-network guard (services/network-origin.ts) must accept. A 403
+          # SETUP_NOT_LOCAL here would mean that guard is rejecting normal LAN
+          # traffic, not just internet traffic — so the status check below
+          # doubles as verification that the request arrived as private/loopback.
+          setup_code="$(curl -s -o /tmp/setup-resp.json -w '%{http_code}' -X POST "http://localhost:18080/api/setup" \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"admin@example.com","name":"CI Admin","password":"ci-smoke-test-password-123"}')"
+          [[ "${setup_code}" == "200" ]] \
+            || fail "POST /api/setup expected 200 (request should look private/loopback through nginx), got ${setup_code}: $(cat /tmp/setup-resp.json)"
+          grep -q '"access_token"' /tmp/setup-resp.json \
+            || fail "POST /api/setup response missing access_token: $(cat /tmp/setup-resp.json)"
+          echo "POST /api/setup created the admin and returned a session (request arrived as private/loopback through nginx)"
+
+          setup_repeat_code="$(curl -s -o /dev/null -w '%{http_code}' -X POST "http://localhost:18080/api/setup" \
+            -H 'Content-Type: application/json' \
+            -d '{"email":"too-late@example.com","name":"Second","password":"ci-smoke-test-password-456"}')"
+          [[ "${setup_repeat_code}" == "409" ]] \
+            || fail "second POST /api/setup expected 409 SETUP_DONE, got ${setup_repeat_code}"
+          echo "Second POST /api/setup correctly returned 409 SETUP_DONE"
+
           echo "=== Replacement persistence: sacred /data secrets survive a container swap ==="
           jwt_before="$(docker exec cg-test sha256sum /data/secrets/jwt.key 2>/dev/null | awk '{print $1}')"
           enc_before="$(docker exec cg-test sha256sum /data/secrets/encryption.key 2>/dev/null | awk '{print $1}')"

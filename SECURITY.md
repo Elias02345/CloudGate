@@ -4,7 +4,7 @@
 
 | Version | Supported |
 | ------- | --------- |
-| Latest release (currently `v0.5.0`) on `main` | ✅ |
+| Latest release (currently `v0.6.0`) on `main` | ✅ |
 | `dev` / nightly builds (`:nightly`) | ⚠️ best-effort |
 | anything older | ❌ |
 
@@ -45,6 +45,7 @@ We protect against:
 - ✅ Brute-force login (rate limiting + Argon2id + optional 2FA)
 - ✅ Container brick-state (Recovery UI + rollback)
 - ✅ Tampered release downloads (mandatory SHA256 verification)
+- ✅ Unauthenticated admin takeover of a fresh install — first-run setup (`POST /api/setup`) is usable exactly once, only from the local network, and only for a short window after process start (`CLOUDGATE_SETUP_WINDOW_MINUTES`, default 30 minutes); a restart reopens the window
 
 We do NOT yet protect against:
 - ❌ A compromised release artifact reaching the updater undetected — release signing is planned but not enabled yet.

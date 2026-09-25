@@ -226,6 +226,17 @@ async function runMigrations(): Promise<void> {
 	log.info({ batchNo, migrations }, 'Migrations applied');
 }
 
+/**
+ * Seeds the initial admin — but only for headless/automated installs that
+ * set CLOUDGATE_INITIAL_ADMIN_PASSWORD (the operator already knows the
+ * password, so nothing needs to be written or logged for them to find it).
+ *
+ * Everyone else gets no admin user at all: the web UI's first-run Setup
+ * page (POST /api/setup, see routes/setup.ts) creates the one-and-only
+ * admin interactively instead of burying a random password in a log line
+ * or /data/secrets/initial-admin.txt that the user had to go dig out of
+ * the container.
+ */
 async function seedAdminIfMissing(): Promise<void> {
 	const cfg = getConfig();
 	const { getDb } = await import('./db/db.js');
@@ -237,9 +248,13 @@ async function seedAdminIfMissing(): Promise<void> {
 		return;
 	}
 
+	if (!cfg.CLOUDGATE_INITIAL_ADMIN_PASSWORD) {
+		log.info('No admin user yet — the web UI setup page (/setup) will create one on first visit');
+		return;
+	}
+
 	const email = cfg.CLOUDGATE_INITIAL_ADMIN_EMAIL ?? 'admin@cloudgate.local';
-	const password = cfg.CLOUDGATE_INITIAL_ADMIN_PASSWORD ?? randomBytes(18).toString('base64');
-	const hash = await argon2.hash(password, { type: argon2.argon2id });
+	const hash = await argon2.hash(cfg.CLOUDGATE_INITIAL_ADMIN_PASSWORD, { type: argon2.argon2id });
 
 	await knex('users').insert({
 		email,
@@ -251,28 +266,9 @@ async function seedAdminIfMissing(): Promise<void> {
 		updated_at: new Date().toISOString(),
 	});
 
-	// Write the initial password ONCE so the user can find it (gets deleted on first login).
-	const adminFile = dataPath('secrets', 'initial-admin.txt');
-	const content = [
-		'CloudGate Initial Admin Credentials',
-		'====================================',
-		'',
-		`Email:    ${email}`,
-		`Password: ${password}`,
-		'',
-		'You will be forced to change this password on first login.',
-		'This file is automatically deleted once you log in successfully.',
-		'',
-	].join('\n');
-	await writeFile(adminFile, content, { encoding: 'utf8', mode: 0o600 });
-
-	// Point the operator at the file — never the password itself. This log
-	// line lands in /data/logs/cloudgate.log AND the docker log driver,
-	// neither of which is an appropriate place for a plaintext credential.
-	log.warn(
-		{ email, password_file: adminFile },
-		'====== INITIAL ADMIN PASSWORD generated — see /data/secrets/initial-admin.txt ======'
-	);
+	// No password file here — CLOUDGATE_INITIAL_ADMIN_PASSWORD means the
+	// operator set it themselves and already knows it.
+	log.info({ email }, 'Initial admin created from CLOUDGATE_INITIAL_ADMIN_PASSWORD');
 }
 
 async function initGpgKeyring(): Promise<void> {

@@ -27,6 +27,10 @@ let destroyTunnelsForAccount: typeof import('../src/services/tunnel-teardown.js'
 beforeAll(async () => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'cloudgate-cascade-'));
 	process.env.CLOUDGATE_DATA_DIR = tmpDir;
+	// USER_ID below needs an actual users(id)=1 row (tunnels.user_id is a NOT
+	// NULL FK). Bootstrap only seeds that row for a headless install (env var
+	// set); see bootstrap.ts `seedAdminIfMissing`.
+	process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD = 'unit-test-initial-pw-123456';
 	const { runBootstrap } = await import('../src/bootstrap.js');
 	const status = await runBootstrap();
 	if (!status.complete) throw new Error(`bootstrap failed: ${status.last_error}`);
@@ -39,10 +43,11 @@ beforeAll(async () => {
 afterAll(async () => {
 	const { closeDb } = await import('../src/db/db.js');
 	await closeDb();
+	delete process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD;
 	if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
 });
 
-/** The seeded admin from bootstrap. */
+/** The seeded admin from bootstrap (headless path — see beforeAll above). */
 const USER_ID = 1;
 
 /** One account + one tunnel + one host attached to it. Returns their ids. */
