@@ -322,11 +322,11 @@
   },
   "setup": {
     "title": "Admin-Account anlegen",
-    "intro": "Das Erste, was eine frische CloudGate-Installation braucht — wähle deine E-Mail, deinen Namen und ein Passwort. Diese Seite siehst du nur einmal.",
+    "intro": "Wähle E-Mail, Namen und Passwort für deinen Admin-Account. Diese Seite erscheint nur einmal, bei einer neuen Installation.",
     "name_required": "Name erforderlich",
     "submit": "Admin-Account anlegen",
     "failed": "Einrichtung fehlgeschlagen",
-    "error_not_local": "Die Einrichtung ist nur aus dem lokalen Netzwerk erlaubt — öffne die CloudGate-Oberfläche von einem Gerät in deinem LAN (oder über Tailscale/VPN), nicht über einen öffentlichen Tunnel.",
+    "error_not_local": "Die Einrichtung ist nur aus deinem lokalen Netzwerk erlaubt. Öffne CloudGate von einem Gerät in deinem LAN (oder über ein VPN wie Tailscale), nicht über einen öffentlichen Tunnel.",
     "error_window_closed": "Die Einrichtung ist aus Sicherheitsgründen geschlossen. Starte den CloudGate-Container/die App neu, um sie erneut zu öffnen.",
     "error_already_done": "Es existiert bereits ein Admin-Account. Gehe stattdessen zur Login-Seite.",
     "window_closed_title": "Einrichtung geschlossen",

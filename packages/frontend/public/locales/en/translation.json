@@ -322,11 +322,11 @@
   },
   "setup": {
     "title": "Create your admin account",
-    "intro": "This is the first thing a fresh CloudGate install needs — pick your email, name and password. You'll only see this once.",
+    "intro": "Choose the email, name and password for your admin account. This page appears only once, on a fresh install.",
     "name_required": "Name is required",
     "submit": "Create my admin account",
     "failed": "Setup failed",
-    "error_not_local": "Setup is only allowed from the local network — open the CloudGate UI from a device on your LAN (or over Tailscale/VPN), not through a public tunnel.",
+    "error_not_local": "Setup is only allowed from your local network. Open CloudGate from a device in your LAN (or over a VPN such as Tailscale), not through a public tunnel.",
     "error_window_closed": "Setup has closed for security. Restart the CloudGate container/app to reopen it for a while.",
     "error_already_done": "An admin account already exists. Go to the login page instead.",
     "window_closed_title": "Setup closed",
