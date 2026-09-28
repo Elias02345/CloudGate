@@ -83,7 +83,9 @@ cloudflareRouter.post(
 			const first = accounts[0];
 			if (!first) {
 				res.status(400).json({
-					error: 'Token has no account access. Re-create with Account.Tunnels:Edit scope.',
+					// Accounts are discovered through the token's zones (see listAccounts).
+					error:
+						'Token cannot see any zone. Re-create it with Zone → Zone → Read, Zone → DNS → Edit and Account → Cloudflare Tunnel → Edit.',
 					code: 'CF_NO_ACCOUNTS',
 				});
 				return;
