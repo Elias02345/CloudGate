@@ -19,6 +19,10 @@ let tmpDir: string;
 beforeAll(async () => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'cloudgate-zonesync-'));
 	process.env.CLOUDGATE_DATA_DIR = tmpDir;
+	// The fake tunnel row below references user_id: 1 under a NOT NULL FK to
+	// users(id). Bootstrap only seeds that row for a headless install (env
+	// var set); see bootstrap.ts `seedAdminIfMissing`.
+	process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD = 'unit-test-initial-pw-123456';
 	const { runBootstrap } = await import('../src/bootstrap.js');
 	const status = await runBootstrap();
 	if (!status.complete) throw new Error(`bootstrap failed: ${status.last_error}`);
@@ -27,6 +31,7 @@ beforeAll(async () => {
 afterAll(async () => {
 	const { closeDb } = await import('../src/db/db.js');
 	await closeDb();
+	delete process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD;
 	if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
 });
 

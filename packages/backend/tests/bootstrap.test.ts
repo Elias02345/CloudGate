@@ -23,6 +23,12 @@ beforeAll(async () => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'cloudgate-bootstrap-'));
 	process.env.CLOUDGATE_DATA_DIR = tmpDir;
 	process.env.CLOUDGATE_INITIAL_ADMIN_EMAIL = 'unit@test.local';
+	// This suite exercises the headless/automated-install path (see
+	// bootstrap.ts `seedAdminIfMissing`): setting the password env var is
+	// what makes bootstrap create an admin at all on a fresh DB. The
+	// interactive path (no env var -> no user, web UI Setup page creates
+	// one) is covered separately in bootstrap-setup-mode.test.ts.
+	process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD = 'unit-test-initial-pw-123456';
 	const { runBootstrap } = await import('../src/bootstrap.js');
 	const status = await runBootstrap();
 	if (!status.complete) throw new Error(`bootstrap failed: ${status.last_error}`);
@@ -33,6 +39,7 @@ afterAll(async () => {
 	await closeDb();
 	if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
 	delete process.env.CLOUDGATE_INITIAL_ADMIN_EMAIL;
+	delete process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD;
 });
 
 describe('bootstrap', () => {
@@ -47,12 +54,13 @@ describe('bootstrap', () => {
 		expect(existsSync(join(tmpDir, 'secrets', 'jwt.key'))).toBe(true);
 	});
 
-	it('writes initial-admin.txt with credentials', () => {
-		const file = join(tmpDir, 'secrets', 'initial-admin.txt');
-		expect(existsSync(file)).toBe(true);
-		const contents = readFileSync(file, 'utf8');
-		expect(contents).toContain('unit@test.local');
-		expect(contents).toContain('Password:');
+	// CHANGED: previously asserted initial-admin.txt WAS written. Since
+	// CLOUDGATE_INITIAL_ADMIN_PASSWORD is now what triggers this seed path
+	// (headless/automated install), the operator already knows the password
+	// they set — bootstrap.ts no longer writes it back out to a file. See
+	// bootstrap-setup-mode.test.ts for the interactive (no env var) path.
+	it('does NOT write initial-admin.txt for a headless install (operator already knows the password)', () => {
+		expect(existsSync(join(tmpDir, 'secrets', 'initial-admin.txt'))).toBe(false);
 	});
 
 	it('writes the bootstrap-complete marker', () => {

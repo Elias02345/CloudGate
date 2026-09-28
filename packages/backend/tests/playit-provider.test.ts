@@ -16,6 +16,10 @@ let tmpDir: string;
 beforeAll(async () => {
 	tmpDir = mkdtempSync(join(tmpdir(), 'cloudgate-playit-'));
 	process.env.CLOUDGATE_DATA_DIR = tmpDir;
+	// The fake rows below reference user_id: 1 under a NOT NULL FK to
+	// users(id). Bootstrap only seeds that row for a headless install (env
+	// var set); see bootstrap.ts `seedAdminIfMissing`.
+	process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD = 'unit-test-initial-pw-123456';
 	const { runBootstrap } = await import('../src/bootstrap.js');
 	const status = await runBootstrap();
 	if (!status.complete) throw new Error(`bootstrap failed: ${status.last_error}`);
@@ -25,6 +29,7 @@ afterAll(async () => {
 	const { closeDb } = await import('../src/db/db.js');
 	await closeDb();
 	if (tmpDir) rmSync(tmpDir, { recursive: true, force: true });
+	delete process.env.CLOUDGATE_INITIAL_ADMIN_PASSWORD;
 });
 
 vi.mock('../src/services/tunnel-providers/playit/client.js', async () => {

@@ -47,6 +47,7 @@ import { PasswordChangePage } from './pages/PasswordChangePage.js';
 import { PlayitPage } from './pages/PlayitPage.js';
 import { RestorePage } from './pages/RestorePage.js';
 import { SettingsPage } from './pages/SettingsPage.js';
+import { SetupPage } from './pages/SetupPage.js';
 import { TunnelsPage } from './pages/TunnelsPage.js';
 import { UpdatesPage } from './pages/UpdatesPage.js';
 
@@ -196,6 +197,7 @@ export function App() {
 					<AppShell.Main key={location.pathname} className="cg-page">
 						<Routes>
 							<Route path="/login" element={<LoginPage />} />
+							<Route path="/setup" element={<SetupPage />} />
 							<Route path="/restore" element={<RestorePage />} />
 							<Route
 								path="/onboarding"

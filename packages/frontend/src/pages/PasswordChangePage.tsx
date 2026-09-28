@@ -114,7 +114,7 @@ export function PasswordChangePage() {
 									/>
 									<TextInput
 										label={t('password.account_name')}
-										placeholder="Elias"
+										placeholder="Alex"
 										{...form.getInputProps('name')}
 										autoComplete="name"
 										required

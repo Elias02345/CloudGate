@@ -320,6 +320,19 @@
     "go_to_login": "Zum Login",
     "restart_hint": "Ausführen: docker restart cloudgate"
   },
+  "setup": {
+    "title": "Admin-Account anlegen",
+    "intro": "Wähle E-Mail, Namen und Passwort für deinen Admin-Account. Diese Seite erscheint nur einmal, bei einer neuen Installation.",
+    "name_required": "Name erforderlich",
+    "submit": "Admin-Account anlegen",
+    "failed": "Einrichtung fehlgeschlagen",
+    "error_not_local": "Die Einrichtung ist nur aus deinem lokalen Netzwerk erlaubt. Öffne CloudGate von einem Gerät in deinem LAN (oder über ein VPN wie Tailscale), nicht über einen öffentlichen Tunnel.",
+    "error_window_closed": "Die Einrichtung ist aus Sicherheitsgründen geschlossen. Starte den CloudGate-Container/die App neu, um sie erneut zu öffnen.",
+    "error_already_done": "Es existiert bereits ein Admin-Account. Gehe stattdessen zur Login-Seite.",
+    "window_closed_title": "Einrichtung geschlossen",
+    "window_closed_body": "Die Einrichtung ist aus Sicherheitsgründen nur kurz nach dem Start von CloudGate offen. Starte den Container/die App neu, um sie erneut zu öffnen.",
+    "restore_link": "Stattdessen aus Backup wiederherstellen"
+  },
   "backup": {
     "title": "Backup & Wiederherstellung",
     "intro": "Eine verschlüsselte Datei enthält alles, was CloudGate nach einem Totalausfall braucht: die Datenbank, deine Encryption-Keys, Cloudflare-Tunnel-Credentials, nginx-Snippets und Zertifikate. Die Datei wird mit einer selbst gewählten Passphrase verschlüsselt — bewahre sie sicher auf.",
@@ -381,8 +394,8 @@
     "email_taken": "Diese E-Mail-Adresse wird bereits von einem anderen Benutzer verwendet.",
     "name_required": "Name erforderlich",
     "divider_password": "und das Passwort",
-    "initial_password": "Auto-generiertes Initial-Passwort",
-    "initial_password_hint": "Aus docker logs oder /data/secrets/initial-admin.txt"
+    "initial_password": "Initiales Admin-Passwort",
+    "initial_password_hint": "Das für diese Installation über CLOUDGATE_INITIAL_ADMIN_PASSWORD gesetzte Passwort."
   },
   "dashboard": {
     "title": "Übersicht",

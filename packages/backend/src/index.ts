@@ -38,6 +38,7 @@ import { hostsRouter } from './routes/hosts.js';
 import { openapiRouter } from './routes/openapi.js';
 import { playitRouter } from './routes/playit.js';
 import { restoreRouter } from './routes/restore.js';
+import { setupRouter } from './routes/setup.js';
 import { totpRouter } from './routes/totp.js';
 import { tunnelsRouter } from './routes/tunnels.js';
 import { updatesRouter } from './routes/updates.js';
@@ -172,6 +173,8 @@ async function main(): Promise<void> {
 	});
 
 	app.use('/api/health', healthRouter);
+	// Public — no auth. Only reachable while zero users exist (see routes/setup.ts).
+	app.use('/api/setup', setupRouter);
 	app.use('/api/auth', authRouter);
 	app.use('/api/cloudflare', cloudflareRouter);
 	app.use('/api/playit', playitRouter);

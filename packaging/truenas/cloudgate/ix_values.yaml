@@ -1,7 +1,7 @@
 images:
   image:
     repository: ghcr.io/elias02345/cloudgate
-    tag: v0.5.0
+    tag: v0.6.0
 
 consts:
   cloudgate_container_name: cloudgate

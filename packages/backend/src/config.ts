@@ -34,6 +34,10 @@ const ConfigSchema = z.object({
 	CLOUDGATE_ENCRYPTION_KEY: z.string().optional(),
 	CLOUDGATE_JWT_SECRET: z.string().optional(),
 
+	// How long after process start the unauthenticated first-run setup page
+	// (POST /api/setup) stays open. Restarting the container/app reopens it.
+	CLOUDGATE_SETUP_WINDOW_MINUTES: z.coerce.number().int().min(1).max(1440).default(30),
+
 	// Update settings — initial only, override-able via UI
 	CLOUDGATE_UPDATE_CHANNEL: z.enum(['stable', 'prerelease', 'nightly', 'disabled']).default('stable'),
 	CLOUDGATE_UPDATE_MODE: z.enum(['auto', 'notify', 'scheduled']).default('notify'),

@@ -1,4 +1,4 @@
-app_version: v0.5.0
+app_version: v0.6.0
 # CloudGate needs no special Linux capabilities for the default packaging
 # (container port 8080 only, unprivileged). If the optional local-nginx
 # reverse-proxy mode is enabled with ports below 1024, NET_BIND_SERVICE would

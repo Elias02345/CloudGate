@@ -17,10 +17,12 @@
 
 import { existsSync } from 'node:fs';
 import { Router, type Router as RouterType } from 'express';
-import { dataPath } from '../config.js';
+import { dataPath, getConfig } from '../config.js';
 import { childLogger } from '../logger.js';
 import { requireAdmin, requireAuth, requirePasswordSet } from '../middleware/auth.js';
+import { isPrivateNetworkRequest } from '../services/network-origin.js';
 import { RestoreError, dataDirHasInstall, restoreAndMark } from '../services/restore.js';
+import { PROCESS_STARTED_AT, computeSetupWindow } from '../services/setup-window.js';
 
 const log = childLogger('routes:restore');
 export const restoreRouter: RouterType = Router();
@@ -42,6 +44,11 @@ restoreRouter.get('/eligibility', async (_req, res) => {
 
 // ---------------------------------------------------------------------------
 // POST /first-run — no auth, refuses if data already exists
+//
+// Guarded the same way POST /api/setup is (see setup-window.ts and
+// network-origin.ts): a stranger on the internet restoring their OWN backup
+// onto someone else's fresh container would otherwise become admin of it.
+// Both guards are defence in depth, not a guarantee — see network-origin.ts.
 // ---------------------------------------------------------------------------
 restoreRouter.post('/first-run', async (req, res) => {
 	if (dataDirHasInstall()) {
@@ -51,6 +58,28 @@ restoreRouter.post('/first-run', async (req, res) => {
 		});
 		return;
 	}
+
+	const cfg = getConfig();
+	const window = computeSetupWindow(PROCESS_STARTED_AT, cfg.CLOUDGATE_SETUP_WINDOW_MINUTES, Date.now());
+	if (!window.open) {
+		res.status(403).json({
+			error: `Restore closed ${cfg.CLOUDGATE_SETUP_WINDOW_MINUTES} minutes after start. Restart the CloudGate container/app to reopen it.`,
+			code: 'SETUP_WINDOW_CLOSED',
+		});
+		return;
+	}
+	const local = isPrivateNetworkRequest({
+		ip: req.ip,
+		xForwardedFor: req.headers['x-forwarded-for'],
+		cfConnectingIp: req.headers['cf-connecting-ip'],
+	});
+	if (!local) {
+		res
+			.status(403)
+			.json({ error: 'Restore is only allowed from the local network.', code: 'SETUP_NOT_LOCAL' });
+		return;
+	}
+
 	await handleRestore(req, res, { allowForce: false });
 });
 

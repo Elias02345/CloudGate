@@ -2,6 +2,7 @@ import { Center, Loader, Stack } from '@mantine/core';
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useMe } from '../api/auth.js';
+import { useSetupStatus } from '../api/setup.js';
 import { ListError } from './ListError.js';
 
 interface Props {
@@ -28,14 +29,20 @@ function BackendUnreachable({ error, onRetry }: { error: unknown; onRetry: () =>
 
 export function ProtectedRoute({ children, enforcePasswordSet = true }: Props) {
 	const { data, isLoading, isError, error, refetch } = useMe();
+	const setupStatus = useSetupStatus();
 	const location = useLocation();
 
-	if (isLoading) {
+	if (isLoading || setupStatus.isLoading) {
 		return (
 			<Center h="60vh">
 				<Loader />
 			</Center>
 		);
+	}
+
+	// No admin exists yet — nothing in here is reachable until /setup runs.
+	if (setupStatus.data?.needs_setup) {
+		return <Navigate to="/setup" replace />;
 	}
 
 	// A failed /auth/me is not the same as being logged out.

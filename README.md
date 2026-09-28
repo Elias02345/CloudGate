@@ -2,7 +2,7 @@
 
 > **Self-hosted WebUI for Cloudflare Tunnels and playit.gg.** Host services from behind CGNAT without port forwarding — Immich, Nextcloud, Jellyfin, Proxmox, Home Assistant, you name it.
 
-**Status:** stable — v0.5.0 is the first production-ready release.
+**Status:** stable — current release v0.6.0.
 
 ![CloudGate hosts overview](packaging/assets/screenshots/2-hosts.png)
 
@@ -44,7 +44,7 @@ The installer:
 - Pulls the latest CloudGate image (falls back to building from source)
 - Creates a persistent data volume
 - Starts the container and waits for it to become healthy
-- Prints your initial admin password
+- Prints the URL to open and create your admin account
 
 **Re-runnable** — running it again won't wipe your data.
 
@@ -70,13 +70,12 @@ docker run -d --name cloudgate \
 ### What happens next
 
 1. Open `http://<your-host-ip>/` (or port `8080`) in a browser.
-2. Login as `admin@cloudgate.local` with the password shown in container logs:
-   ```bash
-   docker logs cloudgate | grep -A1 "INITIAL ADMIN PASSWORD"
-   ```
-3. Change the password (forced on first login).
+2. The first thing you'll see is **Create your admin account** — pick your own email, name and password. This page only works once, only from your local network, and only for a short time after the container starts (30 minutes by default; restart the container to reopen it).
+3. You're logged in immediately — no forced password change, no digging a generated password out of the logs.
 4. Add your Cloudflare API token in the UI (instructions: see [`docs/CLOUDFLARE_SETUP.md`](docs/CLOUDFLARE_SETUP.md)).
 5. Create your first tunnel, add a host — services live within ~30 seconds.
+
+> **Headless / scripted installs**: set `CLOUDGATE_INITIAL_ADMIN_PASSWORD` (and optionally `CLOUDGATE_INITIAL_ADMIN_EMAIL`) before first boot to create the admin account automatically instead of using the Setup page — see [`.env.example`](.env.example).
 
 That's it. CloudGate manages keys, secrets, and updates automatically.
 
