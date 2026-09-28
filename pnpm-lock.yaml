@@ -60,8 +60,8 @@ importers:
         specifier: ^3.1.0
         version: 3.2.10(better-sqlite3@11.10.0)
       liquidjs:
-        specifier: ^10.20.1
-        version: 10.27.0
+        specifier: ^10.27.2
+        version: 10.27.2
       objection:
         specifier: ^3.1.5
         version: 3.1.5(knex@3.2.10(better-sqlite3@11.10.0))
@@ -1923,8 +1923,8 @@ packages:
       tedious:
         optional: true
 
-  liquidjs@10.27.0:
-    resolution: {integrity: sha512-tw/OA59K7aIBlMKIrKlumr37fiZUheShVHXY8cVctWisgY1p9mc5hreOvlreoS0wTiwlWk14Ya7305c2a/Cg5w==}
+  liquidjs@10.27.2:
+    resolution: {integrity: sha512-kvknfAEtOHjHkAAv7GxLEJh8ghpMQm3Fc4uWVyF7hERSTsSRsdC7saWs0p5aDG7GDcWsu5o+T4232O+8KZO55w==}
     engines: {node: '>=16'}
     hasBin: true
 
@@ -4610,7 +4610,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  liquidjs@10.27.0:
+  liquidjs@10.27.2:
     dependencies:
       commander: 10.0.1
 
