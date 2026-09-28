@@ -9,6 +9,18 @@ _Nothing yet._
 
 ---
 
+## [0.6.1] — 2026-09-28
+
+### Fixed
+
+- **Cloudflare tokens are accepted again.** Adding a token that had exactly
+  the permissions from the setup guide failed with "Token has no account
+  access" (`CF_NO_ACCOUNTS`). CloudGate now finds your Cloudflare account
+  through the token's zones, and the error, if it still appears, names the
+  permissions to add. Thanks to @brionispoptart for the fix (#68, #69).
+
+---
+
 ## [0.6.0] — 2026-09-25
 
 ### Added
