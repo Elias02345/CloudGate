@@ -8,25 +8,61 @@
  *    by ManagedProcess.
  *  - Each "tunnel" row points at a Playit account; tunnels group hosts by
  *    account so the agent owns them.
- *  - addHost() calls Playit's REST API to create a port mapping, persists
- *    the assigned external host:port in proxy_hosts.edge_endpoint, and
- *    returns the appropriate edge endpoint for DNS publishing (SRV record
- *    on the user's Cloudflare zone for Java; bare host:port for Bedrock).
- *
- * Stub: full implementation lives alongside client.ts + process.ts and is
- * wired up once the binary + REST client land. Keeping this skeleton so
- * the registry can resolve 'playit' without crashing.
+ *  - addHost() creates (or reuses) a playit tunnel pointing at the host's
+ *    origin, waits for playit to assign a public address, and returns it:
+ *    the free playit address (e.g. name.joinmc.link:port) as host_port, or
+ *    an SRV record on the user's Cloudflare zone for Minecraft Java.
  */
 
+import { lookup } from 'node:dns/promises';
+import { isIP } from 'node:net';
 import type { ProviderEdgeEndpoint } from '@cloudgate/shared';
 import { getDb } from '../../../db/db.js';
 import { childLogger } from '../../../logger.js';
 import { decryptJson } from '../../crypto.js';
 import type { HostBinding, ProviderStatus, TunnelProvider } from '../types.js';
-import { createPlayitClient } from './client.js';
+import {
+	type PlayitAllocation,
+	type PlayitClient,
+	type PlayitTunnelType,
+	createPlayitClient,
+} from './client.js';
 import { PlayitProcess } from './process.js';
 
 const log = childLogger('playit-provider');
+
+/** Host presets that map onto a dedicated playit tunnel type. */
+const PLAYIT_TUNNEL_TYPES: Record<string, PlayitTunnelType> = {
+	minecraft_java: 'minecraft-java',
+	minecraft_bedrock: 'minecraft-bedrock',
+};
+
+const ALLOCATION_WAIT_MS = 30_000;
+const ALLOCATION_POLL_MS = 2_000;
+
+/** playit wants an IP for the origin; resolve container/host names here. */
+async function resolveLocalIp(host: string): Promise<string> {
+	const bare = host.replace(/^\[|\]$/g, '');
+	if (isIP(bare)) return bare;
+	return (await lookup(bare)).address;
+}
+
+/** A new tunnel starts 'pending' until playit assigns it a public address. */
+async function waitForAllocation(client: PlayitClient, tunnelId: string): Promise<PlayitAllocation> {
+	const deadline = Date.now() + ALLOCATION_WAIT_MS;
+	for (;;) {
+		const tunnel = (await client.listTunnels(tunnelId)).tunnels[0];
+		if (!tunnel) throw new Error(`playit tunnel ${tunnelId} disappeared`);
+		if (tunnel.allocation) return tunnel.allocation;
+		if (tunnel.disabled_reason) {
+			throw new Error(`playit disabled the tunnel: ${tunnel.disabled_reason}`);
+		}
+		if (Date.now() > deadline) {
+			throw new Error('playit is still assigning an address to this tunnel; redeploy the host in a minute');
+		}
+		await new Promise((r) => setTimeout(r, ALLOCATION_POLL_MS));
+	}
+}
 
 interface TunnelRow {
 	id: number;
@@ -122,40 +158,70 @@ export class PlayitProvider implements TunnelProvider {
 		if (host.protocol !== 'tcp' && host.protocol !== 'udp') {
 			throw new Error(`playit provider does not support protocol '${host.protocol}'`);
 		}
-		const { secret } = await this.loadTunnelContext(tunnelDbId);
+		const { secret, meta } = await this.loadTunnelContext(tunnelDbId);
 		const client = createPlayitClient(secret);
-		const result = await client.createTunnel({
-			name: host.hostname,
-			protocol: host.protocol,
-			local_host: host.forward_host,
-			local_port: host.forward_port,
-		});
+		const localIp = await resolveLocalIp(host.forward_host);
+		const tunnelType = PLAYIT_TUNNEL_TYPES[host.host_type ?? ''] ?? null;
 
-		// Persist the assignment so future reloads + restarts keep the same
-		// external endpoint (and so we can show it in the UI).
+		// Idempotent: deployHost runs again on every edit, toggle and
+		// redeploy. Reuse the playit tunnel while it still points at the same
+		// origin; otherwise each redeploy would burn one of the few free ports.
+		const previous = meta.hosts?.[String(host.id)];
+		let tunnelId: string | null = null;
+		if (previous) {
+			const existing = (await client.listTunnels(previous.tunnel_uuid)).tunnels[0];
+			if (
+				existing &&
+				existing.port_type === host.protocol &&
+				existing.local_ip === localIp &&
+				existing.local_port === host.forward_port &&
+				existing.tunnel_type === tunnelType
+			) {
+				tunnelId = existing.id;
+			} else if (existing) {
+				await client.deleteTunnel(existing.id);
+			}
+		}
+		if (!tunnelId) {
+			const { agent_id } = await client.runData();
+			tunnelId = await client.createTunnel({
+				// playit tunnel names must be ASCII and short.
+				name: host.hostname.replace(/[^ -~]/g, '').slice(0, 30),
+				tunnel_type: tunnelType,
+				port_type: host.protocol,
+				agent_id,
+				local_ip: localIp,
+				local_port: host.forward_port,
+			});
+			// Persist right away so a failed allocation wait below does not
+			// orphan the tunnel on the next deploy.
+			await this.persistHostAssignment(tunnelDbId, host.id, {
+				tunnel_uuid: tunnelId,
+				assigned_host: '',
+				assigned_port: 0,
+			});
+		}
+
+		const alloc = await waitForAllocation(client, tunnelId);
 		await this.persistHostAssignment(tunnelDbId, host.id, {
-			tunnel_uuid: result.tunnel_uuid,
-			assigned_host: result.assigned_host,
-			assigned_port: result.assigned_port,
+			tunnel_uuid: tunnelId,
+			assigned_host: alloc.assigned_domain,
+			assigned_port: alloc.port_start,
 		});
 
-		// Java Edition uses SRV. Bedrock can't read SRV — emit host_port so
-		// the UI shows the exact "Server Address" string the player must paste.
-		const useSrv = host.protocol === 'tcp';
-		if (useSrv) {
+		// Java Edition reads SRV records, so with a zone the host's own
+		// hostname works without a port. Bedrock and raw TCP/UDP clients do
+		// not, and without a zone players use playit's free address directly.
+		if (host.host_type === 'minecraft_java' && host.has_zone) {
 			return {
 				kind: 'srv',
 				service: '_minecraft',
 				proto: '_tcp',
-				target: result.assigned_host,
-				port: result.assigned_port,
+				target: alloc.ip_hostname,
+				port: alloc.port_start,
 			};
 		}
-		return {
-			kind: 'host_port',
-			target: result.assigned_host,
-			port: result.assigned_port,
-		};
+		return { kind: 'host_port', target: alloc.assigned_domain, port: alloc.port_start };
 	}
 
 	async removeHost(tunnelDbId: number, hostId: number): Promise<void> {
@@ -189,7 +255,7 @@ export class PlayitProvider implements TunnelProvider {
 
 	private async loadTunnelContext(
 		tunnelDbId: number
-	): Promise<{ row: TunnelRow; accountId: number; secret: string }> {
+	): Promise<{ row: TunnelRow; accountId: number; secret: string; meta: ProviderMeta }> {
 		const knex = getDb();
 		const row = await knex<TunnelRow>('tunnels').where({ id: tunnelDbId }).first();
 		if (!row) throw new Error(`tunnel ${tunnelDbId} not found`);
@@ -213,7 +279,7 @@ export class PlayitProvider implements TunnelProvider {
 				? account.encrypted_secret_key
 				: account.encrypted_secret_key.toString('utf8');
 		const secret = decryptJson<{ type: 'playit'; secret: string }>(raw);
-		return { row, accountId: meta.playit_account_id, secret: secret.secret };
+		return { row, accountId: meta.playit_account_id, secret: secret.secret, meta };
 	}
 
 	private async persistHostAssignment(

@@ -5,7 +5,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Link playit.gg with a link instead of a secret.** "Connect with
+  playit.gg" opens playit.gg/claim/…; approve CloudGate there (a free
+  playit account is enough) and the account is linked. Pasting an agent
+  secret still works.
+- **Minecraft servers as regular hosts on the free playit plan.** Pick
+  "Minecraft Java" or "Minecraft Bedrock" when adding a host. CloudGate
+  creates a playit tunnel of the matching type and shows the free address
+  players join with (for example `name.joinmc.link`). A Cloudflare domain is
+  now optional; with one, Java players can join via your own hostname
+  (SRV record).
+
+### Fixed
+
+- **The playit agent starts.** It was launched with a flag the pinned agent
+  does not know (`--no-autoupdate`) and exited right away.
+- **playit tunnels are created through playit's real API.** CloudGate called
+  endpoints that do not exist, so no playit host could be deployed. It now
+  uses the same API as the official agent, waits for playit to assign the
+  address, and shows playit's own error (for example "requires premium").
+- **Redeploying a playit host no longer creates another tunnel.** Every edit
+  or redeploy used up one of the few free tunnels.
+- **TCP hosts on playit can be created from the form.** The form asked for a
+  Cloudflare zone it could not load, so Minecraft Java and raw TCP hosts
+  could not be saved.
+- The playit quota bar shows the limits playit reports for your account
+  instead of a fixed 4/4.
+- `CLOUDGATE_PLAYIT_BINARY_PATH` is now also used to start the agent, not
+  just checked.
 
 ---
 

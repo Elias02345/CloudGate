@@ -551,7 +551,15 @@
     "linked_title": "Playit account linked",
     "linked_message": "{{label}} is ready for game-server tunnels.",
     "label_placeholder": "homelab gaming",
-    "secret_placeholder": "paste the secret string from playit.gg"
+    "secret_placeholder": "paste the secret string from playit.gg",
+    "connect_hint": "Link your playit.gg account in one click: start the connection, open the link and approve CloudGate on playit.gg. A free playit account is enough.",
+    "plan_hint": "The free playit plan includes a few TCP/UDP tunnels with a random address and supports Minecraft Java and Bedrock. Custom domains and dedicated ports need playit Premium.",
+    "connect_button": "Connect with playit.gg",
+    "open_claim": "Open playit.gg to approve",
+    "claim_waiting": "Open the link and approve CloudGate on playit.gg — a free playit account is enough. This window updates automatically.",
+    "claim_rejected": "The connection was rejected on playit.gg.",
+    "claim_expired": "The link expired (15 minutes). Start the connection again.",
+    "use_secret_instead": "Use an agent secret instead"
   },
   "tunnels": {
     "title": "Cloudflare tunnels",
@@ -712,6 +720,13 @@
     "diagnose_remedy_label": "Paste into configuration.yaml:",
     "diagnose_copy": "Copy",
     "diagnose_copied": "Copied",
-    "diagnose_docs_link": "Home Assistant behind CloudGate guide"
+    "diagnose_docs_link": "Home Assistant behind CloudGate guide",
+    "playit_zone_label": "Domain (DNS zone)",
+    "playit_zone_hint": "Optional. Without a domain players use the free playit address. With one, Minecraft Java players can join via your hostname (SRV record).",
+    "playit_zone_account": "Cloudflare account",
+    "playit_hostname_placeholder": "mc.myserver.net",
+    "hint_java": "TCP via playit. Without a domain players paste the free playit address shown after deploy (joinmc.link addresses work without a port). With a domain, an SRV record lets players join with just your hostname.",
+    "hint_bedrock": "UDP via playit. Bedrock cannot read SRV — players must enter the assigned host:port directly. CloudGate shows the exact string to copy after deploy.",
+    "srv_join": "{{hostname}} (SRV → {{target}}:{{port}})"
   }
 }

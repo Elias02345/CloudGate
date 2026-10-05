@@ -6,6 +6,8 @@ import {
 	Box,
 	Button,
 	Card,
+	Collapse,
+	Divider,
 	Group,
 	Modal,
 	Paper,
@@ -19,8 +21,14 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconAlertCircle, IconCheck, IconPlugConnected, IconTrash } from '@tabler/icons-react';
-import { type ReactNode, useState } from 'react';
+import {
+	IconAlertCircle,
+	IconCheck,
+	IconExternalLink,
+	IconPlugConnected,
+	IconTrash,
+} from '@tabler/icons-react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api/client.js';
 import {
@@ -28,6 +36,8 @@ import {
 	useDeletePlayitAccount,
 	usePlayitAccounts,
 	usePlayitQuota,
+	usePollPlayitClaim,
+	useStartPlayitClaim,
 } from '../api/playit.js';
 import { useConfirm } from '../components/ConfirmProvider.js';
 import { EmptyState } from '../components/EmptyState.js';
@@ -58,6 +68,72 @@ export function PlayitPage() {
 
 	const [label, setLabel] = useState('');
 	const [secretKey, setSecretKey] = useState('');
+	const [secretOpen, secret] = useDisclosure(false);
+
+	const startClaim = useStartPlayitClaim();
+	const { mutateAsync: pollClaim } = usePollPlayitClaim();
+	const [claim, setClaim] = useState<{ code: string; url: string } | null>(null);
+	const [claimError, setClaimError] = useState<string | null>(null);
+	const labelRef = useRef(label);
+	labelRef.current = label;
+
+	const closeModal = (): void => {
+		setClaim(null); // stops the polling effect
+		setClaimError(null);
+		modal.close();
+	};
+
+	const onStartClaim = async (): Promise<void> => {
+		setClaimError(null);
+		try {
+			setClaim(await startClaim.mutateAsync());
+		} catch (err) {
+			setClaimError(err instanceof ApiError ? `${err.message} (${err.code})` : t('login.unknown_error'));
+		}
+	};
+
+	// Poll every 2 s until the user approved on playit.gg; stops when the modal closes.
+	useEffect(() => {
+		if (!claim || !modalOpened) return;
+		let cancelled = false;
+		(async () => {
+			while (!cancelled) {
+				try {
+					const r = await pollClaim({ code: claim.code, label: labelRef.current.trim() || undefined });
+					if (cancelled) return;
+					if (r.status === 'linked') {
+						notifications.show({
+							color: 'green',
+							icon: <IconCheck size={18} />,
+							title: t('playit.linked_title'),
+							message: t('playit.linked_message', { label: r.account.label }),
+						});
+						setLabel('');
+						setClaim(null);
+						modal.close();
+						return;
+					}
+				} catch (err) {
+					if (cancelled) return;
+					setClaimError(
+						err instanceof ApiError && err.code === 'PLAYIT_CLAIM_REJECTED'
+							? t('playit.claim_rejected')
+							: err instanceof ApiError && err.status === 404
+								? t('playit.claim_expired')
+								: err instanceof ApiError
+									? `${err.message} (${err.code})`
+									: t('login.unknown_error')
+					);
+					setClaim(null);
+					return;
+				}
+				await new Promise((res) => setTimeout(res, 2000));
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [claim, modalOpened, pollClaim, modal.close, t]);
 
 	const onAdd = async (): Promise<void> => {
 		try {
@@ -280,18 +356,17 @@ export function PlayitPage() {
 				</Card>
 			)}
 
-			<Modal opened={modalOpened} onClose={modal.close} title={t('playit.link_modal_title')} size="md">
+			<Modal opened={modalOpened} onClose={closeModal} title={t('playit.link_modal_title')} size="md">
 				<Stack>
 					<Text size="sm" c="dimmed">
-						{t('playit.get_secret_hint')}{' '}
-						<Anchor href="https://playit.gg/account/agents" target="_blank">
-							playit.gg/account/agents
-						</Anchor>
-						{t('playit.get_secret_hint_suffix')}
+						{t('playit.connect_hint')}
 					</Text>
-					{addError && (
+					<Text size="xs" c="dimmed">
+						{t('playit.plan_hint')}
+					</Text>
+					{claimError && (
 						<Alert color="red" icon={<IconAlertCircle size={18} />}>
-							{addError}
+							{claimError}
 						</Alert>
 					)}
 					<TextInput
@@ -299,20 +374,60 @@ export function PlayitPage() {
 						placeholder={t('playit.label_placeholder')}
 						value={label}
 						onChange={(e) => setLabel(e.currentTarget.value)}
-						required
 					/>
-					<PasswordInput
-						label={t('playit.secret_field')}
-						placeholder={t('playit.secret_placeholder')}
-						value={secretKey}
-						onChange={(e) => setSecretKey(e.currentTarget.value)}
-						required
-					/>
-					<Box>
-						<Button onClick={onAdd} loading={addMutation.isPending} disabled={!label || !secretKey}>
-							{t('playit.validate_and_link')}
-						</Button>
-					</Box>
+					{claim ? (
+						<Stack gap="xs">
+							<Button
+								component="a"
+								href={claim.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								leftSection={<IconExternalLink size={18} />}
+							>
+								{t('playit.open_claim')}
+							</Button>
+							<Text size="sm" c="dimmed">
+								{t('playit.claim_waiting')}
+							</Text>
+						</Stack>
+					) : (
+						<Box>
+							<Button onClick={onStartClaim} loading={startClaim.isPending}>
+								{t('playit.connect_button')}
+							</Button>
+						</Box>
+					)}
+					<Divider />
+					<Anchor component="button" type="button" size="sm" onClick={secret.toggle}>
+						{t('playit.use_secret_instead')}
+					</Anchor>
+					<Collapse in={secretOpen}>
+						<Stack>
+							<Text size="sm" c="dimmed">
+								{t('playit.get_secret_hint')}{' '}
+								<Anchor href="https://playit.gg/account/agents" target="_blank" rel="noopener noreferrer">
+									playit.gg/account/agents
+								</Anchor>
+								{t('playit.get_secret_hint_suffix')}
+							</Text>
+							{addError && (
+								<Alert color="red" icon={<IconAlertCircle size={18} />}>
+									{addError}
+								</Alert>
+							)}
+							<PasswordInput
+								label={t('playit.secret_field')}
+								placeholder={t('playit.secret_placeholder')}
+								value={secretKey}
+								onChange={(e) => setSecretKey(e.currentTarget.value)}
+							/>
+							<Box>
+								<Button onClick={onAdd} loading={addMutation.isPending} disabled={!label || !secretKey}>
+									{t('playit.validate_and_link')}
+								</Button>
+							</Box>
+						</Stack>
+					</Collapse>
 				</Stack>
 			</Modal>
 		</Stack>

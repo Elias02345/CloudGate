@@ -5,8 +5,11 @@
  *   GET    /accounts                 — list linked accounts for current user
  *   DELETE /accounts/:id             — unlink
  *   GET    /accounts/:id/quota       — fetch live TCP/UDP usage from Playit
+ *   POST   /claim                    — start linking via a playit.gg claim link
+ *   POST   /claim/:code              — poll a claim; links the account once approved
  */
 
+import { randomBytes } from 'node:crypto';
 import { CreatePlayitAccountRequestSchema } from '@cloudgate/shared';
 import { Router, type Router as RouterType } from 'express';
 import { childLogger } from '../logger.js';
@@ -20,9 +23,12 @@ import {
 	listAccountsForUser,
 	publicPlayitAccount,
 } from '../services/playit-account.js';
+import { PLAYIT_AGENT_VERSION } from '../services/playit-binary.js';
 import {
-	PLAYIT_FREE_TIER,
 	PlayitApiError,
+	claimExchange,
+	claimSetup,
+	claimUrl,
 	createPlayitClient,
 } from '../services/tunnel-providers/playit/client.js';
 import { destroyTunnelsForAccount } from '../services/tunnel-teardown.js';
@@ -58,8 +64,7 @@ playitRouter.post(
 
 		// Validate the key by attempting a status call. Reject early on bad keys.
 		try {
-			const client = createPlayitClient(secret_key);
-			await client.verify();
+			await createPlayitClient(secret_key).runData();
 		} catch (err) {
 			if (err instanceof PlayitApiError) {
 				res.status(err.status === 0 ? 502 : 400).json({ error: err.message, code: err.code });
@@ -144,17 +149,10 @@ playitRouter.get('/accounts/:id/quota', requireAuth, requirePasswordSet, async (
 		return;
 	}
 	try {
-		const client = createPlayitClient(decryptPlayitSecret(row));
-		const tunnels = await client.listTunnels();
-		const tcp_used = tunnels.filter((t) => t.protocol === 'tcp').length;
-		const udp_used = tunnels.filter((t) => t.protocol === 'udp').length;
+		// playit reports the account's real port allowance (free or premium).
+		const { tcp, udp } = await createPlayitClient(decryptPlayitSecret(row)).listTunnels();
 		res.json({
-			quota: {
-				tcp_used,
-				udp_used,
-				tcp_limit: PLAYIT_FREE_TIER.TCP,
-				udp_limit: PLAYIT_FREE_TIER.UDP,
-			},
+			quota: { tcp_used: tcp.claimed, udp_used: udp.claimed, tcp_limit: tcp.allowed, udp_limit: udp.allowed },
 		});
 	} catch (err) {
 		log.warn({ err: (err as Error).message }, 'Playit quota fetch failed');
@@ -165,3 +163,75 @@ playitRouter.get('/accounts/:id/quota', requireAuth, requirePasswordSet, async (
 		throw err;
 	}
 });
+
+// ---------------------------------------------------------------------------
+// Claim flow — the same one `playit claim` uses: we make up a code, the user
+// approves it at playit.gg/claim/<code> while logged in (a free account is
+// enough), and we exchange the approved code for an agent secret. Nobody has
+// to copy a secret around.
+// ---------------------------------------------------------------------------
+
+const CLAIM_TTL_MS = 15 * 60_000;
+/** code → who started it, so only that user can finish (and store) the claim. */
+const pendingClaims = new Map<string, { userId: number; expiresAt: number }>();
+
+playitRouter.post('/claim', requireAuth, requirePasswordSet, (req, res) => {
+	if (!req.user) {
+		res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+		return;
+	}
+	const now = Date.now();
+	for (const [code, c] of pendingClaims) if (c.expiresAt < now) pendingClaims.delete(code);
+	const code = randomBytes(5).toString('hex');
+	pendingClaims.set(code, { userId: req.user.id, expiresAt: now + CLAIM_TTL_MS });
+	res.status(201).json({ code, url: claimUrl(code) });
+});
+
+playitRouter.post(
+	'/claim/:code',
+	requireAuth,
+	requirePasswordSet,
+	audit({
+		action: 'playit_account.created',
+		entityType: 'playit_account',
+		meta: (req) => ({ label: req.body?.label, via: 'claim' }),
+	}),
+	async (req, res) => {
+		if (!req.user) {
+			res.status(500).json({ error: 'User missing', code: 'INTERNAL' });
+			return;
+		}
+		const code = String(req.params.code ?? '');
+		const pending = pendingClaims.get(code);
+		if (!pending || pending.userId !== req.user.id || pending.expiresAt < Date.now()) {
+			res.status(404).json({ error: 'Claim not found or expired', code: 'NOT_FOUND' });
+			return;
+		}
+		const label =
+			typeof req.body?.label === 'string' && req.body.label.trim()
+				? req.body.label.trim().slice(0, 80)
+				: 'playit.gg';
+		try {
+			const state = await claimSetup(code, `CloudGate (playit ${PLAYIT_AGENT_VERSION})`);
+			if (state === 'UserRejected') {
+				pendingClaims.delete(code);
+				res.status(400).json({ error: 'The claim was rejected on playit.gg', code: 'PLAYIT_CLAIM_REJECTED' });
+				return;
+			}
+			if (state !== 'UserAccepted') {
+				res.json({ status: state === 'WaitingForUser' ? 'waiting_for_approval' : 'waiting_for_visit' });
+				return;
+			}
+			const secret_key = await claimExchange(code);
+			pendingClaims.delete(code);
+			const row = await createAccount({ user_id: req.user.id, label, secret_key });
+			res.status(201).json({ status: 'linked', account: publicPlayitAccount(row) });
+		} catch (err) {
+			if (err instanceof PlayitApiError) {
+				res.status(err.status === 0 ? 502 : 400).json({ error: err.message, code: err.code });
+				return;
+			}
+			throw err;
+		}
+	}
+);

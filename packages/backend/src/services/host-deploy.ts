@@ -47,6 +47,7 @@ interface HostRow {
 	advanced_options: string | null;
 	dns_record_id: string | null;
 	edge_endpoint: string | null;
+	meta?: string | null;
 }
 
 interface TunnelRow {
@@ -62,6 +63,15 @@ interface TunnelRow {
  *  - cloudflare_tunnel: resolve tunnel.provider → provider.addHost() →
  *    write DNS record per edge endpoint kind → provider.reload().
  */
+function parseHostType(meta: string | null | undefined): string | undefined {
+	try {
+		const t = (JSON.parse(meta || '{}') as { host_type?: unknown }).host_type;
+		return typeof t === 'string' ? t : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
 export async function deployHost(hostId: number): Promise<void> {
 	const knex = getDb();
 	const host = await knex<HostRow>('proxy_hosts').where({ id: hostId }).first();
@@ -98,6 +108,8 @@ export async function deployHost(hostId: number): Promise<void> {
 		forward_scheme: host.forward_scheme as 'http' | 'https',
 		path_prefix: host.path_prefix,
 		tls: parseTls(host.tls_options),
+		host_type: parseHostType(host.meta),
+		has_zone: host.cf_zone_id != null,
 	};
 
 	try {

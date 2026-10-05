@@ -23,6 +23,7 @@ import { ApiError } from '../api/client.js';
 import { useCloudflareAccounts, useZones } from '../api/cloudflare.js';
 import { type CreateHostInput, useCreateHost } from '../api/hosts.js';
 import { useTunnels } from '../api/tunnels.js';
+import { PlayitZoneSelect } from '../components/PlayitZoneSelect.js';
 
 const HOSTNAME_RX = /^(?=.{1,253}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,63}$/;
 
@@ -40,6 +41,7 @@ interface HostTypeSpec {
 	srvProto?: '_tcp' | '_udp';
 	label: string;
 	hint: string;
+	hintKey?: string;
 }
 
 const HOST_TYPES: Record<HostType, HostTypeSpec> = {
@@ -59,13 +61,14 @@ const HOST_TYPES: Record<HostType, HostTypeSpec> = {
 		provider: 'playit',
 		defaultPort: 25565,
 		defaultHost: '192.168.1.50',
-		requiresZone: true,
+		requiresZone: false,
 		showScheme: false,
 		showPath: false,
 		srvService: '_minecraft',
 		srvProto: '_tcp',
 		label: 'Minecraft (Java Edition)',
-		hint: 'TCP via Playit. Auto-creates an SRV record on your zone so vanilla clients can connect with just the hostname.',
+		hint: 'TCP via Playit.',
+		hintKey: 'hosts.hint_java',
 	},
 	minecraft_bedrock: {
 		protocol: 'udp',
@@ -76,7 +79,8 @@ const HOST_TYPES: Record<HostType, HostTypeSpec> = {
 		showScheme: false,
 		showPath: false,
 		label: 'Minecraft (Bedrock Edition)',
-		hint: 'UDP via Playit. Bedrock cannot read SRV — players must enter the assigned host:port directly. CloudGate shows the exact string to copy after deploy.',
+		hint: 'UDP via Playit.',
+		hintKey: 'hosts.hint_bedrock',
 	},
 	raw_tcp: {
 		protocol: 'tcp',
@@ -128,7 +132,8 @@ export function HostFormPage() {
 			forward_host: (v) => (v.length > 0 ? null : t('hosts.required')),
 			forward_port: (v) => (v >= 1 && v <= 65535 ? null : t('hosts.invalid_port')),
 			tunnel_id: (v) => (!v ? t('hosts.tunnel_required') : null),
-			cf_zone_id: (v) => (spec.requiresZone && !v ? t('hosts.zone_required') : null),
+			cf_zone_id: (v) =>
+				spec.provider !== 'playit' && spec.requiresZone && !v ? t('hosts.zone_required') : null,
 		},
 	});
 
@@ -164,6 +169,7 @@ export function HostFormPage() {
 			const payload: CreateHostInput = {
 				mode: 'cloudflare_tunnel',
 				protocol: spec.protocol,
+				host_type: hostType,
 				hostname: values.hostname.toLowerCase(),
 				forward_scheme: spec.showScheme ? values.forward_scheme : 'http',
 				forward_host: values.forward_host,
@@ -228,7 +234,7 @@ export function HostFormPage() {
 						/>
 
 						<Alert color="gray" variant="light" icon={<IconInfoCircle size={16} />}>
-							<Text size="sm">{spec.hint}</Text>
+							<Text size="sm">{spec.hintKey ? t(spec.hintKey) : spec.hint}</Text>
 							<Group gap={6} mt={6}>
 								<Badge size="xs" variant="light">
 									protocol: {spec.protocol}
@@ -269,16 +275,19 @@ export function HostFormPage() {
 							{...form.getInputProps('tunnel_id')}
 						/>
 
-						{spec.requiresZone && (
+						{spec.provider === 'playit' && (
+							<PlayitZoneSelect
+								value={form.values.cf_zone_id}
+								onChange={(v) => form.setFieldValue('cf_zone_id', v)}
+								error={form.errors.cf_zone_id as string | undefined}
+							/>
+						)}
+
+						{spec.provider !== 'playit' && spec.requiresZone && (
 							<Select
 								label="DNS zone"
 								placeholder={t('hosts.pick_zone')}
 								disabled={!tunnelId || !zonesAccountId}
-								description={
-									spec.provider === 'playit'
-										? 'Where to publish the SRV record so players can connect with the hostname.'
-										: undefined
-								}
 								data={zones.data?.zones.map((z) => ({ value: String(z.id), label: z.name })) ?? []}
 								{...form.getInputProps('cf_zone_id')}
 							/>
@@ -287,7 +296,7 @@ export function HostFormPage() {
 						<TextInput
 							label={t('hosts.hostname_field')}
 							placeholder={
-								spec.protocol === 'tcp' || spec.protocol === 'udp' ? 'play.example.com' : 'immich.example.com'
+								spec.provider === 'playit' ? t('hosts.playit_hostname_placeholder') : 'immich.example.com'
 							}
 							{...form.getInputProps('hostname')}
 							required
