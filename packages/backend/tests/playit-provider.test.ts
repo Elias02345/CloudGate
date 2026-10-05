@@ -229,3 +229,30 @@ describe('PlayitProvider.addHost', () => {
 		).rejects.toThrow(/does not support protocol 'http'/);
 	});
 });
+
+describe('ensurePlayitTunnelRow', () => {
+	it('gives a linked account exactly one playit tunnel row', async () => {
+		const { getDb } = await import('../src/db/db.js');
+		const { encryptJson } = await import('../src/services/crypto.js');
+		const { ensurePlayitTunnelRow } = await import('../src/services/playit-account.js');
+		const knex = getDb();
+		const now = new Date().toISOString();
+		const [accountId] = await knex('playit_accounts').insert({
+			user_id: 1,
+			label: 'My Account',
+			encrypted_secret_key: encryptJson({ type: 'playit', secret: 'fake-ensure' }),
+			status: 'active',
+			last_validated_at: now,
+			created_at: now,
+		});
+
+		const first = await ensurePlayitTunnelRow(Number(accountId), 'My Account');
+		const second = await ensurePlayitTunnelRow(Number(accountId), 'My Account');
+
+		expect(second).toBe(first);
+		const rows = await knex('tunnels').where({ provider: 'playit', playit_account_id: accountId });
+		expect(rows).toHaveLength(1);
+		expect(rows[0].name).toBe('playit-My-Account');
+		expect(JSON.parse(rows[0].provider_meta).playit_account_id).toBe(Number(accountId));
+	});
+});

@@ -19,7 +19,10 @@ export function useAddPlayitAccount() {
 		mutationFn: async (input: { label: string; secret_key: string }) => {
 			return api<{ account: PlayitAccount }>('/playit/accounts', { method: 'POST', body: input });
 		},
-		onSuccess: () => qc.invalidateQueries({ queryKey: ['playit'] }),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: ['playit'] });
+			qc.invalidateQueries({ queryKey: ['tunnels'] });
+		},
 	});
 }
 
@@ -43,7 +46,10 @@ export function usePollPlayitClaim() {
 				body: { label: input.label },
 			}),
 		onSuccess: (r) => {
-			if (r.status === 'linked') qc.invalidateQueries({ queryKey: ['playit'] });
+			if (r.status === 'linked') {
+				qc.invalidateQueries({ queryKey: ['playit'] });
+				qc.invalidateQueries({ queryKey: ['tunnels'] });
+			}
 		},
 	});
 }

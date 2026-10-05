@@ -19,11 +19,13 @@ import {
 	createAccount,
 	decryptPlayitSecret,
 	deleteAccount,
+	ensurePlayitTunnelRow,
 	getAccountById,
 	listAccountsForUser,
 	publicPlayitAccount,
 } from '../services/playit-account.js';
 import { PLAYIT_AGENT_VERSION } from '../services/playit-binary.js';
+import { startTunnel } from '../services/tunnel-manager.js';
 import {
 	PlayitApiError,
 	claimExchange,
@@ -35,6 +37,16 @@ import { destroyTunnelsForAccount } from '../services/tunnel-teardown.js';
 
 const log = childLogger('routes:playit');
 export const playitRouter: RouterType = Router();
+
+/** Give a freshly linked account its tunnel row and bring the agent online. */
+async function startAgentFor(accountId: number, label: string): Promise<void> {
+	const tunnelId = await ensurePlayitTunnelRow(accountId, label);
+	try {
+		await startTunnel(tunnelId);
+	} catch (err) {
+		log.warn({ err: (err as Error).message, accountId }, 'playit agent start failed (account stays linked)');
+	}
+}
 
 // ---------------------------------------------------------------------------
 // POST /accounts
@@ -74,6 +86,7 @@ playitRouter.post(
 		}
 
 		const row = await createAccount({ user_id: req.user.id, label, secret_key });
+		await startAgentFor(row.id, row.label);
 		res.status(201).json({ account: publicPlayitAccount(row) });
 	}
 );
@@ -225,6 +238,7 @@ playitRouter.post(
 			const secret_key = await claimExchange(code);
 			pendingClaims.delete(code);
 			const row = await createAccount({ user_id: req.user.id, label, secret_key });
+			await startAgentFor(row.id, row.label);
 			res.status(201).json({ status: 'linked', account: publicPlayitAccount(row) });
 		} catch (err) {
 			if (err instanceof PlayitApiError) {

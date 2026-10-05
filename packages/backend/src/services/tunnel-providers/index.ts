@@ -14,6 +14,7 @@
 import type { TunnelProviderName } from '@cloudgate/shared';
 import { getDb } from '../../db/db.js';
 import { childLogger } from '../../logger.js';
+import { ensurePlayitTunnelRow } from '../playit-account.js';
 import { CloudflaredProvider } from './cloudflared/provider.js';
 import { PlayitProvider } from './playit/provider.js';
 import type { TunnelProvider } from './types.js';
@@ -47,6 +48,16 @@ export function getProvider(name: TunnelProviderName): TunnelProvider {
  */
 export async function initAll(): Promise<void> {
 	const knex = getDb();
+	// Accounts linked before v0.7.1 have no tunnel row, so their agent never
+	// ran. Backfill one per account; the loop below then starts it.
+	const accounts = await knex<{ id: number; label: string }>('playit_accounts').select('id', 'label');
+	for (const a of accounts) {
+		try {
+			await ensurePlayitTunnelRow(a.id, a.label);
+		} catch (err) {
+			log.error({ err: (err as Error).message, accountId: a.id }, 'Failed to backfill playit tunnel row');
+		}
+	}
 	type Row = { id: number; name: string; provider: TunnelProviderName | null };
 	const rows = await knex<Row>('tunnels').select('id', 'name', 'provider');
 	for (const row of rows) {
