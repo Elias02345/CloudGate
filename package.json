@@ -28,6 +28,11 @@
     "stores:render": "node scripts/stores/render.mjs",
     "stores:test": "node --test scripts/stores/render.test.mjs"
   },
+  "pnpm": {
+    "overrides": {
+      "esbuild": "^0.28.2"
+    }
+  },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "typescript": "^5.7.2"
