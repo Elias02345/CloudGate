@@ -31,6 +31,10 @@ export interface HostBinding {
 	/** Only meaningful for http(s); '/' is the catch-all. */
 	path_prefix?: string;
 	tls?: { no_tls_verify?: boolean };
+	/** Preset from proxy_hosts.meta.host_type (e.g. 'minecraft_java'). */
+	host_type?: string;
+	/** True when the host has a Cloudflare zone to publish DNS into. */
+	has_zone?: boolean;
 }
 
 /**

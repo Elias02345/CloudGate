@@ -33,7 +33,7 @@ const log = childLogger('playit-binary');
  * then, for each target, `curl -fsSL <asset-url> | sha256sum` and paste the
  * results here together with the new tag.
  */
-const PLAYIT_AGENT_VERSION = 'v1.0.10';
+export const PLAYIT_AGENT_VERSION = 'v1.0.10';
 const PLAYIT_RELEASE_BASE = `https://github.com/playit-cloud/playit-agent/releases/download/${PLAYIT_AGENT_VERSION}`;
 
 /**

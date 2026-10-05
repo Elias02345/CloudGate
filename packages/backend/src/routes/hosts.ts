@@ -165,7 +165,7 @@ hostsRouter.post(
 				enabled: 1,
 				tls_options: JSON.stringify(input.tls_options ?? {}),
 				headers: JSON.stringify(input.headers ?? {}),
-				meta: '{}',
+				meta: JSON.stringify(input.host_type ? { host_type: input.host_type } : {}),
 				created_at: now,
 				updated_at: now,
 			};

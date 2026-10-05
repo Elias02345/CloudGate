@@ -49,6 +49,7 @@ import { useZones } from '../api/cloudflare.js';
 import { type HostDto, type ProbeOutcome, useDiagnoseHost, useUpdateHost } from '../api/hosts.js';
 import { useTunnels } from '../api/tunnels.js';
 import { CopyButton } from './CopyButton.js';
+import { PlayitZoneSelect } from './PlayitZoneSelect.js';
 
 const HOME_ASSISTANT_DOCS_URL = 'https://github.com/Elias02345/CloudGate/blob/dev/docs/HOME-ASSISTANT.md';
 
@@ -288,18 +289,25 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 								}))}
 								{...form.getInputProps('tunnel_id')}
 							/>
-							<Select
-								label="DNS zone"
-								placeholder={zones.isLoading ? 'Loading…' : 'Pick a zone'}
-								disabled={!zonesAccountId}
-								data={zones.data?.zones.map((z) => ({ value: String(z.id), label: z.name })) ?? []}
-								{...form.getInputProps('cf_zone_id')}
-								error={
-									!hostnameMatchesZone && form.values.cf_zone_id
-										? `Hostname '${host?.hostname ?? ''}' does not end with this zone`
-										: undefined
-								}
-							/>
+							{host?.protocol === 'tcp' || host?.protocol === 'udp' ? (
+								<PlayitZoneSelect
+									value={form.values.cf_zone_id}
+									onChange={(v) => form.setFieldValue('cf_zone_id', v)}
+								/>
+							) : (
+								<Select
+									label="DNS zone"
+									placeholder={zones.isLoading ? 'Loading…' : 'Pick a zone'}
+									disabled={!zonesAccountId}
+									data={zones.data?.zones.map((z) => ({ value: String(z.id), label: z.name })) ?? []}
+									{...form.getInputProps('cf_zone_id')}
+									error={
+										!hostnameMatchesZone && form.values.cf_zone_id
+											? `Hostname '${host?.hostname ?? ''}' does not end with this zone`
+											: undefined
+									}
+								/>
+							)}
 						</Stack>
 					</Collapse>
 					<Divider />

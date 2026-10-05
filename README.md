@@ -2,7 +2,7 @@
 
 > **Self-hosted WebUI for Cloudflare Tunnels and playit.gg.** Host services from behind CGNAT without port forwarding — Immich, Nextcloud, Jellyfin, Proxmox, Home Assistant, you name it.
 
-**Status:** stable — current release v0.6.1.
+**Status:** stable — current release v0.7.0.
 
 ![CloudGate hosts overview](packaging/assets/screenshots/2-hosts.png)
 

@@ -7,8 +7,7 @@
  * REST client.
  *
  * Binary lives in /data/playit/bin/playit-agent (downloaded idempotently
- * by services/playit-binary.ts). Secret key is passed via env var so it
- * doesn't show up in `ps`.
+ * by services/playit-binary.ts).
  */
 
 import { dataPath } from '../../../config.js';
@@ -34,18 +33,27 @@ export class PlayitProcess extends ManagedProcess {
 	}
 
 	protected override defaultBinPath(): string {
-		return dataPath('playit', 'bin', process.platform === 'win32' ? 'playit-agent.exe' : 'playit-agent');
+		return (
+			process.env.CLOUDGATE_PLAYIT_BINARY_PATH ||
+			dataPath('playit', 'bin', process.platform === 'win32' ? 'playit-agent.exe' : 'playit-agent')
+		);
 	}
 
 	protected override buildArgs(): string[] {
-		// `--secret <KEY>` is the documented agent flag. This puts the secret
-		// in argv, so it is readable via `ps` by anything on the same host —
-		// ManagedProcess redacts it from our own logs (see SECRET_FLAGS), but
-		// that is a log fix, not a fix for argv. Moving it to the environment
-		// requires confirming the pinned agent build honours
-		// PLAYIT_SECRET_KEY; an earlier comment here claimed we already did
-		// that, and we did not.
-		return ['--secret', this.secretKey, '--no-autoupdate'];
+		// The pinned release asset is `playitd`. It accepts --secret,
+		// --secret-path, --socket-path, --log-path, --platform-docker and
+		// nothing else (clap rejects unknown flags, so the old
+		// `--no-autoupdate` made it exit on start). One daemon runs per
+		// account, so each needs its own IPC socket. The secret stays in
+		// argv (inside the container only); ManagedProcess redacts it from
+		// our logs (see SECRET_FLAGS).
+		return [
+			'--secret',
+			this.secretKey,
+			'--socket-path',
+			dataPath('playit', `agent-${this.accountId}.sock`),
+			'--platform-docker',
+		];
 	}
 
 	/**
