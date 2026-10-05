@@ -262,10 +262,7 @@ export function HostFormPage() {
 							<Alert color="orange">{t('hosts.no_tunnel_warning')}</Alert>
 						)}
 						{showNoTunnelHint && spec.provider === 'playit' && (
-							<Alert color="orange">
-								No Playit tunnel found. Add a Playit account in Settings → Playit, then create a Playit tunnel
-								on the Tunnels page.
-							</Alert>
+							<Alert color="orange">{t('hosts.no_playit_tunnel')}</Alert>
 						)}
 
 						<Select
