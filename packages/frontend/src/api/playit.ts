@@ -23,6 +23,31 @@ export function useAddPlayitAccount() {
 	});
 }
 
+export function useStartPlayitClaim() {
+	return useMutation({
+		mutationFn: () => api<{ code: string; url: string }>('/playit/claim', { method: 'POST' }),
+	});
+}
+
+export type PlayitClaimResult =
+	| { status: 'waiting_for_visit' | 'waiting_for_approval' }
+	| { status: 'linked'; account: PlayitAccount };
+
+/** One poll step of a claim; the caller loops until 'linked' or an error (400 rejected, 404 expired). */
+export function usePollPlayitClaim() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (input: { code: string; label?: string }) =>
+			api<PlayitClaimResult>(`/playit/claim/${encodeURIComponent(input.code)}`, {
+				method: 'POST',
+				body: { label: input.label },
+			}),
+		onSuccess: (r) => {
+			if (r.status === 'linked') qc.invalidateQueries({ queryKey: ['playit'] });
+		},
+	});
+}
+
 export function useDeletePlayitAccount() {
 	const qc = useQueryClient();
 	return useMutation({
@@ -44,7 +69,7 @@ export function usePlayitQuota(accountId: number | null) {
 		queryKey: ['playit', 'quota', accountId],
 		queryFn: () => {
 			if (!accountId)
-				return Promise.resolve({ quota: { tcp_used: 0, udp_used: 0, tcp_limit: 4, udp_limit: 4 } });
+				return Promise.resolve({ quota: { tcp_used: 0, udp_used: 0, tcp_limit: 0, udp_limit: 0 } });
 			return api(`/playit/accounts/${accountId}/quota`);
 		},
 		enabled: accountId !== null,

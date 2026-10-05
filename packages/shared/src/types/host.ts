@@ -191,6 +191,8 @@ export type ProxyHost = z.infer<typeof ProxyHostSchema>;
 export const CreateProxyHostRequestSchema = z.object({
 	mode: HostModeSchema,
 	protocol: HostProtocolSchema.default('http'),
+	/** Preset the host was created from; picks the playit tunnel type (stored in meta). */
+	host_type: HostTypeSchema.optional(),
 	hostname: z.string().regex(HostnameRegex),
 	// forward_scheme is HTTP-only; kept for back-compat. TCP/UDP hosts
 	// just ignore it (route validation enforces the constraint).

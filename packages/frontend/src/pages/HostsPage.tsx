@@ -66,9 +66,9 @@ function protocolBadge(protocol: string): { icon: ReactElement; label: string; c
 	}
 }
 
-function edgeEndpointString(edge: HostDto['edge_endpoint']): string | null {
+function edgeEndpointString(edge: HostDto['edge_endpoint'], hostname: string): string | null {
 	if (!edge) return null;
-	if (edge.kind === 'srv') return `${edge.target}:${edge.port} (via SRV)`;
+	if (edge.kind === 'srv') return `${hostname} (SRV → ${edge.target}:${edge.port})`;
 	if (edge.kind === 'host_port') return `${edge.target}:${edge.port}`;
 	if (edge.kind === 'cname') return edge.target;
 	return null;
@@ -79,14 +79,9 @@ function lastTwoLabels(host: string): string {
 	return labels.length <= 2 ? host : labels.slice(-2).join('.');
 }
 
-function shortEdgeEndpoint(edge: HostDto['edge_endpoint']): string | null {
+function shortEdgeEndpoint(edge: HostDto['edge_endpoint'], hostname: string): string | null {
 	if (!edge) return null;
-	if (edge.kind === 'srv') {
-		const labels = edge.target.split('.');
-		return labels.length <= 2
-			? `${edge.target}:${edge.port} (via SRV)`
-			: `•••.${lastTwoLabels(edge.target)} (SRV)`;
-	}
+	if (edge.kind === 'srv') return `${hostname} (SRV)`;
 	if (edge.kind === 'host_port') {
 		const labels = edge.target.split('.');
 		return labels.length <= 2 ? `${edge.target}:${edge.port}` : `•••.${lastTwoLabels(edge.target)}`;
@@ -253,7 +248,7 @@ export function HostsPage() {
 										{hosts.data.hosts.map((h) => {
 											const proto = protocolBadge(h.protocol ?? 'http');
 											const isWebish = h.protocol === 'http' || h.protocol === 'https';
-											const endpointStr = edgeEndpointString(h.edge_endpoint);
+											const endpointStr = edgeEndpointString(h.edge_endpoint, h.hostname);
 											return (
 												<Table.Tr key={h.id}>
 													<Table.Td>
@@ -292,7 +287,7 @@ export function HostsPage() {
 														{endpointStr ? (
 															<Group gap={4} justify="center" wrap="nowrap">
 																<Text ff="monospace" size="xs" c="dimmed" title={endpointStr}>
-																	{shortEdgeEndpoint(h.edge_endpoint)}
+																	{shortEdgeEndpoint(h.edge_endpoint, h.hostname)}
 																</Text>
 																<CopyButton value={endpointStr}>
 																	{({ copied, copy }) => (
@@ -412,7 +407,7 @@ export function HostsPage() {
 							{hosts.data.hosts.map((h) => {
 								const proto = protocolBadge(h.protocol ?? 'http');
 								const isWebish = h.protocol === 'http' || h.protocol === 'https';
-								const endpointStr = edgeEndpointString(h.edge_endpoint);
+								const endpointStr = edgeEndpointString(h.edge_endpoint, h.hostname);
 								return (
 									<Paper key={h.id} withBorder radius="md" p="sm">
 										<Stack gap={6}>
@@ -466,7 +461,7 @@ export function HostsPage() {
 												{endpointStr ? (
 													<Group gap={4} wrap="nowrap">
 														<Text ff="monospace" size="xs" c="dimmed" title={endpointStr}>
-															{shortEdgeEndpoint(h.edge_endpoint)}
+															{shortEdgeEndpoint(h.edge_endpoint, h.hostname)}
 														</Text>
 														<CopyButton value={endpointStr}>
 															{({ copied, copy }) => (

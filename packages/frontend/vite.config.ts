@@ -20,5 +20,7 @@ export default defineConfig({
 		outDir: 'dist',
 		emptyOutDir: true,
 		sourcemap: true,
+		// esbuild >=0.28 cannot down-level destructuring for vite's default (safari14) target.
+		target: 'es2022',
 	},
 });

@@ -89,10 +89,11 @@ export async function checkHostPlacement(
 		};
 	}
 
-	// Zone is required for cloudflared (CNAME) and Java MC over TCP (SRV
-	// record), but optional for Bedrock UDP, which publishes no DNS record.
-	const needsZone = providerName === 'cloudflared' || (providerName === 'playit' && protocol === 'tcp');
-	if (needsZone && !input.cf_zone_id) {
+	// Zone is required for cloudflared (CNAME). On playit it is optional:
+	// without one, players use the free address playit assigns
+	// (e.g. name.tun.ply.gg); with one, a Minecraft Java host also gets an
+	// SRV record on the user's own domain.
+	if (providerName === 'cloudflared' && !input.cf_zone_id) {
 		return {
 			error: `Protocol '${protocol}' on provider '${providerName}' requires a cf_zone_id for the DNS record.`,
 			code: 'ZONE_REQUIRED',

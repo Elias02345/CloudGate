@@ -26,6 +26,7 @@ export interface HostDto {
 export interface CreateHostInput {
 	mode: 'cloudflare_tunnel' | 'local_nginx';
 	protocol?: HostProtocol;
+	host_type?: 'web' | 'minecraft_java' | 'minecraft_bedrock' | 'raw_tcp' | 'raw_udp';
 	hostname: string;
 	forward_scheme: 'http' | 'https';
 	forward_host: string;
