@@ -42,7 +42,7 @@ export interface PlayitCreateTunnelInput {
 }
 
 export interface PlayitAllocation {
-	/** Address players use, e.g. `name.joinmc.link` or `x.gl.joinmc.link`. */
+	/** Address players use, e.g. `name.tun.ply.gg` (with its own `_minecraft._tcp` SRV for Java tunnels). */
 	assigned_domain: string;
 	/** Hostname that resolves to the tunnel IP (an SRV target must be one). */
 	ip_hostname: string;

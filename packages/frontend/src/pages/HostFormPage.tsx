@@ -253,7 +253,7 @@ export function HostFormPage() {
 						{hostType === 'minecraft_bedrock' && (
 							<Alert color="yellow" icon={<IconAlertCircle size={18} />} title="Bedrock has no SRV support">
 								Players will need the exact <strong>host:port</strong> CloudGate shows after deploy (e.g.{' '}
-								<code>mc-abc.joinmc.link:54322</code>) — type it into the Bedrock client's Servers tab. The
+								<code>abc-xyz.ply.gg:54322</code>) — type it into the Bedrock client's Servers tab. The
 								hostname alone won't resolve.
 							</Alert>
 						)}

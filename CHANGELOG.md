@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 
 ## [Unreleased]
 
+_Nothing yet._
+
+---
+
+## [0.7.0] — 2026-10-05
+
 ### Added
 
 - **Link playit.gg with a link instead of a secret.** "Connect with
@@ -14,14 +20,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 - **Minecraft servers as regular hosts on the free playit plan.** Pick
   "Minecraft Java" or "Minecraft Bedrock" when adding a host. CloudGate
   creates a playit tunnel of the matching type and shows the free address
-  players join with (for example `name.joinmc.link`). A Cloudflare domain is
-  now optional; with one, Java players can join via your own hostname
-  (SRV record).
+  players join with (for example `name.tun.ply.gg:20982`; Java players can
+  leave out the port). A Cloudflare domain is now optional; with one, Java
+  players can join via your own hostname (SRV record).
 
 ### Fixed
 
 - **The playit agent starts.** It was launched with a flag the pinned agent
-  does not know (`--no-autoupdate`) and exited right away.
+  does not know (`--no-autoupdate`) and exited right away. CloudGate also
+  starts the agent before it creates the first tunnel, because playit
+  refuses tunnels for an agent that has never connected.
 - **playit tunnels are created through playit's real API.** CloudGate called
   endpoints that do not exist, so no playit host could be deployed. It now
   uses the same API as the official agent, waits for playit to assign the
@@ -35,6 +43,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
   instead of a fixed 4/4.
 - `CLOUDGATE_PLAYIT_BINARY_PATH` is now also used to start the agent, not
   just checked.
+
+### Security
+
+- Dependencies updated to fix all open Dependabot alerts (vitest, tar,
+  axios, react-router, vite, esbuild, postcss, fast-uri, liquidjs and
+  others).
+
+### Changed
+
+- The web UI is now built for ES2022 browsers (Chrome/Edge 94+, Firefox
+  93+, Safari 15.4+), required by the updated build tooling.
 
 ---
 

@@ -4,13 +4,13 @@
 
 ---
 
-## Released (v0.6.1)
+## Released (v0.7.0)
 
 CloudGate is stable as of v0.5.0. What it does today:
 
 - **Setup** — one-liner installer for Ubuntu/LXC, plain `docker run`, or an app-store package (listings pending review; see the README). Zero required configuration: secrets are generated on first boot, and you create your admin account in the browser.
 - **Cloudflare Tunnel hosting** — add a service, get a public hostname. CloudGate creates the tunnel, the DNS record, and the ingress rule, and reloads `cloudflared` for you. Multiple Cloudflare accounts and multiple tunnels are supported.
-- **Playit.gg tunnels for TCP/UDP** — Minecraft (Java via SRV, Bedrock via literal `host:port`), SSH, and other raw TCP/UDP services that Cloudflare's free tier can't carry to a vanilla client.
+- **Playit.gg tunnels for TCP/UDP** — Minecraft Java and Bedrock on the free playit plan (linked with a claim link; free `*.ply.gg` address, or your own domain via SRV for Java), SSH, and other raw TCP/UDP services that Cloudflare's free tier can't carry to a vanilla client.
 - **Hybrid mode** — per host, choose "via Cloudflare Tunnel" or "local nginx reverse proxy" with Let's Encrypt via DNS-01 and automatic renewal.
 - **Security** — Argon2id passwords, AES-256-GCM secret encryption, 2FA (TOTP), per-route rate limiting, a full audit log, and long-lived scoped API keys for automation (see [`docs/AGENT.md`](docs/AGENT.md)).
 - **Self-update** — polls GitHub for new releases, verifies a mandatory SHA256 checksum, applies atomically with a DB/app snapshot, and rolls back automatically on a failed health check. App-store installs leave updates to the platform instead (`CLOUDGATE_DISABLE_UPDATES=true`).

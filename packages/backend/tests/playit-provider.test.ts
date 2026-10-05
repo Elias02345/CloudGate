@@ -40,13 +40,23 @@ interface FakeTunnel {
 	local_port: number;
 }
 
-const fake = vi.hoisted(() => ({ tunnels: new Map<string, FakeTunnel>(), created: 0, deleted: 0 }));
+const fake = vi.hoisted(() => ({
+	tunnels: new Map<string, FakeTunnel>(),
+	created: 0,
+	deleted: 0,
+	agentNotConnected: false,
+}));
 
 vi.mock('../src/services/tunnel-providers/playit/client.js', async () => {
 	return {
 		PlayitApiError: class PlayitApiError extends Error {
-			status = 0;
-			code = '';
+			constructor(
+				public status: number,
+				public code: string,
+				message: string
+			) {
+				super(message);
+			}
 		},
 		createPlayitClient: () => ({
 			runData: async () => ({ agent_id: 'agent-1', account_status: 'ready' }),
@@ -67,6 +77,11 @@ vi.mock('../src/services/tunnel-providers/playit/client.js', async () => {
 				udp: { allowed: 4, claimed: 0 },
 			}),
 			createTunnel: async (input: Omit<FakeTunnel, 'id'>) => {
+				if (fake.agentNotConnected) {
+					fake.agentNotConnected = false;
+					const { PlayitApiError } = await import('../src/services/tunnel-providers/playit/client.js');
+					throw new PlayitApiError(400, 'AgentVersionTooOld', 'agent never connected');
+				}
 				fake.created++;
 				const id = `mock-${fake.created}`;
 				fake.tunnels.set(id, {
@@ -168,6 +183,19 @@ describe('PlayitProvider.addHost', () => {
 		expect(fake.created).toBe(createdBefore + 1);
 		expect(fake.deleted).toBe(deletedBefore + 1);
 	});
+
+	it('starts the agent and retries while playit reports AgentVersionTooOld', async () => {
+		const { PlayitProvider } = await import('../src/services/tunnel-providers/playit/provider.js');
+		const tunnelId = await makeTunnel('fresh-agent');
+		const provider = new PlayitProvider();
+		const start = vi.spyOn(provider, 'start').mockResolvedValue();
+		fake.agentNotConnected = true;
+
+		const edge = await provider.addHost(tunnelId, { ...javaHost, id: 997 });
+
+		expect(start).toHaveBeenCalledWith(tunnelId);
+		expect(edge.kind).toBe('host_port');
+	}, 15_000);
 
 	it('Bedrock (UDP): minecraft-bedrock tunnel, host_port endpoint', async () => {
 		const { PlayitProvider } = await import('../src/services/tunnel-providers/playit/provider.js');

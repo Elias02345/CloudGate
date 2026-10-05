@@ -91,7 +91,7 @@ export async function checkHostPlacement(
 
 	// Zone is required for cloudflared (CNAME). On playit it is optional:
 	// without one, players use the free address playit assigns
-	// (e.g. name.joinmc.link); with one, a Minecraft Java host also gets an
+	// (e.g. name.tun.ply.gg); with one, a Minecraft Java host also gets an
 	// SRV record on the user's own domain.
 	if (providerName === 'cloudflared' && !input.cf_zone_id) {
 		return {

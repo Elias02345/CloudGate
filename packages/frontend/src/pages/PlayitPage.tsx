@@ -115,6 +115,12 @@ export function PlayitPage() {
 					}
 				} catch (err) {
 					if (cancelled) return;
+					// playit.gg briefly unreachable (backend maps that to 502): keep polling.
+					const transient = !(err instanceof ApiError) || err.status === 502 || err.status === 429;
+					if (transient) {
+						await new Promise((res) => setTimeout(res, 2000));
+						continue;
+					}
 					setClaimError(
 						err instanceof ApiError && err.code === 'PLAYIT_CLAIM_REJECTED'
 							? t('playit.claim_rejected')

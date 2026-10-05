@@ -725,7 +725,7 @@
     "playit_zone_hint": "Optional. Ohne Domain nutzen Spieler die kostenlose playit-Adresse. Mit Domain können Minecraft-Java-Spieler über deinen Hostnamen beitreten (SRV-Eintrag).",
     "playit_zone_account": "Cloudflare-Account",
     "playit_hostname_placeholder": "mc.meinserver.net",
-    "hint_java": "TCP über playit. Ohne Domain fügen Spieler die nach dem Deploy angezeigte kostenlose playit-Adresse ein (joinmc.link-Adressen funktionieren ohne Port). Mit Domain lässt ein SRV-Eintrag Spieler nur mit deinem Hostnamen beitreten.",
+    "hint_java": "TCP über playit. Ohne Domain fügen Spieler die nach dem Deploy angezeigte kostenlose playit-Adresse ein (Java-Spieler brauchen dabei keinen Port, playit setzt selbst einen SRV-Eintrag). Mit Domain lässt ein SRV-Eintrag Spieler nur mit deinem Hostnamen beitreten.",
     "hint_bedrock": "UDP über playit. Bedrock kann kein SRV lesen — Spieler müssen den zugewiesenen Host:Port direkt eingeben. CloudGate zeigt nach dem Deploy den genauen String zum Kopieren.",
     "srv_join": "{{hostname}} (SRV → {{target}}:{{port}})"
   }

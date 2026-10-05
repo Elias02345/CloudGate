@@ -10,7 +10,7 @@
  *    account so the agent owns them.
  *  - addHost() creates (or reuses) a playit tunnel pointing at the host's
  *    origin, waits for playit to assign a public address, and returns it:
- *    the free playit address (e.g. name.joinmc.link:port) as host_port, or
+ *    the free playit address (e.g. name.tun.ply.gg:port) as host_port, or
  *    an SRV record on the user's Cloudflare zone for Minecraft Java.
  */
 
@@ -23,6 +23,7 @@ import { decryptJson } from '../../crypto.js';
 import type { HostBinding, ProviderStatus, TunnelProvider } from '../types.js';
 import {
 	type PlayitAllocation,
+	PlayitApiError,
 	type PlayitClient,
 	type PlayitTunnelType,
 	createPlayitClient,
@@ -39,6 +40,8 @@ const PLAYIT_TUNNEL_TYPES: Record<string, PlayitTunnelType> = {
 
 const ALLOCATION_WAIT_MS = 30_000;
 const ALLOCATION_POLL_MS = 2_000;
+const AGENT_CONNECT_WAIT_MS = 45_000;
+const AGENT_CONNECT_POLL_MS = 3_000;
 
 /** playit wants an IP for the origin; resolve container/host names here. */
 async function resolveLocalIp(host: string): Promise<string> {
@@ -184,7 +187,7 @@ export class PlayitProvider implements TunnelProvider {
 		}
 		if (!tunnelId) {
 			const { agent_id } = await client.runData();
-			tunnelId = await client.createTunnel({
+			const input = {
 				// playit tunnel names must be ASCII and short.
 				name: host.hostname.replace(/[^ -~]/g, '').slice(0, 30),
 				tunnel_type: tunnelType,
@@ -192,7 +195,27 @@ export class PlayitProvider implements TunnelProvider {
 				agent_id,
 				local_ip: localIp,
 				local_port: host.forward_port,
-			});
+			};
+			// playit refuses tunnels (AgentVersionTooOld) until the agent has
+			// connected and reported its version — true for every freshly
+			// claimed agent. Start it and retry while it connects.
+			const deadline = Date.now() + AGENT_CONNECT_WAIT_MS;
+			for (;;) {
+				try {
+					tunnelId = await client.createTunnel(input);
+					break;
+				} catch (err) {
+					if (
+						!(err instanceof PlayitApiError) ||
+						err.code !== 'AgentVersionTooOld' ||
+						Date.now() > deadline
+					) {
+						throw err;
+					}
+					await this.start(tunnelDbId);
+					await new Promise((r) => setTimeout(r, AGENT_CONNECT_POLL_MS));
+				}
+			}
 			// Persist right away so a failed allocation wait below does not
 			// orphan the tunnel on the next deploy.
 			await this.persistHostAssignment(tunnelDbId, host.id, {

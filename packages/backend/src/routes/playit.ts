@@ -228,7 +228,9 @@ playitRouter.post(
 			res.status(201).json({ status: 'linked', account: publicPlayitAccount(row) });
 		} catch (err) {
 			if (err instanceof PlayitApiError) {
-				res.status(err.status === 0 ? 502 : 400).json({ error: err.message, code: err.code });
+				res
+					.status(err.status === 0 || err.status === 429 || err.status >= 500 ? 502 : 400)
+					.json({ error: err.message, code: err.code });
 				return;
 			}
 			throw err;
