@@ -99,3 +99,37 @@ export function decryptPlayitSecret(row: { encrypted_secret_key: Buffer | string
 	const envelope = decryptJson<PlayitSecretEnvelope>(raw);
 	return envelope.secret;
 }
+
+/**
+ * Every linked account gets one playit tunnel row, created right away.
+ * The agent only runs for tunnel rows, and the host form only offers
+ * tunnel rows, so an account without one sat "offline" on playit.gg and
+ * could not be picked for a host. Returns the row id (existing or new);
+ * starting the agent is the caller's job.
+ */
+export async function ensurePlayitTunnelRow(accountId: number, label: string): Promise<number> {
+	const knex = getDb();
+	const existing = await knex<{ id: number }>('tunnels')
+		.where({ provider: 'playit', playit_account_id: accountId })
+		.first('id');
+	if (existing) return existing.id;
+	const now = new Date().toISOString();
+	const [id] = await knex('tunnels').insert({
+		cloudflare_account_id: null,
+		playit_account_id: accountId,
+		provider: 'playit',
+		provider_meta: JSON.stringify({ playit_account_id: accountId, hosts: {} }),
+		// Synthetic: playit has no tunnel object at this level; per-host
+		// tunnels are created by PlayitProvider.addHost().
+		tunnel_id: `playit-${accountId}-${Date.now().toString(36)}`,
+		name: `playit-${label.replace(/[^a-zA-Z0-9-_]/g, '-').slice(0, 60) || accountId}`,
+		account_tag: null,
+		encrypted_tunnel_secret: null,
+		credentials_path: null,
+		status: 'starting',
+		last_status_at: now,
+		created_at: now,
+	});
+	log.info({ accountId, tunnelId: id }, 'Created playit tunnel row for account');
+	return Number(id);
+}

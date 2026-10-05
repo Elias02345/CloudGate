@@ -9,6 +9,21 @@ _Nothing yet._
 
 ---
 
+## [0.7.1] — 2026-10-05
+
+### Fixed
+
+- **The playit agent comes online as soon as you link an account.**
+  CloudGate only ran the agent for a playit tunnel, which you had to create
+  separately on the Tunnels page, so playit.gg showed the agent as offline
+  and the host form said no account was linked. Linking an account now
+  creates its tunnel and starts the agent. Accounts linked with v0.7.0 get
+  their tunnel on the next start, no relinking needed.
+- The host form's hint points to "Playit" in the sidebar instead of a
+  "Settings → Playit" page that does not exist.
+
+---
+
 ## [0.7.0] — 2026-10-05
 
 ### Added

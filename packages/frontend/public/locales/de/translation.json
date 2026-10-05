@@ -722,6 +722,7 @@
     "diagnose_copied": "Kopiert",
     "diagnose_docs_link": "Anleitung: Home Assistant hinter CloudGate",
     "playit_zone_label": "Domain (DNS-Zone)",
+    "no_playit_tunnel": "Noch kein playit-Account verbunden. Verbinde einen unter „Playit“ in der Seitenleiste; CloudGate richtet den Tunnel dann automatisch ein.",
     "playit_zone_hint": "Optional. Ohne Domain nutzen Spieler die kostenlose playit-Adresse. Mit Domain können Minecraft-Java-Spieler über deinen Hostnamen beitreten (SRV-Eintrag).",
     "playit_zone_account": "Cloudflare-Account",
     "playit_hostname_placeholder": "mc.meinserver.net",
