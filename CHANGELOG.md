@@ -9,6 +9,22 @@ _Nothing yet._
 
 ---
 
+## [0.7.2] — 2026-10-11
+
+### Fixed
+
+- **Backups download again.** "Download backup" (and the admin restore) failed
+  with "Missing or malformed Authorization header" because the request left
+  out the login token (#89).
+- **Hosts behind a login redirect no longer show an upstream error.** The
+  upstream check followed redirects without keeping cookies, so apps such as
+  PHP sites that set a session cookie and redirect looped until "fetch
+  failed". A redirect now counts as reachable (#87).
+- **The Cloudflare token guide is complete.** It now says the token needs
+  Account Resources (your account) and Zone Resources (all zones), the
+  missing step behind "Token cannot see any zone" (#88). Account discovery
+  through zones already shipped in 0.6.1.
+
 ## [0.7.1] — 2026-10-05
 
 ### Fixed

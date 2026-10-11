@@ -140,6 +140,9 @@ export async function probeUpstream(args: ProbeArgs): Promise<ProbeOutcome> {
 		const res = await fetch(url, {
 			method: 'GET',
 			signal: ctrl.signal,
+			// A 3xx already proves the upstream answers. Following it breaks on apps
+			// that need their session cookie across the redirect (PHPSESSID loops).
+			redirect: 'manual',
 			// Self-signed certs would fail without no_tls_verify — but Node's
 			// global undici client honours NODE_TLS_REJECT_UNAUTHORIZED=0
 			// for self-signed, and per-call options are limited. We rely on

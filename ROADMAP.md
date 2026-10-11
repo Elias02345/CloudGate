@@ -4,7 +4,7 @@
 
 ---
 
-## Released (v0.7.1)
+## Released (v0.7.2)
 
 CloudGate is stable as of v0.5.0. What it does today:
 
