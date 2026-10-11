@@ -1,5 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from './client.js';
+import { api, getStoredToken } from './client.js';
+
+/** Raw fetches below bypass api(), so they must attach the Bearer token themselves. */
+function authHeader(): Record<string, string> {
+	const token = getStoredToken();
+	return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 interface Eligibility {
 	fresh: boolean;
@@ -59,6 +65,7 @@ export async function runAdminRestore(
 		method: 'POST',
 		credentials: 'include',
 		headers: {
+			...authHeader(),
 			'Content-Type': 'application/octet-stream',
 			'X-Cloudgate-Passphrase': passphrase,
 		},
@@ -79,7 +86,7 @@ export async function runBackupExport(passphrase: string): Promise<{ blob: Blob;
 	const res = await fetch('/api/backup', {
 		method: 'POST',
 		credentials: 'include',
-		headers: { 'Content-Type': 'application/json' },
+		headers: { ...authHeader(), 'Content-Type': 'application/json' },
 		body: JSON.stringify({ passphrase }),
 	});
 	if (!res.ok) {

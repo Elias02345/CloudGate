@@ -85,7 +85,7 @@ cloudflareRouter.post(
 				res.status(400).json({
 					// Accounts are discovered through the token's zones (see listAccounts).
 					error:
-						'Token cannot see any zone. Re-create it with Zone → Zone → Read, Zone → DNS → Edit and Account → Cloudflare Tunnel → Edit.',
+						'Token cannot see any zone. Re-create it with Zone → Zone → Read, Zone → DNS → Edit and Account → Cloudflare Tunnel → Edit, with Zone Resources set to "All zones" (or the zones you want) and Account Resources including your account.',
 					code: 'CF_NO_ACCOUNTS',
 				});
 				return;

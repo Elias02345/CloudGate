@@ -260,6 +260,7 @@
     "cf_step2": "Berechtigung",
     "cf_step3": "Berechtigung",
     "cf_step4": "Berechtigung",
+    "cf_step_resources": "Ressourcen (erforderlich, sonst ist keine Zone sichtbar)",
     "cf_open_dashboard": "Cloudflare-Token-Seite öffnen",
     "step3_title": "Ersten Tunnel erstellen",
     "step3_intro": "Ein Tunnel ist eine sichere Outbound-Verbindung von CloudGate zu Cloudflare. Ein Tunnel kann viele Hosts hosten — Name frei wählbar.",
