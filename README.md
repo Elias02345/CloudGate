@@ -2,7 +2,7 @@
 
 > **Self-hosted WebUI for Cloudflare Tunnels and playit.gg.** Host services from behind CGNAT without port forwarding — Immich, Nextcloud, Jellyfin, Proxmox, Home Assistant, you name it.
 
-**Status:** stable — current release v0.7.1.
+**Status:** stable — current release v0.7.2.
 
 ![CloudGate hosts overview](packaging/assets/screenshots/2-hosts.png)
 
@@ -21,7 +21,7 @@ Many home internet connections (especially in Germany — 1&1, Vodafone Cable, m
 **CloudGate** is a WebUI that does it all:
 - Add a service: enter `192.168.1.42:8080` and `immich.yourdomain.com` → done.
 - CloudGate creates the Cloudflare Tunnel, DNS record, ingress rule, and reloads `cloudflared`.
-- Need raw TCP/UDP instead of HTTP — a Minecraft server, SSH, a game server? [Playit.gg](https://playit.gg) tunnels handle that (Cloudflare's free tier can't).
+- Need raw TCP/UDP instead of HTTP — a Minecraft server, SSH, a game server? [Playit.gg](https://playit.gg) tunnels handle that (Cloudflare's free tier can't). See [Hosting a Minecraft server](docs/MINECRAFT.md).
 - Hybrid mode: per host, pick **"via Cloudflare Tunnel"** OR **"local nginx reverse proxy"**.
 - Self-updates when new releases ship on a standalone install — never overwrites your data. On an app-store install, the platform updates the image instead (see [Install from an app store](#install-from-an-app-store)).
 

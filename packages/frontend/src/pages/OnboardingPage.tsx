@@ -299,7 +299,11 @@ export function OnboardingPage() {
 											4. {t('onboarding.cf_step4')} — <Code>Zone · Zone · Read</Code>
 										</Text>
 										<Text size="sm">
-											5.{' '}
+											5. {t('onboarding.cf_step_resources')} — <Code>Account · Include · your account</Code>{' '}
+											<Code>Zone · Include · All zones</Code>
+										</Text>
+										<Text size="sm">
+											6.{' '}
 											<Anchor
 												href="https://dash.cloudflare.com/profile/api-tokens"
 												target="_blank"
