@@ -9,6 +9,23 @@ _Nothing yet._
 
 ---
 
+## [0.8.1] — 2026-10-17
+
+Includes the VPN compatibility work from 0.8.0.
+
+### Security
+
+- `i18next-http-backend` 3.0.6 → 4.0.3 (fixes GHSA-xvq9-wjp8-hwqf and
+  GHSA-9jhj-wvmw-cfx5; CloudGate's `/locales/{{lng}}/{{ns}}.json` path was not
+  affected). v4 needs a native `fetch`, which every supported browser has.
+
+### Fixed
+
+- `compression` 1.8.1 → 1.8.2: frees the zlib stream when a client disconnects
+  mid-response (memory leak), and matches `no-transform` case-insensitively.
+
+---
+
 ## [0.8.0] — 2026-10-17
 
 ### Added
