@@ -28,12 +28,17 @@ import {
 	IconSparkles,
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMe, usePatchUserFlags } from '../api/auth.js';
 import { api, getStoredToken } from '../api/client.js';
 import { useTotpDisable, useTotpEnable, useTotpSetup } from '../api/totp.js';
+import {
+	type CloudflaredNetworkSettings,
+	useNetworkSettings,
+	useUpdateNetworkSettings,
+} from '../api/tunnels.js';
 import { useAppTour } from '../components/AppTour.js';
 
 interface HealthResponse {
@@ -72,6 +77,8 @@ export function SettingsPage() {
 				colorScheme={colorScheme}
 				onScheme={(v) => setColorScheme(v as 'light' | 'dark' | 'auto')}
 			/>
+
+			{me?.user.is_admin && <NetworkCard />}
 
 			<BackupCard />
 
@@ -432,6 +439,75 @@ function BackupCard() {
 					</Button>
 				</Stack>
 			</Modal>
+		</Card>
+	);
+}
+
+// ===========================================================================
+// Network compatibility Card (cloudflared transport, VPN workarounds)
+// ===========================================================================
+
+function NetworkCard() {
+	const { t } = useTranslation();
+	const settings = useNetworkSettings();
+	const update = useUpdateNetworkSettings();
+	const [form, setForm] = useState<CloudflaredNetworkSettings | null>(null);
+
+	useEffect(() => {
+		if (settings.data) setForm(settings.data);
+	}, [settings.data]);
+
+	const onSave = async () => {
+		if (!form) return;
+		try {
+			await update.mutateAsync(form);
+			notifications.show({ color: 'green', message: t('settings.network_saved') });
+		} catch (err) {
+			notifications.show({ color: 'red', message: (err as Error).message });
+		}
+	};
+
+	return (
+		<Card withBorder>
+			<Stack>
+				<Title order={4}>{t('settings.network_title')}</Title>
+				<Text size="sm" c="dimmed">
+					{t('settings.network_hint')}
+				</Text>
+				<Select
+					label={t('settings.network_protocol')}
+					allowDeselect={false}
+					value={form?.protocol ?? null}
+					onChange={(v) =>
+						v && form && setForm({ ...form, protocol: v as CloudflaredNetworkSettings['protocol'] })
+					}
+					data={[
+						{ value: 'auto', label: t('settings.network_protocol_auto') },
+						{ value: 'http2', label: 'HTTP/2 (TCP 7844)' },
+						{ value: 'quic', label: 'QUIC (UDP 7844)' },
+					]}
+				/>
+				<Select
+					label={t('settings.network_edge_ip')}
+					allowDeselect={false}
+					value={form?.edge_ip_version ?? null}
+					onChange={(v) =>
+						v &&
+						form &&
+						setForm({ ...form, edge_ip_version: v as CloudflaredNetworkSettings['edge_ip_version'] })
+					}
+					data={[
+						{ value: '4', label: 'IPv4' },
+						{ value: '6', label: 'IPv6' },
+						{ value: 'auto', label: 'Auto' },
+					]}
+				/>
+				<Group>
+					<Button onClick={onSave} loading={update.isPending} disabled={!form}>
+						{t('settings.network_save')}
+					</Button>
+				</Group>
+			</Stack>
 		</Card>
 	);
 }

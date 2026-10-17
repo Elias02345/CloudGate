@@ -9,6 +9,27 @@ _Nothing yet._
 
 ---
 
+## [0.8.0] — 2026-10-17
+
+### Added
+
+- **Network compatibility settings** (Settings, admins). New `cloudflared.protocol`
+  (`auto` default, `http2`, `quic`) and `cloudflared.edge_ip_version` (`4`
+  default, `6`, `auto`) settings; defaults are unchanged. Saving restarts the
+  cloudflared tunnels.
+- **Automatic HTTP/2 fallback.** With protocol `auto`, a tunnel that is not ready
+  60 s after start is restarted on HTTP/2 over TCP 7844 (typical behind a
+  WireGuard VPN, where QUIC hangs and Cloudflare shows error 1033). QUIC is
+  retried after a restart of CloudGate or a settings change.
+
+### Fixed
+
+- A tunnel stuck connecting no longer shows "starting" forever: after 2 minutes
+  it is reported as an error with the last failure line from the cloudflared
+  log.
+
+---
+
 ## [0.7.2] — 2026-10-11
 
 ### Fixed

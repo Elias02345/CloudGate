@@ -33,6 +33,8 @@ describe('tunnel-config-writer', () => {
 			tunnel_id: 'abc-uuid',
 			credentials_path: '/data/cloudflared/abc.json',
 			metrics_addr: '127.0.0.1:36500',
+			protocol: 'auto',
+			edge_ip_version: '4',
 			hosts: [],
 		});
 		expect(yaml).toContain('tunnel: abc-uuid');
@@ -47,6 +49,8 @@ describe('tunnel-config-writer', () => {
 			tunnel_id: 'tid',
 			credentials_path: '/p/cred.json',
 			metrics_addr: '127.0.0.1:36500',
+			protocol: 'auto',
+			edge_ip_version: '4',
 			hosts: [
 				{
 					hostname: 'a.example.com',
@@ -84,6 +88,8 @@ describe('tunnel-config-writer', () => {
 			tunnel_id: 'tid2',
 			credentials_path: '/p/cred.json',
 			metrics_addr: '127.0.0.1:36500',
+			protocol: 'auto',
+			edge_ip_version: '4',
 			hosts: [
 				{
 					hostname: 'ha.example.com',
@@ -111,6 +117,8 @@ describe('tunnel-config-writer', () => {
 			tunnel_id: 'tid3',
 			credentials_path: '/p/cred.json',
 			metrics_addr: '127.0.0.1:36500',
+			protocol: 'auto',
+			edge_ip_version: '4',
 			hosts: [
 				{
 					hostname: 'plain.example.com',
@@ -132,6 +140,8 @@ describe('tunnel-config-writer', () => {
 			tunnel_id: 'wtest',
 			credentials_path: '/p/c.json',
 			metrics_addr: '127.0.0.1:36500',
+			protocol: 'auto',
+			edge_ip_version: '4',
 			hosts: [],
 		});
 		const dir = join(tmpDir, 'cloudflared');

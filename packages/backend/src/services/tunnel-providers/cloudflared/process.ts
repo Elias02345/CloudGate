@@ -23,6 +23,18 @@ import { ManagedProcess, type ManagedProcessOptions, type ProcessStatus } from '
 
 const HEALTH_CHECK_TIMEOUT_MS = 3_000;
 const DEFAULT_METRICS_PORT = 36500;
+/** How long 'auto' (QUIC first) may stay not-ready before we pin HTTP/2. */
+const QUIC_FALLBACK_AFTER_MS = 60_000;
+
+/** Pure decision for the sticky HTTP/2 fallback (exported for tests). */
+export function shouldFallbackToHttp2(
+	protocol: string,
+	forceHttp2: boolean,
+	msSinceSpawn: number,
+	ready: boolean
+): boolean {
+	return protocol === 'auto' && !forceHttp2 && !ready && msSinceSpawn > QUIC_FALLBACK_AFTER_MS;
+}
 
 export interface CloudflaredProcessOptions extends ManagedProcessOptions {
 	/** CF tunnel UUID — the positional arg for `cloudflared tunnel run`. */
@@ -35,6 +47,8 @@ export interface CloudflaredProcessOptions extends ManagedProcessOptions {
 	 * tunnel. Default `127.0.0.1:36500` (legacy single-tunnel layout).
 	 */
 	metricsAddr?: string;
+	/** Configured transport ('auto' | 'http2' | 'quic'). Only 'auto' may fall back. Default 'auto'. */
+	protocol?: string;
 }
 
 /** Derive a unique metrics-port for a tunnel DB row. */
@@ -48,12 +62,22 @@ export class CloudflaredProcess extends ManagedProcess {
 	private tunnelUuid: string;
 	private configPath: string;
 	private metricsAddr: string;
+	private protocol: string;
+	// ponytail: in-memory, lives as long as this object. QUIC is retried after a
+	// container restart or a settings change (the provider builds a fresh process).
+	private forceHttp2 = false;
 
 	constructor(opts: CloudflaredProcessOptions) {
 		super({ ...opts, loggerName: opts.loggerName ?? 'cloudflared-process' });
 		this.tunnelUuid = opts.tunnelUuid;
 		this.configPath = opts.configPath;
 		this.metricsAddr = opts.metricsAddr ?? `127.0.0.1:${DEFAULT_METRICS_PORT}`;
+		this.protocol = opts.protocol ?? 'auto';
+	}
+
+	/** True once QUIC failed to connect and this process was pinned to HTTP/2. */
+	get http2FallbackActive(): boolean {
+		return this.forceHttp2;
 	}
 
 	protected override defaultBinPath(): string {
@@ -68,6 +92,8 @@ export class CloudflaredProcess extends ManagedProcess {
 			'--metrics',
 			this.metricsAddr,
 			'--no-autoupdate',
+			// CLI flag overrides the protocol in config.yml.
+			...(this.forceHttp2 ? ['--protocol', 'http2'] : []),
 			'run',
 			this.tunnelUuid,
 		];
@@ -81,10 +107,25 @@ export class CloudflaredProcess extends ManagedProcess {
 			const res = await fetch(`http://${this.metricsAddr}/ready`, { signal: controller.signal });
 			clearTimeout(timer);
 			if (res.ok) return { status: 'running' };
+			this.maybeFallbackToHttp2();
 			return { status: 'error', reason: `health check returned ${res.status}` };
 		} catch (err) {
+			this.maybeFallbackToHttp2();
 			return { status: 'error', reason: (err as Error).message };
 		}
+	}
+
+	private maybeFallbackToHttp2(): void {
+		// Only while still connecting: a tunnel that was up and then dropped is not a QUIC-setup problem.
+		if (this.status !== 'starting') return;
+		if (!shouldFallbackToHttp2(this.protocol, this.forceHttp2, Date.now() - this.lastStartedAt, false))
+			return;
+		this.forceHttp2 = true;
+		this.log.warn(
+			{ id: this.id },
+			'QUIC (UDP 7844) did not connect within 60s — likely VPN/firewall/MTU; falling back to HTTP/2 over TCP 7844'
+		);
+		void this.stop().then(() => this.start());
 	}
 
 	/**

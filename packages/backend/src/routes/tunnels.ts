@@ -11,13 +11,17 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import { CreateTunnelRequestSchema, type TunnelProviderName } from '@cloudgate/shared';
+import {
+	CreateTunnelRequestSchema,
+	type TunnelProviderName,
+	UpdateCloudflaredNetworkSettingsSchema,
+} from '@cloudgate/shared';
 import { Router, type Router as RouterType } from 'express';
 import { z } from 'zod';
 import { getDb } from '../db/db.js';
 import { childLogger } from '../logger.js';
 import { audit } from '../middleware/audit.js';
-import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
+import { requireAdmin, requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { decryptCredentials, getAccountById } from '../services/cf-account.js';
 import { CloudflareApiError, clientFor } from '../services/cloudflare-client.js';
 import { encryptJson } from '../services/crypto.js';
@@ -31,6 +35,12 @@ import {
 	stopTunnel,
 } from '../services/tunnel-manager.js';
 import { readCurrentConfig } from '../services/tunnel-providers/cloudflared/config-writer.js';
+import {
+	getCloudflaredNetworkSettings,
+	setCloudflaredNetworkSettings,
+} from '../services/tunnel-providers/cloudflared/network-settings.js';
+import type { CloudflaredProvider } from '../services/tunnel-providers/cloudflared/provider.js';
+import { getProvider } from '../services/tunnel-providers/index.js';
 import { destroyTunnel } from '../services/tunnel-teardown.js';
 
 const log = childLogger('routes:tunnels');
@@ -92,6 +102,36 @@ function publicTunnel(row: TunnelRow): {
 		recovery_needed: recoveryNeeded,
 	};
 }
+
+// ---------------------------------------------------------------------------
+// GET/PUT /network — global cloudflared transport settings (VPN compatibility).
+// Defined before any /:id route. PUT restarts running cloudflared tunnels.
+// ---------------------------------------------------------------------------
+tunnelsRouter.get('/network', requireAuth, requirePasswordSet, async (_req, res) => {
+	res.json(await getCloudflaredNetworkSettings());
+});
+
+tunnelsRouter.put(
+	'/network',
+	requireAuth,
+	requirePasswordSet,
+	requireAdmin,
+	audit({
+		action: 'tunnel.network_settings_updated',
+		entityType: 'tunnel',
+		meta: (req) => ({ protocol: req.body?.protocol, edge_ip_version: req.body?.edge_ip_version }),
+	}),
+	async (req, res) => {
+		const parsed = UpdateCloudflaredNetworkSettingsSchema.safeParse(req.body);
+		if (!parsed.success) {
+			res.status(400).json({ error: 'Invalid network settings', code: 'BAD_REQUEST' });
+			return;
+		}
+		const settings = await setCloudflaredNetworkSettings(parsed.data);
+		await (getProvider('cloudflared') as CloudflaredProvider).restartAll();
+		res.json(settings);
+	}
+);
 
 // ---------------------------------------------------------------------------
 // POST /
