@@ -53,3 +53,18 @@ export const CreateTunnelRequestSchema = z
 		}
 	);
 export type CreateTunnelRequest = z.infer<typeof CreateTunnelRequestSchema>;
+
+/**
+ * Global cloudflared network settings (settings table keys
+ * `cloudflared.protocol` / `cloudflared.edge_ip_version`).
+ * 'auto' = cloudflared's own QUIC-then-HTTP/2 choice, plus CloudGate's
+ * HTTP/2 fallback when QUIC never connects (VPN / firewall).
+ */
+export const CloudflaredProtocolSchema = z.enum(['auto', 'http2', 'quic']);
+export const CloudflaredEdgeIpVersionSchema = z.enum(['4', '6', 'auto']);
+export const CloudflaredNetworkSettingsSchema = z.object({
+	protocol: CloudflaredProtocolSchema,
+	edge_ip_version: CloudflaredEdgeIpVersionSchema,
+});
+export type CloudflaredNetworkSettings = z.infer<typeof CloudflaredNetworkSettingsSchema>;
+export const UpdateCloudflaredNetworkSettingsSchema = CloudflaredNetworkSettingsSchema.partial();

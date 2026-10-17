@@ -27,6 +27,8 @@ const BACKOFF_RESET_AFTER_MS = 60_000;
 const LOG_BUFFER_LINES = 1000;
 const HEALTH_GRACE_MS = 5_000;
 const KILL_FORCE_TIMEOUT_MS = 5_000;
+/** A child that is still not healthy this long after spawn is reported as an error. */
+const STARTUP_TIMEOUT_MS = 120_000;
 
 export type ProcessStatus = 'starting' | 'running' | 'stopped' | 'error';
 
@@ -263,6 +265,15 @@ export abstract class ManagedProcess {
 		}
 	}
 
+	/** Most recent log line that looks like a failure (truncated), if any. */
+	private lastErrorLine(): string | undefined {
+		for (let i = this.logBuffer.length - 1; i >= 0; i--) {
+			const line = this.logBuffer[i] as string;
+			if (/FAIL|ERR|failed to dial|error/i.test(line)) return line.slice(0, 300);
+		}
+		return undefined;
+	}
+
 	private startHealthTimer(): void {
 		if (this.healthTimer) return;
 		this.healthTimer = setInterval(() => void this.pollHealth(), HEALTH_CHECK_INTERVAL_MS);
@@ -284,12 +295,16 @@ export abstract class ManagedProcess {
 				this.setStatus('running');
 				return;
 			}
-			if (result.status === 'error') {
-				// Connection refused during warm-up is normal; we only flip
-				// to error if we were already past warm-up.
-				if (this.status === 'starting') return;
-				this.setStatus('error', result.reason);
+			if (result.status !== 'running' && this.status === 'starting') {
+				// Connection refused during warm-up is normal, but not forever:
+				// past STARTUP_TIMEOUT_MS surface the failure instead of an
+				// eternal "starting" (a later healthy poll still recovers).
+				if (Date.now() - this.lastStartMs > STARTUP_TIMEOUT_MS) {
+					this.setStatus('error', this.lastErrorLine() ?? result.reason ?? 'did not become healthy');
+				}
+				return;
 			}
+			if (result.status === 'error') this.setStatus('error', result.reason);
 		} catch (err) {
 			if (this.status === 'starting') return;
 			this.setStatus('error', `health check failed: ${(err as Error).message}`);

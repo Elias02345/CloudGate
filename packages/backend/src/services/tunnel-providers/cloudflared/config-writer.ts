@@ -13,6 +13,7 @@ import { Liquid } from 'liquidjs';
 import { dataPath } from '../../../config.js';
 import { getDb } from '../../../db/db.js';
 import { childLogger } from '../../../logger.js';
+import { getCloudflaredNetworkSettings } from './network-settings.js';
 
 const log = childLogger('tunnel-config');
 
@@ -27,6 +28,8 @@ const CONFIG_TEMPLATE = `tunnel: {{ tunnel_id }}
 credentials-file: {{ credentials_path }}
 metrics: {{ metrics_addr }}
 no-autoupdate: true
+protocol: {{ protocol }}
+edge-ip-version: "{{ edge_ip_version }}"
 
 ingress:
 {%- for host in hosts %}
@@ -154,6 +157,9 @@ export interface RenderContext {
 	tunnel_id: string;
 	credentials_path: string;
 	metrics_addr: string;
+	/** Whitelisted by network-settings.ts, never raw user input. */
+	protocol: string;
+	edge_ip_version: string;
 	hosts: RenderHost[];
 }
 
@@ -344,6 +350,7 @@ export async function buildContext(tunnelRow: {
 		tunnel_id: tunnelRow.tunnel_id,
 		credentials_path: tunnelRow.credentials_path,
 		metrics_addr: '127.0.0.1:36500',
+		...(await getCloudflaredNetworkSettings()),
 		hosts,
 	};
 }

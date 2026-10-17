@@ -150,3 +150,26 @@ export function useRedeployAllHosts() {
 		},
 	});
 }
+
+export interface CloudflaredNetworkSettings {
+	protocol: 'auto' | 'http2' | 'quic';
+	edge_ip_version: '4' | '6' | 'auto';
+}
+
+export function useNetworkSettings() {
+	return useQuery<CloudflaredNetworkSettings>({
+		queryKey: ['tunnels', 'network'],
+		queryFn: () => api('/tunnels/network'),
+	});
+}
+
+export function useUpdateNetworkSettings() {
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (input: Partial<CloudflaredNetworkSettings>) =>
+			api<CloudflaredNetworkSettings>('/tunnels/network', { method: 'PUT', body: input }),
+		onSuccess: () => {
+			qc.invalidateQueries({ queryKey: ['tunnels'] });
+		},
+	});
+}
