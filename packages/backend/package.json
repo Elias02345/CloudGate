@@ -1,6 +1,6 @@
 {
   "name": "@cloudgate/backend",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -23,7 +23,7 @@
     "argon2": "^0.41.1",
     "better-sqlite3": "^11.7.0",
     "cloudflare": "^4.0.0",
-    "compression": "^1.7.5",
+    "compression": "^1.8.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.0.1",
