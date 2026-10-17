@@ -17,6 +17,7 @@ import { childLogger } from '../../../logger.js';
 import { decryptJson } from '../../crypto.js';
 import type { HostBinding, ProviderStatus, TunnelProvider } from '../types.js';
 import { buildContext, writeConfig } from './config-writer.js';
+import { getCloudflaredNetworkSettings } from './network-settings.js';
 import { CloudflaredProcess, metricsAddrFor } from './process.js';
 
 /** UUID v4 in lowercase hex with dashes, as Cloudflare returns. */
@@ -94,6 +95,7 @@ export class CloudflaredProvider implements TunnelProvider {
 				// Each tunnel binds its own metrics port so multi-tunnel
 				// installs don't collide on 127.0.0.1:36500.
 				metricsAddr: metricsAddrFor(tunnelDbId),
+				protocol: (await getCloudflaredNetworkSettings()).protocol,
 				onStatusChange: (s, err) => void this.persistStatus(tunnelDbId, s, err),
 			});
 			this.processes.set(tunnelDbId, proc);
@@ -113,6 +115,18 @@ export class CloudflaredProvider implements TunnelProvider {
 		// producing the dreaded "live and running but page not found"
 		// state. Fresh proc on next start picks up the new UUID.
 		this.processes.delete(tunnelDbId);
+	}
+
+	/**
+	 * Apply changed network settings: full stop+start (SIGHUP does not change
+	 * the transport). stop() drops the cached process, so start() builds a
+	 * fresh one with the new protocol and a cleared HTTP/2 fallback.
+	 */
+	async restartAll(): Promise<void> {
+		for (const id of [...this.processes.keys()]) {
+			await this.stop(id);
+			await this.start(id);
+		}
 	}
 
 	async reload(tunnelDbId: number): Promise<void> {

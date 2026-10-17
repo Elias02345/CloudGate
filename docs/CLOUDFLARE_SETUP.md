@@ -48,3 +48,18 @@ credential type outright (`CF_UNSUPPORTED_AUTH`).
 
 The API token flow is the supported path, and the recommended one regardless —
 it is the only one that can list zones across the account.
+
+## Troubleshooting: VPN / WireGuard (error 1033)
+
+If every hostname shows Cloudflare **error 1033** while the tunnel looks started,
+cloudflared probably cannot reach Cloudflare. This is common when the whole
+network runs through a VPN (e.g. Mullvad via WireGuard on a UniFi router): QUIC
+(UDP 7844) tends to hang instead of failing.
+
+1. Open **Settings > Network compatibility** and set the protocol to **HTTP/2**
+   (CloudGate also switches to HTTP/2 on its own after 60 s without a connection).
+2. Check the tunnel logs (**Tunnels > View logs**). cloudflared prints PASS/WARN/FAIL
+   prechecks for DNS, UDP 7844 and TCP 7844.
+3. If both UDP and TCP 7844 are **FAIL**, the VPN blocks Cloudflare Tunnel. Add a
+   routing exception for the CloudGate host in your router (e.g. a UniFi
+   Policy-Based Route that sends its traffic around the VPN).
