@@ -265,6 +265,11 @@ export abstract class ManagedProcess {
 		}
 	}
 
+	/** Hook: turn the last failure log line into the user-facing status reason. */
+	protected describeFailure(line: string): string {
+		return line;
+	}
+
 	/** Most recent log line that looks like a failure (truncated), if any. */
 	private lastErrorLine(): string | undefined {
 		for (let i = this.logBuffer.length - 1; i >= 0; i--) {
@@ -300,7 +305,11 @@ export abstract class ManagedProcess {
 				// past STARTUP_TIMEOUT_MS surface the failure instead of an
 				// eternal "starting" (a later healthy poll still recovers).
 				if (Date.now() - this.lastStartMs > STARTUP_TIMEOUT_MS) {
-					this.setStatus('error', this.lastErrorLine() ?? result.reason ?? 'did not become healthy');
+					const line = this.lastErrorLine();
+					this.setStatus(
+						'error',
+						line ? this.describeFailure(line) : (result.reason ?? 'did not become healthy')
+					);
 				}
 				return;
 			}

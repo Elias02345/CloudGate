@@ -9,6 +9,23 @@ _Nothing yet._
 
 ---
 
+## [0.8.2] — 2026-10-18
+
+### Fixed
+
+- In-app updates now also update cloudflared. Installs that were updated in
+  place kept the cloudflared from their first install (e.g. 2026.5.0). The
+  pinned version is downloaded from the official release, SHA256-verified and
+  stored in `/data/cloudflared/bin`. It is never downgraded and is skipped
+  when `CLOUDGATE_DISABLE_UPDATES` is set.
+
+### Changed
+
+- A tunnel that cannot reach Cloudflare on port 7844 now says so, including
+  the IP ranges to allow around a VPN or firewall.
+
+---
+
 ## [0.8.1] — 2026-10-17
 
 Includes the VPN compatibility work from 0.8.0.

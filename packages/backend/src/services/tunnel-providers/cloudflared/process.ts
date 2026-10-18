@@ -36,6 +36,15 @@ export function shouldFallbackToHttp2(
 	return protocol === 'auto' && !forceHttp2 && !ready && msSinceSpawn > QUIC_FALLBACK_AFTER_MS;
 }
 
+const EDGE_UNREACHABLE_RE =
+	/:7844.*(i\/o timeout|timed out|connection refused)|failed to dial to edge with quic|no recent network activity/i;
+
+/** Maps cloudflared's raw edge-connection failures to an actionable message (exported for tests). */
+export function describeCloudflaredFailure(line: string): string {
+	if (!EDGE_UNREACHABLE_RE.test(line)) return line;
+	return `Cannot reach the Cloudflare Tunnel edge on port 7844 (TCP and UDP). A VPN or firewall on this network path is blocking it. Route 198.41.192.0/24 and 198.41.200.0/24 (IPv6 2606:4700:a0::/48, 2606:4700:a8::/48) around the VPN, or try another VPN server. Details: ${line.slice(0, 200)}`;
+}
+
 export interface CloudflaredProcessOptions extends ManagedProcessOptions {
 	/** CF tunnel UUID — the positional arg for `cloudflared tunnel run`. */
 	tunnelUuid: string;
@@ -82,6 +91,10 @@ export class CloudflaredProcess extends ManagedProcess {
 
 	protected override defaultBinPath(): string {
 		return 'cloudflared';
+	}
+
+	protected override describeFailure(line: string): string {
+		return describeCloudflaredFailure(line);
 	}
 
 	protected override buildArgs(): string[] {
