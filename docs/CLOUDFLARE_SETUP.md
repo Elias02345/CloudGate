@@ -63,3 +63,12 @@ network runs through a VPN (e.g. Mullvad via WireGuard on a UniFi router): QUIC
 3. If both UDP and TCP 7844 are **FAIL**, the VPN blocks Cloudflare Tunnel. Add a
    routing exception for the CloudGate host in your router (e.g. a UniFi
    Policy-Based Route that sends its traffic around the VPN).
+4. Test the route to Cloudflare's tunnel edge from the CloudGate host:
+   `curl -s --max-time 8 http://portquiz.net:7844`. If this works but the tunnel
+   still reports `dial tcp 198.41.x.x:7844: i/o timeout`, the port is open
+   and the problem is the VPN exit IP or its route to Cloudflare's tunnel edge.
+5. Fix: add a router policy route that sends only the Cloudflare tunnel ranges
+   around the VPN: `198.41.192.0/24`, `198.41.200.0/24`, `2606:4700:a0::/48`,
+   `2606:4700:a8::/48`. Everything else stays in the VPN; Cloudflare sees your
+   home IP for the tunnel connection only. Alternatively, switch to another
+   VPN server.
