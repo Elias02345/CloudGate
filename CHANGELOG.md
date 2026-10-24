@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 
 ## [Unreleased]
 
+_Nothing yet._
+
+---
+
+## [0.9.0] — 2026-10-24
+
 ### Added
 
 - Visitor login for hosts (#99). In the host's edit dialog, set a username and

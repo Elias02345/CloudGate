@@ -70,6 +70,11 @@ beforeAll(async () => {
 		lastOriginCookie = req.headers.cookie;
 		res.end(`origin says hi: ${req.url}`);
 	});
+	// Minimal echo "WebSocket": enough to prove the gateway tunnels an upgraded socket.
+	origin.on('upgrade', (_req, socket) => {
+		socket.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n');
+		socket.on('data', (d) => socket.write(d));
+	});
 	await new Promise<void>((r) => origin.listen(0, '127.0.0.1', r));
 	const originPort = (origin.address() as AddressInfo).port;
 
@@ -221,6 +226,49 @@ describe('host auth gateway', () => {
 			req.end();
 		});
 		expect(res).toBe(404);
+	});
+});
+
+describe('host auth WebSocket upgrade', () => {
+	function upgrade(cookie?: string): Promise<{ status: number; echoed?: string }> {
+		return new Promise((resolve, reject) => {
+			const req = request({
+				host: '127.0.0.1',
+				port: gatewayPort,
+				path: '/ws',
+				headers: {
+					host: HOSTNAME,
+					connection: 'Upgrade',
+					upgrade: 'websocket',
+					...(cookie ? { cookie } : {}),
+				},
+			});
+			req.on('upgrade', (res, socket) => {
+				socket.once('data', (d) => {
+					socket.destroy();
+					resolve({ status: res.statusCode ?? 0, echoed: d.toString() });
+				});
+				socket.write('ping');
+			});
+			req.on('response', (res) => {
+				res.resume();
+				resolve({ status: res.statusCode ?? 0 });
+			});
+			req.on('error', (e) => (String(e).includes('socket hang up') ? resolve({ status: 0 }) : reject(e)));
+			req.end();
+		});
+	}
+
+	it('refuses an upgrade without a session and tunnels one with a session', async () => {
+		expect((await upgrade()).status).not.toBe(101);
+
+		const login = await call('POST', '/__cg_auth/login', {
+			body: 'username=alice&password=a%20brand%20new%20long%20password&next=%2F',
+		});
+		const cookie = sessionFrom(login.headers);
+		const ok = await upgrade(cookie);
+		expect(ok.status).toBe(101);
+		expect(ok.echoed).toBe('ping');
 	});
 });
 
