@@ -21,13 +21,14 @@ import { authenticator } from 'otplib';
 import { dataPath } from '../config.js';
 import { childLogger } from '../logger.js';
 import { requireAuth } from '../middleware/auth.js';
-import { authLimiter } from '../middleware/rate-limit.js';
+import { accountLoginLimiter, authLimiter } from '../middleware/rate-limit.js';
 import { record } from '../services/audit.js';
 import {
 	changePassword,
 	claimTotpStep,
 	findUserByEmail,
 	findUserById,
+	getDummyHash,
 	issueAccessToken,
 	publicUser,
 	recordLogin,
@@ -48,7 +49,7 @@ export const authRouter: RouterType = Router();
 // ---------------------------------------------------------------------------
 // POST /login
 // ---------------------------------------------------------------------------
-authRouter.post('/login', authLimiter, async (req, res) => {
+authRouter.post('/login', authLimiter, accountLoginLimiter, async (req, res) => {
 	const parsed = LoginRequestSchema.safeParse(req.body);
 	if (!parsed.success) {
 		res
@@ -61,7 +62,7 @@ authRouter.post('/login', authLimiter, async (req, res) => {
 	const user = await findUserByEmail(email);
 	if (!user) {
 		// Constant-time-ish behaviour: still hash a fake password to avoid timing leak
-		await verifyPassword('$argon2id$v=19$m=65536,t=3,p=1$abcdefgh$ijklmnop', password);
+		await verifyPassword(await getDummyHash(), password);
 		log.info({ email }, 'Login failed: user not found');
 		res.status(401).json({ error: 'Invalid email or password', code: 'AUTH_FAILED' });
 		return;

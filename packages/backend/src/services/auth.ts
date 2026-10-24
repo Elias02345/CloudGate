@@ -10,6 +10,7 @@
  * just reads/writes existing rows.
  */
 
+import { createHmac, randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import argon2 from 'argon2';
 import { type JWTPayload, SignJWT, jwtVerify } from 'jose';
@@ -36,6 +37,15 @@ function loadJwtKey(): Uint8Array {
 	return cachedJwtKey;
 }
 
+/**
+ * Purpose-bound signing key: HMAC(jwt.key, label). Lets other features sign
+ * their own tokens without sharing a key with (or being replayable as) the
+ * admin session JWT.
+ */
+export function deriveSigningKey(label: string): Uint8Array {
+	return new Uint8Array(createHmac('sha256', loadJwtKey()).update(label).digest());
+}
+
 // ---------------------------------------------------------------------------
 // Password hashing
 // ---------------------------------------------------------------------------
@@ -47,6 +57,15 @@ export async function hashPassword(plaintext: string): Promise<string> {
 		timeCost: 3,
 		parallelism: 1,
 	});
+}
+
+// A real hash of a throwaway string, computed on first use. Verifying against
+// it costs the same as a real account, so "unknown user" and "wrong password"
+// cannot be told apart by response time.
+let dummyHash: Promise<string> | null = null;
+export function getDummyHash(): Promise<string> {
+	dummyHash ??= hashPassword(randomBytes(16).toString('hex'));
+	return dummyHash;
 }
 
 export async function verifyPassword(hash: string, plaintext: string): Promise<boolean> {

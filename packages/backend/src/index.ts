@@ -33,6 +33,7 @@ import { backupRouter } from './routes/backup.js';
 import { cloudflareRouter } from './routes/cloudflare.js';
 import { eventsRouter } from './routes/events.js';
 import { healthRouter } from './routes/health.js';
+import { hostAuthRouter } from './routes/host-auth.js';
 import { hostsBulkRouter } from './routes/hosts-bulk.js';
 import { hostsRouter } from './routes/hosts.js';
 import { openapiRouter } from './routes/openapi.js';
@@ -44,6 +45,7 @@ import { tunnelsRouter } from './routes/tunnels.js';
 import { updatesRouter } from './routes/updates.js';
 import { initRenewalCron } from './services/acme.js';
 import { verifyKeyOrSeed } from './services/crypto.js';
+import { startHostGateway } from './services/host-gateway.js';
 import { checkImageDrift } from './services/image-drift.js';
 import { init as initTunnelManager } from './services/tunnel-manager.js';
 import { init as initUpdater } from './services/updater.js';
@@ -134,13 +136,22 @@ async function main(): Promise<void> {
 		}
 		next();
 	});
-	app.use(pinoHttp({ logger }));
-
-	// Restore endpoint accepts raw octet-stream (.cgbk file). Must be wired
-	// BEFORE express.json so the body parser doesn't consume the stream.
-	app.use('/api/restore', restoreRouter);
-
-	app.use(express.json({ limit: '1mb' }));
+	// The default request serializer logs every header — that would put
+	// session JWTs, cgk_ API keys and the restore passphrase into the log file.
+	app.use(
+		pinoHttp({
+			logger,
+			redact: {
+				paths: [
+					'req.headers.authorization',
+					'req.headers.cookie',
+					'req.headers["x-cloudgate-passphrase"]',
+					'res.headers["set-cookie"]',
+				],
+				censor: '[redacted]',
+			},
+		})
+	);
 
 	// Eager API-key auth — if Authorization: Bearer cgk_... is present, resolve
 	// the user + scope BEFORE the rate limiter so the API-key tier kicks in.
@@ -172,6 +183,13 @@ async function main(): Promise<void> {
 		next();
 	});
 
+	// Restore accepts a raw octet-stream (.cgbk file), so it must sit BEFORE
+	// express.json — but AFTER the limiter and scope guard above: it replaces
+	// /data/secrets and the DB, so a read-only API key must not reach it.
+	app.use('/api/restore', restoreRouter);
+
+	app.use(express.json({ limit: '1mb' }));
+
 	app.use('/api/health', healthRouter);
 	// Public — no auth. Only reachable while zero users exist (see routes/setup.ts).
 	app.use('/api/setup', setupRouter);
@@ -180,6 +198,7 @@ async function main(): Promise<void> {
 	app.use('/api/playit', playitRouter);
 	app.use('/api/tunnels', tunnelsRouter);
 	app.use('/api/hosts', hostsBulkRouter);
+	app.use('/api/hosts', hostAuthRouter);
 	app.use('/api/hosts', hostsRouter);
 	app.use('/api/events', eventsRouter);
 	app.use('/api/audit', auditRouter);
@@ -221,9 +240,13 @@ async function main(): Promise<void> {
 		checkImageDrift();
 	});
 
+	// Login gateway for hosts that have visitor authentication (127.0.0.1 only).
+	const gateway = startHostGateway();
+
 	// Graceful shutdown
 	const shutdown = async (signal: string): Promise<void> => {
 		log.info({ signal }, 'Shutting down');
+		gateway.close();
 		server.close(() => {
 			void closeDb().then(() => process.exit(0));
 		});
