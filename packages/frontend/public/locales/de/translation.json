@@ -629,6 +629,28 @@
     "col_status": "Status",
     "col_detail": "Detail"
   },
+  "host_auth": {
+    "title": "Besucher-Login",
+    "hint": "Verlangt Benutzername und Passwort (optional zusätzlich einen Authenticator-Code), bevor jemand diesen Host erreicht. Funktioniert für HTTP-Hosts an einem Cloudflare-Tunnel.",
+    "unsupported": "Der Besucher-Login ist nur für HTTP(S)-Hosts an einem Cloudflare-Tunnel verfügbar.",
+    "status_on": "Geschützt",
+    "status_off": "Nicht geschützt",
+    "username": "Benutzername",
+    "password": "Passwort",
+    "password_new_hint": "Leer lassen, um das aktuelle Passwort zu behalten. Mindestens 12 Zeichen.",
+    "password_hint": "Mindestens 12 Zeichen.",
+    "totp_enabled": "Authenticator-Code ist erforderlich",
+    "totp_setup": "Authenticator-Code hinzufügen",
+    "totp_scan": "Scanne den QR-Code mit deiner Authenticator-App und gib den 6-stelligen Code ein.",
+    "totp_code": "Code",
+    "totp_remove": "Authenticator-Code entfernen",
+    "enable": "Login aktivieren",
+    "save": "Login speichern",
+    "remove": "Schutz entfernen",
+    "saved": "Besucher-Login gespeichert",
+    "removed": "Schutz entfernt",
+    "deploy_warning": "Gespeichert, aber der Tunnel konnte nicht aktualisiert werden: {{error}}"
+  },
   "hosts": {
     "title": "Hosts",
     "add": "Host hinzufügen",

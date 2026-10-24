@@ -72,10 +72,28 @@ function parseHostType(meta: string | null | undefined): string | undefined {
 	}
 }
 
+function isLoopbackHost(value: string): boolean {
+	const h = value
+		.trim()
+		.toLowerCase()
+		.replace(/^\[|\]$/g, '');
+	return h === 'localhost' || h === '::1' || h === '0.0.0.0' || /^127(\.\d{1,3}){3}$/.test(h);
+}
+
 export async function deployHost(hostId: number): Promise<void> {
 	const knex = getDb();
 	const host = await knex<HostRow>('proxy_hosts').where({ id: hostId }).first();
 	if (!host) throw new Error(`host ${hostId} not found`);
+
+	// The Recovery UI (127.0.0.1:8001) has no authentication. Publishing it as a
+	// host would hand its reset/restore endpoints to the internet. Checked here
+	// rather than in the request schemas because create, edit, bulk import and
+	// the AI tools all end up in deployHost — one choke point, exact match.
+	if (host.forward_port === 8001 && isLoopbackHost(host.forward_host)) {
+		const msg = 'Port 8001 on this machine is the CloudGate Recovery UI and cannot be published as a host.';
+		await knex('proxy_hosts').where({ id: hostId }).update({ last_error: msg });
+		throw new Error(msg);
+	}
 
 	if (host.mode === 'local_nginx') {
 		await deployLocalNginx(hostId, host);

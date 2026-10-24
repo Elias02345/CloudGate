@@ -5,7 +5,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- Visitor login for hosts (#99). In the host's edit dialog, set a username and
+  password (and optionally an authenticator code) and nobody reaches the host
+  without signing in first. Cloudflare-tunnel HTTP(S) hosts are routed through
+  a built-in login gateway that listens on `127.0.0.1:8090` inside the
+  container (change with `CLOUDGATE_GATEWAY_PORT`, e.g. when running with host
+  networking). WebSockets work behind it. Passwords are stored as argon2id
+  hashes, authenticator secrets encrypted, sessions last 12 hours and end when
+  the credentials change. Failed logins are rate limited. New table
+  `host_auth` (migration 011, additive). Hosts without a login are unchanged;
+  if the gateway is down, protected hosts answer 502 instead of opening up.
+  Not available for `local_nginx` or playit hosts.
+
+### Security
+
+- Dependencies: `proxy-addr` 2.0.8, `follow-redirects` 1.16.1, `body-parser`
+  2.4.0 (request-body DoS), `fast-uri` 3.1.9, plus `vite` 6.4.5 / `vitest`
+  4.1.12 for development. Known and not fixable yet: `node-forge` (no patched
+  release; only used by ACME) and `zod` 3 (needs the zod 4 migration).
+- A read-only API key could call `/api/restore` and overwrite the whole
+  installation. The restore route now sits behind the same scope guard and
+  rate limiters as the rest of the API.
+- Session tokens, API keys, cookies and the restore passphrase are no longer
+  written to the request log.
+- The Recovery UI now listens on 127.0.0.1 only, and a host that forwards to
+  port 8001 on this machine is refused (it would publish the unauthenticated
+  Recovery UI).
+- Login: added a per-account failure limit (the per-IP limit can be bypassed by
+  a forged `X-Forwarded-For` behind a loopback hop), and "unknown user" now
+  takes as long as "wrong password".
+- Changing the AI base URL now requires re-entering the API key, so the stored
+  key cannot be sent to an arbitrary server.
+- The event stream rejects tokens revoked by a password change.
 
 ---
 
