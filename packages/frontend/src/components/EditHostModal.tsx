@@ -49,6 +49,7 @@ import { useZones } from '../api/cloudflare.js';
 import { type HostDto, type ProbeOutcome, useDiagnoseHost, useUpdateHost } from '../api/hosts.js';
 import { useTunnels } from '../api/tunnels.js';
 import { CopyButton } from './CopyButton.js';
+import { HostAuthSection } from './HostAuthSection.js';
 import { PlayitZoneSelect } from './PlayitZoneSelect.js';
 
 const HOME_ASSISTANT_DOCS_URL = 'https://github.com/Elias02345/CloudGate/blob/dev/docs/HOME-ASSISTANT.md';
@@ -449,6 +450,12 @@ export function EditHostModal({ host, opened, onClose }: EditHostModalProps) {
 					</Box>
 				</Stack>
 			</form>
+			{host && (
+				<>
+					<Divider my="md" />
+					<HostAuthSection host={host} />
+				</>
+			)}
 		</Modal>
 	);
 }

@@ -629,6 +629,28 @@
     "col_status": "Status",
     "col_detail": "Detail"
   },
+  "host_auth": {
+    "title": "Visitor login",
+    "hint": "Require a username and password (and optionally an authenticator code) before anyone can reach this host. Works for HTTP hosts on a Cloudflare tunnel.",
+    "unsupported": "Visitor login is available for HTTP(S) hosts on a Cloudflare tunnel only.",
+    "status_on": "Protected",
+    "status_off": "Not protected",
+    "username": "Username",
+    "password": "Password",
+    "password_new_hint": "Leave empty to keep the current password. At least 12 characters.",
+    "password_hint": "At least 12 characters.",
+    "totp_enabled": "Authenticator code is required",
+    "totp_setup": "Add authenticator code",
+    "totp_scan": "Scan the QR code with your authenticator app, then enter the 6-digit code.",
+    "totp_code": "Code",
+    "totp_remove": "Remove authenticator code",
+    "enable": "Enable login",
+    "save": "Save login",
+    "remove": "Remove protection",
+    "saved": "Visitor login saved",
+    "removed": "Protection removed",
+    "deploy_warning": "Saved, but the tunnel could not be updated: {{error}}"
+  },
   "hosts": {
     "title": "Hosts",
     "add": "Add host",

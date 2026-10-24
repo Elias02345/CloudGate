@@ -13,6 +13,7 @@ import { Liquid } from 'liquidjs';
 import { dataPath } from '../../../config.js';
 import { getDb } from '../../../db/db.js';
 import { childLogger } from '../../../logger.js';
+import { gatewayPort } from '../../host-gateway.js';
 import { getCloudflaredNetworkSettings } from './network-settings.js';
 
 const log = childLogger('tunnel-config');
@@ -280,6 +281,20 @@ export async function buildContext(tunnelRow: {
 	);
 	const rows = included;
 
+	// Hosts with visitor credentials (host_auth) are sent to the local auth
+	// gateway instead of their origin; the gateway forwards after login. The
+	// table may not exist yet on an install that has not run migration 011.
+	const protectedIds = new Set<number>();
+	if (rows.length > 0 && (await knex.schema.hasTable('host_auth'))) {
+		const auth = await knex('host_auth')
+			.whereIn(
+				'host_id',
+				rows.map((r) => r.id)
+			)
+			.select('host_id');
+		for (const a of auth) protectedIds.add(Number(a.host_id));
+	}
+
 	const hosts: RenderHost[] = [];
 	for (const r of rows) {
 		// Skip rows with corrupt forward_port / forward_host so a single bad
@@ -315,6 +330,22 @@ export async function buildContext(tunnelRow: {
 					: {};
 		} catch {
 			adv = {};
+		}
+
+		if (protectedIds.has(r.id)) {
+			// The gateway needs the public hostname in Host to find the host;
+			// the user's own Host/SNI/TLS options apply on the gateway→origin leg.
+			hosts.push({
+				hostname: hostSafe(r.hostname),
+				path_prefix: pathSafe(r.path_prefix),
+				forward_scheme: 'http',
+				forward_host: '127.0.0.1',
+				forward_port: gatewayPort(),
+				no_tls_verify: false,
+				has_origin_request: true,
+				http_host_header: yamlQuotedSafe(hostSafe(r.hostname)),
+			});
+			continue;
 		}
 
 		const noTlsVerify = Boolean(tls.no_tls_verify);

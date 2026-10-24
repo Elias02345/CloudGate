@@ -264,7 +264,9 @@ app.post('/api/hard-reset', blockCrossSite, (req, res) => {
 
 // --- listen ---------------------------------------------------------------
 
-app.listen(PORT, () => {
+// Loopback only: nginx proxies to 127.0.0.1:8001 and this UI has no auth, so
+// it must not be reachable from other containers on the Docker network.
+app.listen(PORT, '127.0.0.1', () => {
 	console.log(`[recovery-ui] Listening on port ${PORT}, DATA_DIR=${DATA_DIR}`);
 });
 

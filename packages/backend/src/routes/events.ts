@@ -17,7 +17,13 @@
 import { Router, type Router as RouterType } from 'express';
 import { childLogger } from '../logger.js';
 import { requireAuth } from '../middleware/auth.js';
-import { findUserById, issueSseTicket, verifyAccessToken, verifySseTicket } from '../services/auth.js';
+import {
+	findUserById,
+	isTokenRevoked,
+	issueSseTicket,
+	verifyAccessToken,
+	verifySseTicket,
+} from '../services/auth.js';
 import { type EventTopic, subscribe } from '../services/events.js';
 
 const log = childLogger('routes:events');
@@ -40,12 +46,11 @@ eventsRouter.get('/', async (req, res) => {
 		return;
 	}
 	try {
-		const sub = headerToken
-			? (await verifyAccessToken(headerToken)).sub
-			: (await verifySseTicket(ticket as string)).sub;
+		const claims = headerToken ? await verifyAccessToken(headerToken) : null;
+		const sub = claims ? claims.sub : (await verifySseTicket(ticket as string)).sub;
 		const user = await findUserById(Number.parseInt(sub, 10));
-		if (!user) {
-			res.status(401).json({ error: 'User not found', code: 'UNAUTHENTICATED' });
+		if (!user || (claims && isTokenRevoked(claims, user)) || user.must_change_password) {
+			res.status(401).json({ error: 'User not found or token revoked', code: 'UNAUTHENTICATED' });
 			return;
 		}
 	} catch (err) {

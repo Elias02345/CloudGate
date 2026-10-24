@@ -79,6 +79,16 @@ aiRouter.post('/settings', async (req, res) => {
 		res.status(400).json({ error: 'Invalid payload', code: 'BAD_REQUEST', details: parsed.error.flatten() });
 		return;
 	}
+	if (parsed.data.base_url !== undefined && !parsed.data.api_key) {
+		const before = await getLlmSettings();
+		if ((parsed.data.base_url ?? null) !== (before.base_url ?? null)) {
+			res.status(400).json({
+				error: 'Enter the API key again when changing the base URL.',
+				code: 'BAD_REQUEST',
+			});
+			return;
+		}
+	}
 	const updated = await updateLlmSettings(parsed.data);
 	record({
 		user_id: req.user.id,
@@ -101,8 +111,18 @@ aiRouter.post('/settings/test', async (req, res) => {
 	const current = await getLlmSettings();
 	const provider = parsed.data.provider ?? current.provider;
 	const model = parsed.data.model ?? current.model ?? 'claude-sonnet-4-6';
-	const apiKey = parsed.data.api_key ?? (await getLlmApiKey());
 	const baseUrl = parsed.data.base_url !== undefined ? parsed.data.base_url : current.base_url;
+	// The stored key must never travel to a URL the caller just made up — that
+	// would turn this endpoint into a key-exfiltration oracle. A different
+	// base_url needs its own key in the request.
+	if (!parsed.data.api_key && (baseUrl ?? null) !== (current.base_url ?? null)) {
+		res.status(400).json({
+			error: 'Enter the API key again when changing the base URL.',
+			code: 'BAD_REQUEST',
+		});
+		return;
+	}
+	const apiKey = parsed.data.api_key ?? (await getLlmApiKey());
 	if (!provider || !apiKey) {
 		res.status(400).json({ error: 'Provider + API key required', code: 'BAD_REQUEST' });
 		return;

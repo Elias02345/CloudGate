@@ -1,6 +1,6 @@
 {
   "name": "@cloudgate/backend",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "main": "./dist/index.js",
@@ -51,6 +51,6 @@
     "@types/tar": "^6.1.13",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.12"
   }
 }

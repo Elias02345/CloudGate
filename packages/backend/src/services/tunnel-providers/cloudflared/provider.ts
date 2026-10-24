@@ -16,6 +16,7 @@ import { getDb } from '../../../db/db.js';
 import { childLogger } from '../../../logger.js';
 import { decryptJson } from '../../crypto.js';
 import type { HostBinding, ProviderStatus, TunnelProvider } from '../types.js';
+import { resolveCloudflaredBin } from './binary.js';
 import { buildContext, writeConfig } from './config-writer.js';
 import { getCloudflaredNetworkSettings } from './network-settings.js';
 import { CloudflaredProcess, metricsAddrFor } from './process.js';
@@ -92,6 +93,7 @@ export class CloudflaredProvider implements TunnelProvider {
 				id: row.tunnel_id,
 				tunnelUuid: row.tunnel_id,
 				configPath: dataPath('cloudflared', 'config.yml'),
+				binPath: await resolveCloudflaredBin(),
 				// Each tunnel binds its own metrics port so multi-tunnel
 				// installs don't collide on 127.0.0.1:36500.
 				metricsAddr: metricsAddrFor(tunnelDbId),

@@ -92,7 +92,7 @@ function safeJson(s: string | null | undefined): unknown {
 	}
 }
 
-async function ownsHost(userId: number, hostId: number): Promise<HostRow | null> {
+export async function ownsHost(userId: number, hostId: number): Promise<HostRow | null> {
 	const knex = getDb();
 	// A host belongs to the user if:
 	//   - its tunnel goes through a cloudflare_accounts row owned by user, OR
