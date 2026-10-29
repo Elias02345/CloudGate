@@ -6,8 +6,9 @@
  *     whether to auto-start (after onboarding, when tour_completed_at is null
  *     and tour_dismissed is false).
  *   - Also auto-starts when URL contains `?tour=auto` or `?tour=replay`.
- *   - Cross-page navigation: each TourStop knows its `route`; `goTo` navigates
- *     and only resumes the spotlight once the target is rendered.
+ *   - Cross-page navigation: each TourStop knows its `route`; the step's
+ *     `before` hook navigates there and waits until the target is rendered.
+ *     A target that never appears is skipped by Joyride, in either direction.
  *   - Phones: stops whose target is hidden there use `mobileTarget`.
  *   - Persistence: skip → tour_dismissed = true, finish → tour_completed_at.
  *
@@ -19,7 +20,7 @@ import { useComputedColorScheme } from '@mantine/core';
 import { useMediaQuery } from '@mantine/hooks';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import Joyride, { ACTIONS, EVENTS, STATUS, type CallBackProps, type Step } from 'react-joyride';
+import { ACTIONS, EVENTS, type EventData, Joyride, STATUS, type Step } from 'react-joyride';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMe, usePatchUserFlags } from '../api/auth.js';
 import { MOBILE_QUERY } from '../layout.js';
@@ -46,7 +47,11 @@ function targetOf(stop: TourStop, mobile: boolean): string {
 	return mobile && stop.mobileTarget ? stop.mobileTarget : stop.target;
 }
 
-/** Resolves once `selector` matches a rendered, non-empty element — or after `timeoutMs` (Joyride then reports TARGET_NOT_FOUND). */
+/**
+ * Resolves once `selector` matches a rendered, non-empty element — or after
+ * `timeoutMs` (Joyride then reports TARGET_NOT_FOUND). Kept below Joyride's
+ * 5s `beforeTimeout`, which would otherwise abort the step.
+ */
 function waitForTarget(selector: string, timeoutMs = 4000): Promise<void> {
 	return new Promise((resolve) => {
 		const t0 = Date.now();
@@ -74,64 +79,56 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 	const cloudy = useCloudy();
 
 	const [running, setRunning] = useState(false);
-	const [stepIndex, setStepIndex] = useState(0);
+	// Remounts Joyride so every start begins at the first stop
+	const [runId, setRunId] = useState(0);
 	const autoStartedRef = useRef(false);
-	// Read from async step transitions: current path, and a token that cancels stale ones
+	// Set once the tour ended, so the several end events only persist once
+	const endedRef = useRef(false);
+	// Read from the steps' async `before` hooks, which must not change identity mid-tour
 	const pathRef = useRef(location.pathname);
 	pathRef.current = location.pathname;
-	const goToken = useRef(0);
+	const navigateRef = useRef(navigate);
+	navigateRef.current = navigate;
+	const cloudyRef = useRef(cloudy);
+	cloudyRef.current = cloudy;
 
 	// Build the Joyride step array from TOUR_STOPS + i18n. Re-runs on language
 	// change because `t` updates.
 	const steps: Step[] = useMemo(
 		() =>
-			TOUR_STOPS.map((stop) => ({
-				target: targetOf(stop, isMobile),
-				placement: isMobile ? 'auto' : stop.placement,
-				disableBeacon: true,
-				title: t(`${stop.i18nKey}_title`),
-				content: t(
-					isMobile && i18n.exists(`${stop.i18nKey}_body_mobile`)
-						? `${stop.i18nKey}_body_mobile`
-						: `${stop.i18nKey}_body`
-				),
-			})),
+			TOUR_STOPS.map((stop) => {
+				const selector = targetOf(stop, isMobile);
+				return {
+					target: selector,
+					placement: isMobile ? 'auto' : stop.placement,
+					title: t(`${stop.i18nKey}_title`),
+					content: t(
+						isMobile && i18n.exists(`${stop.i18nKey}_body_mobile`)
+							? `${stop.i18nKey}_body_mobile`
+							: `${stop.i18nKey}_body`
+					),
+					// Joyride holds the step until this resolves. A fixed delay used to
+					// race page mount + data fetch, so stops were silently skipped.
+					before: async () => {
+						// Escape closes the step and Joyride moves on before the tour stops
+						if (endedRef.current) return;
+						if (pathRef.current !== stop.route) navigateRef.current(stop.route);
+						await waitForTarget(selector);
+						// Cloudy hosts the tour: he walks along and stands next to each stop
+						void cloudyRef.current.walkTo(selector, { pose: 'point' });
+					},
+				};
+			}),
 		[t, i18n, isMobile]
 	);
 
-	/**
-	 * Show step `index`: navigate to its page if needed and resume the tour only
-	 * once the target exists. A fixed delay used to race page mount + data fetch,
-	 * so Joyride hit TARGET_NOT_FOUND and silently skipped stops.
-	 */
-	const goTo = useCallback(
-		(index: number) => {
-			const stop = TOUR_STOPS[index];
-			if (!stop) return;
-			const token = ++goToken.current;
-			const selector = targetOf(stop, window.matchMedia(MOBILE_QUERY).matches);
-			setStepIndex(index);
-			if (pathRef.current === stop.route && document.querySelector(selector)) {
-				setRunning(true);
-				void cloudy.walkTo(selector, { pose: 'point' });
-				return;
-			}
-			setRunning(false);
-			if (pathRef.current !== stop.route) navigate(stop.route);
-			void waitForTarget(selector).then(() => {
-				if (goToken.current !== token) return;
-				setRunning(true);
-				// Cloudy hosts the tour: he walks along and stands next to each stop
-				void cloudy.walkTo(selector, { pose: 'point' });
-			});
-		},
-		[navigate, cloudy]
-	);
-
-	const start = useCallback(() => goTo(0), [goTo]);
+	const start = useCallback(() => {
+		endedRef.current = false;
+		setRunId((n) => n + 1);
+		setRunning(true);
+	}, []);
 
 	const stop = useCallback(() => {
-		goToken.current++;
 		setRunning(false);
 		void cloudy.goHome();
 	}, [cloudy]);
@@ -157,34 +154,26 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 		}
 	}, [me, searchParams, setSearchParams, start]);
 
-	const onCallback = useCallback(
-		(data: CallBackProps) => {
-			const { action, index, status, type } = data;
+	const onEvent = useCallback(
+		(data: EventData) => {
+			const { action, status, type } = data;
+			if (endedRef.current) return;
 
-			// Tour finished or user clicked Skip / closed
+			// Last stop done (Joyride also finishes when the remaining targets are missing)
 			if (status === STATUS.FINISHED) {
+				endedRef.current = true;
 				stop();
 				void patchFlags.mutateAsync({ tour_completed_at: new Date().toISOString() });
 				return;
 			}
-			if (status === STATUS.SKIPPED || action === ACTIONS.CLOSE) {
+			// Skip button, the X (closeButtonAction 'skip') or Escape
+			if (status === STATUS.SKIPPED || (type === EVENTS.STEP_AFTER && action === ACTIONS.CLOSE)) {
+				endedRef.current = true;
 				stop();
 				void patchFlags.mutateAsync({ tour_dismissed: true });
-				return;
-			}
-
-			// Step finished (or its target never appeared) — move on, navigating if needed
-			if (type === EVENTS.STEP_AFTER || type === EVENTS.TARGET_NOT_FOUND) {
-				const nextIndex = action === ACTIONS.PREV ? index - 1 : index + 1;
-				if (nextIndex >= TOUR_STOPS.length) {
-					stop();
-					void patchFlags.mutateAsync({ tour_completed_at: new Date().toISOString() });
-					return;
-				}
-				if (nextIndex >= 0) goTo(nextIndex);
 			}
 		},
-		[goTo, stop, patchFlags]
+		[stop, patchFlags]
 	);
 
 	// Joyride's overlay sits at 10000 — lift Cloudy above it while he hosts the tour
@@ -208,26 +197,30 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 		<AppTourContext.Provider value={ctx}>
 			{children}
 			<Joyride
+				key={runId}
 				steps={steps}
 				run={running}
-				stepIndex={stepIndex}
 				continuous
-				showProgress
-				showSkipButton
-				disableOverlayClose
 				scrollToFirstStep
-				scrollOffset={isMobile ? 76 : 96}
-				callback={onCallback}
+				onEvent={onEvent}
+				options={{
+					showProgress: true,
+					skipBeacon: true,
+					buttons: ['back', 'close', 'primary', 'skip'],
+					// The X ends the tour (v3's default would advance a step)
+					closeButtonAction: 'skip',
+					overlayClickAction: false,
+					scrollOffset: isMobile ? 76 : 96,
+					primaryColor: '#ff7030',
+					zIndex: 10000,
+					width: isMobile ? 'calc(100vw - 32px)' : 380,
+					arrowColor: surface,
+					backgroundColor: surface,
+					textColor: text,
+					overlayColor: 'rgba(0, 0, 0, 0.55)',
+					spotlightRadius: 8,
+				}}
 				styles={{
-					options: {
-						primaryColor: '#ff7030',
-						zIndex: 10000,
-						width: isMobile ? 'calc(100vw - 32px)' : 380,
-						arrowColor: surface,
-						backgroundColor: surface,
-						textColor: text,
-						overlayColor: 'rgba(0, 0, 0, 0.55)',
-					},
 					tooltip: {
 						borderRadius: 8,
 						padding: 16,
@@ -251,7 +244,7 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 					tooltipFooter: {
 						marginTop: 12,
 					},
-					buttonNext: {
+					buttonPrimary: {
 						borderRadius: 8,
 						backgroundColor: 'var(--mantine-primary-color-filled)',
 						boxShadow: 'var(--cg-shadow-surface)',
@@ -276,9 +269,6 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 					buttonClose: {
 						color: dimmed,
 					},
-					spotlight: {
-						borderRadius: 8,
-					},
 				}}
 				locale={{
 					back: t('tour.back'),
@@ -286,7 +276,7 @@ export function AppTourProvider({ children }: { children: React.ReactNode }) {
 					last: t('tour.last'),
 					next: t('tour.next'),
 					// Replaces `next` while showProgress is on — untranslated, it showed English buttons
-					nextLabelWithProgress: t('tour.next_progress', { defaultValue: t('tour.next') }),
+					nextWithProgress: t('tour.next_progress', { defaultValue: t('tour.next') }),
 					skip: t('tour.skip'),
 				}}
 			/>

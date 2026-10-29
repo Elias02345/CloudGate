@@ -5,7 +5,54 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 
 ## [Unreleased]
 
-_Nothing yet._
+### Fixed
+
+- "Verify DNS" reported a missing record for every working tunnel host
+  (#104). It asked public DNS for a CNAME, but tunnel records are proxied,
+  and Cloudflare flattens a proxied CNAME to its own A/AAAA addresses. The
+  check now asks for the address and reads the real CNAME target from the
+  Cloudflare API, so a record pointing at the wrong tunnel is still caught.
+  The same check runs after each deploy, so the false "didn't see a CNAME"
+  warning disappears there too.
+- Bulk import could fail on some hosts with `ENOENT ... rename
+  '/data/cloudflared/config.yml.<pid>.tmp'` (#105). Concurrent deploys wrote
+  the cloudflared config through one shared temp file, so all but the first
+  rename failed; a render that read the hosts earlier could also land last
+  and leave hosts out. Config rebuilds now run one at a time with unique temp
+  names (nginx host configs too). Hosts hit by this before only need a
+  re-deploy.
+- Store installations (TrueNAS, Unraid, Umbrel, ZimaOS) shipped an outdated
+  cloudflared (#103). These run with in-app updates disabled and use the
+  cloudflared in the image, which was 2026.9.1. Bumped to 2026.10.5; update
+  the app in your store to get it.
+
+### Security
+
+- `zod` 4.6.7 (was 3.25.76, GHSA-mrhx-c7xc-m3w5, high: memory exhaustion on
+  oversized input). Replaces Dependabot PR #102, whose build failed.
+- `node-forge` 1.4.2 via override (GHSA-86w9-cpqp-85rv, high: RSA signature
+  verification, pulled in by `acme-client`).
+- `qs` 6.16.1+ via override (GHSA-6pq8-jhm2-2vcw, moderate: DoS).
+- `i18next-http-backend` 4.0.6 (GHSA-3cmx-xjww-583x, low).
+- cloudflared 2026.10.5, SHA256 checked against Cloudflare's release notes.
+- CI and the Docker build now install strictly from the lockfile, so a build
+  can no longer pull dependency versions nobody reviewed.
+- New `Security` workflow: weekly and on every PR it fails on high or
+  critical advisories, and weekly it flags a cloudflared pin that is behind
+  the latest release. Dependabot now also proposes regular version updates
+  for npm, GitHub Actions and the Docker base images.
+- `react-joyride` 3.2.0 (was 2.9.3). Drops the unpatched `deepmerge`
+  (GHSA-gcqx-w48m-w2h4, low) and supports React 19 officially. `pnpm audit`
+  now reports no known vulnerabilities.
+
+### Changed
+
+- The guided tour runs on react-joyride 3. Each stop now navigates to its
+  page and waits for its target itself, so stops are no longer skipped while
+  a page is still loading. Looks and texts are unchanged; Escape, the close
+  button and "Skip" still end the tour.
+- `pnpm dev` works again: the dev server's dependency pre-bundling now uses
+  the same `es2022` target as the production build.
 
 ---
 

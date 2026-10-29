@@ -280,7 +280,7 @@
     "close": "Close",
     "last": "Finish",
     "next": "Next",
-    "next_progress": "Next ({step} of {steps})",
+    "next_progress": "Next ({current} of {total})",
     "skip": "Skip tour",
     "stop_1_title": "Welcome to CloudGate",
     "stop_1_body": "Quick guided tour — about a minute. We'll walk through every page and show you what's where. Press Skip any time to dismiss.",
