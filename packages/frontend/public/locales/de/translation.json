@@ -280,7 +280,7 @@
     "close": "Schließen",
     "last": "Fertig",
     "next": "Weiter",
-    "next_progress": "Weiter ({step} von {steps})",
+    "next_progress": "Weiter ({current} von {total})",
     "skip": "Tour überspringen",
     "stop_1_title": "Willkommen bei CloudGate",
     "stop_1_body": "Kurzer geführter Rundgang — circa eine Minute. Wir gehen jede Seite durch und zeigen dir, was wo liegt. 'Überspringen' bricht jederzeit ab.",

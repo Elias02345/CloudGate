@@ -8,6 +8,7 @@
  * not http/https. Non-HTTP hosts route through a different provider entirely.
  */
 
+import { randomBytes } from 'node:crypto';
 import { rename, writeFile } from 'node:fs/promises';
 import { Liquid } from 'liquidjs';
 import { dataPath } from '../../../config.js';
@@ -168,16 +169,42 @@ export async function renderConfig(ctx: RenderContext): Promise<string> {
 	return engine.parseAndRender(CONFIG_TEMPLATE, ctx);
 }
 
-/** Atomic write — temp + rename. Returns the path written. */
-export async function writeConfig(ctx: RenderContext): Promise<string> {
+/** Runs `fn` after every earlier call on the same queue has settled. */
+function serialized<A extends unknown[], R>(fn: (...args: A) => Promise<R>): (...args: A) => Promise<R> {
+	let tail: Promise<unknown> = Promise.resolve();
+	return (...args) => {
+		const run = tail.then(() => fn(...args));
+		tail = run.catch(() => undefined);
+		return run;
+	};
+}
+
+/**
+ * Atomic write — temp + rename, one write at a time. Returns the path
+ * written. Serialized because concurrent renames onto one target fail
+ * (EPERM on Windows, and they did with ENOENT via a shared temp name, #105).
+ */
+export const writeConfig = serialized(async (ctx: RenderContext): Promise<string> => {
 	const outPath = dataPath('cloudflared', 'config.yml');
-	const tmpPath = `${outPath}.${process.pid}.tmp`;
+	// Unique per write: concurrent writes sharing one temp name raced, and
+	// the loser's rename failed with ENOENT (#105).
+	const tmpPath = `${outPath}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
 	const yaml = await renderConfig(ctx);
 	await writeFile(tmpPath, yaml, { encoding: 'utf8', mode: 0o600 });
 	await rename(tmpPath, outPath);
 	log.info({ outPath, hosts: ctx.hosts.length }, 'Wrote cloudflared config');
 	return outPath;
-}
+});
+
+/**
+ * Build the context from the DB and write it, one call at a time. A bulk
+ * import deploys many hosts at once; unserialized, a render that read the
+ * DB earlier could land last and drop hosts added in between (#105).
+ */
+export const rebuildConfig = serialized(
+	async (tunnelRow: Parameters<typeof buildContext>[0]): Promise<string> =>
+		writeConfig(await buildContext(tunnelRow))
+);
 
 /**
  * Read the currently-rendered config.yml from disk. Used by the UI's

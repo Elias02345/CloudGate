@@ -7,6 +7,11 @@ export default defineConfig({
 	define: {
 		__APP_VERSION__: JSON.stringify(pkg.version),
 	},
+	// Same reason as build.target below: the dev server's dependency
+	// pre-bundling otherwise fails on every destructuring in node_modules.
+	optimizeDeps: {
+		esbuildOptions: { target: 'es2022' },
+	},
 	server: {
 		port: 5173,
 		proxy: {

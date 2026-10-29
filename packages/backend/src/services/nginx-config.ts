@@ -11,6 +11,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { rename, unlink, writeFile } from 'node:fs/promises';
 import type { ForwardedHeaderMode } from '@cloudgate/shared';
@@ -233,7 +234,7 @@ async function nginxReload(): Promise<void> {
  */
 export async function writeHostConfig(host: RenderHost): Promise<void> {
 	const outPath = dataPath('nginx', 'hosts', `${host.id}.conf`);
-	const tmpPath = `${outPath}.${process.pid}.tmp`;
+	const tmpPath = `${outPath}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
 
 	// Snapshot existing (for rollback)
 	let previous: string | null = null;
