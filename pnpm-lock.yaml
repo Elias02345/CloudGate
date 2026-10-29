@@ -72,8 +72,8 @@ importers:
         specifier: ^10.30.0
         version: 10.30.0
       objection:
-        specifier: ^3.1.5
-        version: 3.1.5(knex@3.2.10(better-sqlite3@11.10.0))
+        specifier: ^4.4.0
+        version: 4.4.0(knex@3.2.10(better-sqlite3@11.10.0))(typescript@5.9.3)
       openai:
         specifier: ^4.77.0
         version: 4.104.0(zod@4.6.7)
@@ -1015,8 +1015,8 @@ packages:
     resolution: {integrity: sha512-kja8j7PjmncONqaTsB8fQ+wE2mSU2DJ9D4XKoJ5PFWIdRMa6SLSN1ff4mOr4jCbfRSsxR4keIiySJU0N9T5hIQ==}
     engines: {node: '>= 8.0.0'}
 
-  ajv-formats@2.1.1:
-    resolution: {integrity: sha512-Wx0Kx52hxE7C18hkMEggYlEifqWZtYaRgouJor+WMdPnQyEK13vgEWyVNup7SoeeoLMsr4kf5h6dOW11I15MUA==}
+  ajv-formats@3.0.1:
+    resolution: {integrity: sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ==}
     peerDependencies:
       ajv: ^8.0.0
     peerDependenciesMeta:
@@ -1212,9 +1212,6 @@ packages:
 
   date-fns@4.1.0:
     resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
-
-  db-errors@0.2.3:
-    resolution: {integrity: sha512-OOgqgDuCavHXjYSJoV2yGhv6SeG8nk42aoCSoyXLZUH7VwFG27rxbavU1z+VrZbZjphw5UkDQwUlD21MwZpUng==}
 
   debug@2.6.9:
     resolution: {integrity: sha512-bC7ElrdJaJnPbAP+1EotYvqZsb3ecl5wi6Bfi6BJTUcNowp6cvspg0jXznRTKDjm/E7AdgFBVeAPVMNcKGsHMA==}
@@ -1922,11 +1919,15 @@ packages:
     resolution: {integrity: sha512-W67iLl4J2EXEGTbfeHCffrjDfitvLANg0UlX3wFUUSTx92KXRFegMHUVgSqE+wvhAbi4WqjGg9czysTV2Epbew==}
     engines: {node: '>= 0.4'}
 
-  objection@3.1.5:
-    resolution: {integrity: sha512-Hx/ipAwXSuRBbOMWFKtRsAN0yITafqXtWB4OT4Z9wED7ty1h7bOnBdhLtcNus23GwLJqcMsRWdodL2p5GwlnfQ==}
-    engines: {node: '>=14.0.0'}
+  objection@4.4.0:
+    resolution: {integrity: sha512-zViVS8la34lvdtkpktatKyTdu0AqQkRSvmWMR02sbhmK0vU3mdUYtWUx40fGwBfvxp0JdyJcZN3pkKrGhdKtAg==}
+    engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
-      knex: '>=1.0.1'
+      knex: ^3.3.0
+      typescript: '>=5.8'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   obug@2.2.1:
     resolution: {integrity: sha512-XrsrhT5sybtKI6wakr2SPOlGZWWYbUXZ7a0jT8/QOeAPau+1X/bSegNe5YR75oJmEZQbKningirmGOEJCIk61Q==}
@@ -3491,7 +3492,7 @@ snapshots:
     dependencies:
       humanize-ms: 1.2.1
 
-  ajv-formats@2.1.1(ajv@8.20.0):
+  ajv-formats@3.0.1(ajv@8.20.0):
     optionalDependencies:
       ajv: 8.20.0
 
@@ -3693,8 +3694,6 @@ snapshots:
   csstype@3.2.3: {}
 
   date-fns@4.1.0: {}
-
-  db-errors@0.2.3: {}
 
   debug@2.6.9:
     dependencies:
@@ -4541,12 +4540,13 @@ snapshots:
 
   object-inspect@1.13.4: {}
 
-  objection@3.1.5(knex@3.2.10(better-sqlite3@11.10.0)):
+  objection@4.4.0(knex@3.2.10(better-sqlite3@11.10.0))(typescript@5.9.3):
     dependencies:
       ajv: 8.20.0
-      ajv-formats: 2.1.1(ajv@8.20.0)
-      db-errors: 0.2.3
+      ajv-formats: 3.0.1(ajv@8.20.0)
       knex: 3.2.10(better-sqlite3@11.10.0)
+    optionalDependencies:
+      typescript: 5.9.3
 
   obug@2.2.1: {}
 
