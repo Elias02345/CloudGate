@@ -152,4 +152,38 @@ describe('tunnel-config-writer', () => {
 		const content = readFileSync(join(dir, 'config.yml'), 'utf8');
 		expect(content).toContain('tunnel: wtest');
 	});
+
+	// #105: a bulk import of 16 hosts wrote config.yml concurrently through
+	// one shared temp name; every rename after the first failed with ENOENT.
+	it('survives concurrent writes (bulk import)', async () => {
+		const { writeConfig } = await import('../src/services/tunnel-config-writer.js');
+		const writes = Array.from({ length: 16 }, (_, i) =>
+			writeConfig({
+				tunnel_id: `bulk-${i}`,
+				credentials_path: '/p/c.json',
+				metrics_addr: '127.0.0.1:36500',
+				protocol: 'auto',
+				edge_ip_version: '4',
+				hosts: [],
+			})
+		);
+		await expect(Promise.all(writes)).resolves.toHaveLength(16);
+		const files = readdirSync(join(tmpDir, 'cloudflared'));
+		expect(files.some((f) => f.endsWith('.tmp'))).toBe(false);
+	});
+
+	it('rebuildConfig runs one rebuild at a time', async () => {
+		const { rebuildConfig } = await import('../src/services/tunnel-providers/cloudflared/config-writer.js');
+		const { getDb } = await import('../src/db/db.js');
+		const [tunnelId] = await getDb()('tunnels').insert({
+			name: 'bulk-test',
+			provider: 'cloudflared',
+			tunnel_id: 'bulk-uuid',
+			created_at: new Date().toISOString(),
+		});
+		const row = { id: Number(tunnelId), tunnel_id: 'bulk-uuid', credentials_path: '/p/c.json' };
+		await expect(Promise.all(Array.from({ length: 16 }, () => rebuildConfig(row)))).resolves.toHaveLength(16);
+		const content = readFileSync(join(tmpDir, 'cloudflared', 'config.yml'), 'utf8');
+		expect(content).toContain('tunnel: bulk-uuid');
+	});
 });

@@ -17,7 +17,7 @@ import { childLogger } from '../../../logger.js';
 import { decryptJson } from '../../crypto.js';
 import type { HostBinding, ProviderStatus, TunnelProvider } from '../types.js';
 import { resolveCloudflaredBin } from './binary.js';
-import { buildContext, writeConfig } from './config-writer.js';
+import { rebuildConfig } from './config-writer.js';
 import { getCloudflaredNetworkSettings } from './network-settings.js';
 import { CloudflaredProcess, metricsAddrFor } from './process.js';
 
@@ -74,12 +74,11 @@ export class CloudflaredProvider implements TunnelProvider {
 		}
 
 		try {
-			const ctx = await buildContext({
+			await rebuildConfig({
 				id: row.id,
 				tunnel_id: row.tunnel_id,
 				credentials_path: credsPath,
 			});
-			await writeConfig(ctx);
 		} catch (err) {
 			const message = (err as Error).message;
 			log.warn({ tunnelDbId, err: message }, 'cloudflared config render failed');
@@ -135,12 +134,11 @@ export class CloudflaredProvider implements TunnelProvider {
 		const knex = getDb();
 		const row = await knex<TunnelRow>('tunnels').where({ id: tunnelDbId }).first();
 		if (!row) throw new Error(`tunnel ${tunnelDbId} not found`);
-		const ctx = await buildContext({
+		await rebuildConfig({
 			id: row.id,
 			tunnel_id: row.tunnel_id,
 			credentials_path: row.credentials_path ?? '',
 		});
-		await writeConfig(ctx);
 
 		const proc = this.processes.get(tunnelDbId);
 		if (proc) proc.reload();

@@ -20,10 +20,11 @@ import { decryptCredentials } from './cf-account.js';
 import {
 	CloudflareApiError,
 	deleteDnsRecord,
+	findDnsRecordsByName,
 	upsertCnameRecord,
 	upsertSrvRecord,
 } from './cloudflare-client.js';
-import { verifyDns } from './dns-verify.js';
+import { type ZoneRecord, verifyDns } from './dns-verify.js';
 import { publish } from './events.js';
 import { removeHostConfig, writeHostConfig } from './nginx-config.js';
 import { getProvider } from './tunnel-providers/index.js';
@@ -239,6 +240,22 @@ async function loadZoneToken(cfZoneId: number): Promise<{ token: string; zone_id
 	return { token: creds.token, zone_id: zoneRow.zone_id };
 }
 
+/**
+ * Record lookup for DNS verification: reads what Cloudflare holds for the
+ * hostname, since a proxied CNAME is invisible in public DNS. Undefined
+ * when the host has no zone attached.
+ */
+export function zoneRecordLookup(
+	cfZoneId: number | null,
+	hostname: string
+): (() => Promise<ZoneRecord[]>) | undefined {
+	if (!cfZoneId) return undefined;
+	return async () => {
+		const { token, zone_id } = await loadZoneToken(cfZoneId);
+		return findDnsRecordsByName(token, zone_id, hostname);
+	};
+}
+
 async function persistDnsRecordId(hostId: number, recordId: string): Promise<void> {
 	const knex = getDb();
 	await knex('proxy_hosts').where({ id: hostId }).update({ dns_record_id: recordId });
@@ -304,7 +321,11 @@ async function deployLocalNginx(hostId: number, host: HostRow): Promise<void> {
 
 async function verifyDnsAndProbe(hostId: number, host: HostRow, expectedCnameTarget: string): Promise<void> {
 	const knex = getDb();
-	const dnsResult = await verifyDns(host.hostname, expectedCnameTarget, { attempts: 6, intervalMs: 2000 });
+	const dnsResult = await verifyDns(host.hostname, expectedCnameTarget, {
+		attempts: 6,
+		intervalMs: 2000,
+		lookupRecords: zoneRecordLookup(host.cf_zone_id, host.hostname),
+	});
 	log.info({ hostId, hostname: host.hostname, dns: dnsResult.kind }, 'DNS verification done');
 
 	if (dnsResult.kind !== 'ok') {
@@ -369,9 +390,9 @@ function formatDnsWarning(
 ): string {
 	switch (result.kind) {
 		case 'nxdomain':
-			return `⚠ DNS: Cloudflare's resolver (1.1.1.1) returned NXDOMAIN for ${hostname}. The CNAME was NOT created — check the host's status and re-deploy.`;
+			return `⚠ DNS: Cloudflare's resolver (1.1.1.1) returned NXDOMAIN for ${hostname}. The record was NOT created — check the host's status and re-deploy.`;
 		case 'no_record':
-			return `ℹ DNS: 1.1.1.1 didn't see a CNAME for ${hostname} during the 12s post-deploy check. This is usually a stale negative cache on the resolver, not a real failure — if your hostname loads in the browser, you can ignore this. Click "Verify DNS" to re-check.`;
+			return `ℹ DNS: 1.1.1.1 didn't see a DNS record for ${hostname} during the 12s post-deploy check. This is usually a stale negative cache on the resolver, not a real failure — if your hostname loads in the browser, you can ignore this. Click "Verify DNS" to re-check.`;
 		case 'wrong_target':
 			return `⚠ DNS: ${hostname} resolves to "${result.got}" but should point to "${expectedSuffix}". Another DNS record (probably from before) is taking precedence — delete it in your Cloudflare dashboard.`;
 		case 'timeout':

@@ -1,5 +1,5 @@
 /**
- * DNS verification — confirms a hostname's CNAME has actually propagated
+ * DNS verification — confirms a hostname's tunnel record has actually propagated
  * to Cloudflare's public resolvers.
  *
  * Why this exists:
@@ -28,12 +28,19 @@ import { childLogger } from '../logger.js';
 const log = childLogger('dns-verify');
 
 export type DnsVerifyOutcome =
-	| { kind: 'ok'; cname: string; ttl: number; latency_ms: number }
+	| { kind: 'ok'; cname: string; ttl: number; latency_ms: number; proxied: boolean }
 	| { kind: 'wrong_target'; expected: string; got: string }
 	| { kind: 'no_record'; message: string }
 	| { kind: 'nxdomain'; message: string }
 	| { kind: 'timeout'; message: string }
 	| { kind: 'error'; message: string };
+
+/** A record as Cloudflare's API reports it for the verified hostname. */
+export interface ZoneRecord {
+	type: string;
+	content: string;
+	proxied: boolean;
+}
 
 interface DohAnswer {
 	name: string;
@@ -55,15 +62,19 @@ interface DohResponse {
 }
 
 const CF_DOH = 'https://cloudflare-dns.com/dns-query';
+const TYPE_A = 1;
 const TYPE_CNAME = 5;
+const TYPE_AAAA = 28;
 const NXDOMAIN_RCODE = 3;
 
 /**
- * Single DoH query against 1.1.1.1 for the CNAME record. Returns the
- * answer chain — we expect [hostname → tunnel-uuid.cfargotunnel.com].
+ * Single DoH query against 1.1.1.1 for the hostname's A record. Asking for
+ * A (not CNAME) matters: a proxied CNAME — which every tunnel hostname is —
+ * is flattened by Cloudflare and only ever answers with edge A/AAAA
+ * addresses. An unproxied CNAME still shows up as a CNAME in the chain.
  */
 async function dohQuery(hostname: string, timeoutMs = 4000): Promise<DohResponse | null> {
-	const url = `${CF_DOH}?name=${encodeURIComponent(hostname)}&type=CNAME`;
+	const url = `${CF_DOH}?name=${encodeURIComponent(hostname)}&type=A`;
 	const ctrl = new AbortController();
 	const timer = setTimeout(() => ctrl.abort(), timeoutMs);
 	try {
@@ -80,20 +91,33 @@ async function dohQuery(hostname: string, timeoutMs = 4000): Promise<DohResponse
 	}
 }
 
+function clean(name: string): string {
+	return name.replace(/\.$/, '').toLowerCase();
+}
+
 /**
- * Verify a single hostname resolves to the expected CNAME target. Polls
- * up to `attempts` times with 2s gap if the record isn't there yet —
- * lets the create call's propagation catch up. Returns the FIRST
- * outcome that isn't a "still propagating" state.
+ * Verify a single hostname is published and points at the expected tunnel.
+ * Polls up to `attempts` times with a gap if the record isn't there yet —
+ * lets the create call's propagation catch up. Returns the FIRST outcome
+ * that isn't a "still propagating" state.
+ *
+ * Public DNS proves the name resolves. For a proxied record it cannot show
+ * the CNAME target, so `lookupRecords` (Cloudflare's API) supplies it.
+ * Without a lookup, a resolving proxied name counts as verified.
  */
 export async function verifyDns(
 	hostname: string,
 	expectedCnameSuffix: string,
-	options: { attempts?: number; intervalMs?: number } = {}
+	options: {
+		attempts?: number;
+		intervalMs?: number;
+		lookupRecords?: () => Promise<ZoneRecord[]>;
+	} = {}
 ): Promise<DnsVerifyOutcome> {
 	const attempts = options.attempts ?? 6;
 	const intervalMs = options.intervalMs ?? 2000;
 	const start = Date.now();
+	const cleanExpected = clean(expectedCnameSuffix);
 
 	for (let i = 0; i < attempts; i++) {
 		const resp = await dohQuery(hostname);
@@ -115,38 +139,71 @@ export async function verifyDns(
 			};
 		}
 
-		const answers = (resp.Answer ?? []).filter((a) => a.type === TYPE_CNAME);
-		if (answers.length === 0) {
-			// Record might still be propagating, or wrong type. Retry.
+		const answers = resp.Answer ?? [];
+		const cnames = answers.filter((a) => a.type === TYPE_CNAME);
+		const addresses = answers.filter((a) => a.type === TYPE_A || a.type === TYPE_AAAA);
+
+		if (cnames.length === 0 && addresses.length === 0) {
+			// Record might still be propagating. Retry.
 			if (i < attempts - 1) {
 				await sleep(intervalMs);
 				continue;
 			}
 			return {
 				kind: 'no_record',
-				message: `No CNAME found for ${hostname} after ${(attempts * intervalMs) / 1000}s. The record may still be propagating, or the create call silently failed.`,
+				message: `No DNS record found for ${hostname} after ${(attempts * intervalMs) / 1000}s. The record may still be propagating, or the create call silently failed.`,
 			};
 		}
 
-		const target = answers[answers.length - 1]?.data ?? '';
-		const cleanTarget = target.replace(/\.$/, '').toLowerCase();
-		const cleanExpected = expectedCnameSuffix.replace(/\.$/, '').toLowerCase();
-
-		if (!cleanTarget.endsWith(cleanExpected)) {
+		// Unproxied CNAME: the chain is visible, check it directly.
+		if (cnames.length > 0) {
+			const match = cnames.find((a) => clean(a.data).endsWith(cleanExpected));
+			if (!match) {
+				return { kind: 'wrong_target', expected: cleanExpected, got: clean(cnames[0]?.data ?? '') };
+			}
+			log.info({ hostname, target: clean(match.data), attempts: i + 1 }, 'DNS verified');
 			return {
-				kind: 'wrong_target',
-				expected: cleanExpected,
-				got: cleanTarget,
+				kind: 'ok',
+				cname: clean(match.data),
+				ttl: match.TTL,
+				latency_ms: Date.now() - start,
+				proxied: false,
 			};
 		}
 
-		const ttl = answers[answers.length - 1]?.TTL ?? 0;
-		log.info({ hostname, target: cleanTarget, ttl, attempts: i + 1 }, 'DNS verified');
-		return {
+		// Proxied (flattened) record: public DNS only shows edge addresses.
+		const ttl = addresses[0]?.TTL ?? 0;
+		const resolvesOk = (): DnsVerifyOutcome => ({
 			kind: 'ok',
-			cname: cleanTarget,
+			cname: clean(addresses[0]?.data ?? ''),
 			ttl,
 			latency_ms: Date.now() - start,
+			proxied: true,
+		});
+		if (!options.lookupRecords) {
+			log.info({ hostname, attempts: i + 1 }, 'DNS verified (proxied, target not checked)');
+			return resolvesOk();
+		}
+		let records: ZoneRecord[];
+		try {
+			records = await options.lookupRecords();
+		} catch (err) {
+			// The name resolves; we just can't read the target. Don't fail.
+			log.warn({ hostname, err: (err as Error).message }, 'DNS record lookup failed — trusting public DNS');
+			return resolvesOk();
+		}
+		const cname = records.find((r) => r.type.toUpperCase() === 'CNAME');
+		if (cname && clean(cname.content).endsWith(cleanExpected)) {
+			log.info({ hostname, target: clean(cname.content), attempts: i + 1 }, 'DNS verified (proxied)');
+			return { kind: 'ok', cname: clean(cname.content), ttl, latency_ms: Date.now() - start, proxied: true };
+		}
+		const other = cname ?? records[0];
+		return {
+			kind: 'wrong_target',
+			expected: cleanExpected,
+			got: other
+				? `${other.type} ${clean(other.content)}`
+				: `no record for ${hostname} in the zone (a wildcard record may be answering)`,
 		};
 	}
 

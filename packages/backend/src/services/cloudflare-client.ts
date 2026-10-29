@@ -240,6 +240,29 @@ export async function upsertSrvRecord(
 	}
 }
 
+/**
+ * Look up the DNS records Cloudflare holds for an exact hostname. Used by
+ * DNS verification: a proxied CNAME is flattened to A/AAAA in public DNS,
+ * so the API is the only place the real CNAME target is visible.
+ */
+export async function findDnsRecordsByName(
+	token: string,
+	zoneId: string,
+	hostname: string
+): Promise<Array<{ type: string; content: string; proxied: boolean }>> {
+	const cf = clientFor(token);
+	try {
+		const page = await cf.dns.records.list({ zone_id: zoneId, name: { exact: hostname } });
+		return page.result.map((r) => ({
+			type: String(r.type ?? ''),
+			content: String(r.content ?? ''),
+			proxied: Boolean((r as { proxied?: boolean }).proxied),
+		}));
+	} catch (err) {
+		throw mapError(err, 'dns record lookup');
+	}
+}
+
 /** Best-effort DNS record delete — swallows 404, propagates real failures. */
 export async function deleteDnsRecord(token: string, zoneId: string, recordId: string): Promise<void> {
 	const cf = clientFor(token);

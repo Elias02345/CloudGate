@@ -124,7 +124,7 @@ export interface DnsVerifyResponse {
 	hostname: string;
 	expected: string;
 	result:
-		| { kind: 'ok'; cname: string; ttl: number; latency_ms: number }
+		| { kind: 'ok'; cname: string; ttl: number; latency_ms: number; proxied: boolean }
 		| { kind: 'wrong_target'; expected: string; got: string }
 		| { kind: 'no_record'; message: string }
 		| { kind: 'nxdomain'; message: string }

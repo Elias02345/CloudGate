@@ -26,7 +26,7 @@ import { audit } from '../middleware/audit.js';
 import { requireAuth, requirePasswordSet } from '../middleware/auth.js';
 import { verifyDns } from '../services/dns-verify.js';
 import { publish } from '../services/events.js';
-import { deployHost, undeployHost } from '../services/host-deploy.js';
+import { deployHost, undeployHost, zoneRecordLookup } from '../services/host-deploy.js';
 import { checkHostPlacement } from '../services/host-placement.js';
 import { probeUpstream } from '../services/upstream-probe.js';
 
@@ -270,7 +270,7 @@ const UpdateHostSchema = z.object({
 		})
 		.optional(),
 	advanced_options: HostAdvancedOptionsSchema.optional(),
-	headers: z.record(z.string()).optional(),
+	headers: z.record(z.string(), z.string()).optional(),
 });
 
 hostsRouter.put(
@@ -509,8 +509,9 @@ hostsRouter.post('/:id/redeploy', requireAuth, requirePasswordSet, async (req, r
 });
 
 // ---------------------------------------------------------------------------
-// GET /:id/verify-dns — query 1.1.1.1 DoH to confirm the CNAME has
-// propagated. Used by the UI to show a clear DNS status badge.
+// GET /:id/verify-dns — query 1.1.1.1 DoH to confirm the record has
+// propagated, and Cloudflare's API for the target of a proxied CNAME
+// (flattened to A/AAAA in public DNS). Used by the UI for a DNS badge.
 // ---------------------------------------------------------------------------
 hostsRouter.get('/:id/verify-dns', requireAuth, requirePasswordSet, async (req, res) => {
 	if (!req.user) {
@@ -542,7 +543,11 @@ hostsRouter.get('/:id/verify-dns', requireAuth, requirePasswordSet, async (req, 
 	}
 	const expected = `${tunnelRow.tunnel_id}.cfargotunnel.com`;
 	// Fast probe — single attempt, no retry; manual button click should be snappy
-	const result = await verifyDns(row.hostname, expected, { attempts: 1, intervalMs: 0 });
+	const result = await verifyDns(row.hostname, expected, {
+		attempts: 1,
+		intervalMs: 0,
+		lookupRecords: zoneRecordLookup(row.cf_zone_id, row.hostname),
+	});
 	res.json({ hostname: row.hostname, expected, result });
 });
 
