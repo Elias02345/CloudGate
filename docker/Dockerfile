@@ -12,7 +12,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: builder
 # -----------------------------------------------------------------------------
-FROM node:22-bookworm-slim AS builder
+FROM node:25-bookworm-slim AS builder
 
 WORKDIR /build
 
