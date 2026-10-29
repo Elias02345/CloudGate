@@ -22,7 +22,7 @@
     "acme-client": "^5.4.0",
     "argon2": "^0.41.1",
     "better-sqlite3": "^11.7.0",
-    "cloudflare": "^4.0.0",
+    "cloudflare": "^7.3.0",
     "compression": "^1.8.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
