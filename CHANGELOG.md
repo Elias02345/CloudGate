@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the 
 
 ## [Unreleased]
 
+_Nothing yet._
+
+---
+
+## [0.9.1] — 2026-10-29
+
 ### Fixed
 
 - "Verify DNS" reported a missing record for every working tunnel host
