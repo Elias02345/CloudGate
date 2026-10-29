@@ -177,8 +177,10 @@ export const ProxyHostSchema = z.object({
 			no_tls_verify: z.boolean().default(false),
 			origin_cert: z.string().optional(),
 		})
-		.default({}),
-	advanced_options: HostAdvancedOptionsSchema.default({}),
+		// prefault (not default): the {} must run through the inner
+		// schema so field defaults apply — zod 4's default() skips parsing.
+		.prefault({}),
+	advanced_options: HostAdvancedOptionsSchema.prefault({}),
 	headers: z.record(z.string(), z.string()).default({}),
 	meta: z.record(z.string(), z.unknown()).default({}),
 	last_deployed_at: z.string().datetime().nullable(),
@@ -214,8 +216,8 @@ export const CreateProxyHostRequestSchema = z.object({
 		.object({
 			no_tls_verify: z.boolean().default(false),
 		})
-		.default({}),
-	advanced_options: HostAdvancedOptionsSchema.default({}),
+		.prefault({}),
+	advanced_options: HostAdvancedOptionsSchema.prefault({}),
 	headers: z.record(z.string(), z.string()).default({}),
 });
 export type CreateProxyHostRequest = z.infer<typeof CreateProxyHostRequestSchema>;

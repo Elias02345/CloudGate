@@ -33,7 +33,7 @@ COPY packages/frontend/package.json ./packages/frontend/
 COPY packages/recovery-ui/package.json ./packages/recovery-ui/
 
 RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile=false
+    pnpm install --frozen-lockfile
 
 COPY packages/ ./packages/
 
@@ -50,7 +50,7 @@ FROM debian:bookworm-slim AS runtime
 
 
 ARG S6_OVERLAY_VERSION=3.2.0.0
-ARG CLOUDFLARED_VERSION=2026.9.1
+ARG CLOUDFLARED_VERSION=2026.10.5
 ARG TARGETARCH
 
 # Install runtime deps
@@ -98,14 +98,14 @@ RUN set -eux; \
 # fetch-and-compare here; the hash was obtained by downloading each arch's .deb
 # and hashing it directly:
 #   curl -fsSL -o cloudflared-linux-amd64.deb \
-#     https://github.com/cloudflare/cloudflared/releases/download/2026.9.1/cloudflared-linux-amd64.deb
+#     https://github.com/cloudflare/cloudflared/releases/download/2026.10.5/cloudflared-linux-amd64.deb
 #   sha256sum cloudflared-linux-amd64.deb
 # (repeated for cloudflared-linux-arm64.deb). Re-derive and update both hashes
 # whenever CLOUDFLARED_VERSION is bumped.
 RUN set -eux; \
     case "$TARGETARCH" in \
-      amd64) cf_arch="amd64"; cf_sha256="3be76adc4185d36a0bfb4c2dd8663292f0ed363797f2180333b513b43c81d419" ;; \
-      arm64) cf_arch="arm64"; cf_sha256="2a870d5bf6ea74d16c0923b804eabbf4943f1fd7c63a5c20fd41cc66b629c725" ;; \
+      amd64) cf_arch="amd64"; cf_sha256="149d1ec4ac8e58bdbf08a41cc42347da9184d9fb4ef0df6528d75c90a85ac0ed" ;; \
+      arm64) cf_arch="arm64"; cf_sha256="361584f9c6a1af6f9c553011291494b72fb6c887841ce6735dc6df8b6e727e72" ;; \
       *) echo "Unsupported arch $TARGETARCH"; exit 1 ;; \
     esac; \
     curl -fsSL -o /tmp/cloudflared.deb \

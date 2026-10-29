@@ -28,7 +28,7 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       # Build first — pnpm -r runs in topological order, so shared/dist
       # exists before backend/frontend typecheck against it.

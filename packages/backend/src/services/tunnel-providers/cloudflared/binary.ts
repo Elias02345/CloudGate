@@ -18,10 +18,10 @@ const log = childLogger('cloudflared-binary');
 
 /** Must be bumped together with ARG CLOUDFLARED_VERSION in docker/Dockerfile. */
 export const CLOUDFLARED_PINNED = {
-	version: '2026.9.1',
+	version: '2026.10.5',
 	sha256: {
-		amd64: '03f1f25d1cc93b9ad6c60569d44060bc4f17ed97075760ed8cfca4b12dcd68cc',
-		arm64: '3d97437c71848bd8df68041e12436b484a661d95073ea1937f01a845ce88faa3',
+		amd64: 'e1bc0cf084fd9e590554fe769a86b1db46701c3f847a43d902f7b974a4e16298',
+		arm64: '72e0d05a67e09da87cf495e409a28c3cc5994dd23fc66a982eebea6a55923b7d',
 	},
 };
 

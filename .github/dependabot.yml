@@ -1,0 +1,28 @@
+# Version updates. Security updates are separate and arrive as soon as an
+# advisory is published; these keep the rest from drifting so a security
+# bump never has to jump several majors at once.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Base images only. cloudflared and s6-overlay are pinned by version and
+  # SHA256 in the Dockerfile; the security workflow flags a stale cloudflared.
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: weekly

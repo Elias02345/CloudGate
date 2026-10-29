@@ -1,0 +1,59 @@
+name: Security
+
+on:
+  schedule:
+    - cron: "0 5 * * 1" # Mondays 05:00 UTC
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Fails on any high or critical advisory in the locked dependency tree.
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+        with:
+          version: 9.15.0
+          run_install: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+
+      - name: Audit dependencies
+        run: pnpm audit --audit-level high
+
+  # Store installations (TrueNAS, Unraid, ...) run with in-app updates
+  # disabled, so the cloudflared they get is the one baked into the image.
+  # A stale pin means every such user sees Cloudflare's "newer release
+  # available" warning (issue #103). Fails until the pin is bumped.
+  cloudflared-pin:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Compare pinned cloudflared with the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          pinned=$(sed -n 's/^ARG CLOUDFLARED_VERSION=//p' docker/Dockerfile)
+          code=$(grep -oP "version: '\K[0-9.]+(?=')" packages/backend/src/services/tunnel-providers/cloudflared/binary.ts)
+          latest=$(gh release view -R cloudflare/cloudflared --json tagName --jq .tagName)
+          echo "Dockerfile: $pinned  binary.ts: $code  latest: $latest"
+          if [ "$pinned" != "$code" ]; then
+            echo "::error::Dockerfile ($pinned) and binary.ts ($code) pin different cloudflared versions"
+            exit 1
+          fi
+          if [ "$pinned" != "$latest" ]; then
+            echo "::error::cloudflared $latest is out (pinned: $pinned). Bump CLOUDFLARED_VERSION in docker/Dockerfile and CLOUDFLARED_PINNED in binary.ts, with fresh SHA256s."
+            exit 1
+          fi
